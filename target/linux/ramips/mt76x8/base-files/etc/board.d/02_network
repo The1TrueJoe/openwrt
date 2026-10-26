@@ -24,6 +24,7 @@ ramips_setup_interfaces()
 	onion,omega2|\
 	qding,qc202|\
 	rakwireless,rak7268cv2|\
+	rakwireless,rak7289cv2|\
 	ravpower,rp-wd009|\
 	tama,w06|\
 	tplink,re200-v2|\
