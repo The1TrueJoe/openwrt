@@ -165,6 +165,23 @@ endef
 $(eval $(call KernelPackage,leds-apu))
 
 
+define KernelPackage/leds-aw2013
+  SUBMENU:=$(LEDS_MENU)
+  TITLE:=Awinic AW2013 LED support
+  DEPENDS:=+kmod-i2c-core +kmod-regmap-i2c
+  KCONFIG:=CONFIG_LEDS_AW2013
+  FILES:=$(LINUX_DIR)/drivers/leds/leds-aw2013.ko
+  AUTOLOAD:=$(call AutoProbe,leds-aw2013,1)
+endef
+
+define KernelPackage/leds-aw2013/description
+  This option enables support for the Awinic AW2013, a three-channel
+  LED driver with hardware breathing, controlled over I2C.
+endef
+
+$(eval $(call KernelPackage,leds-aw2013))
+
+
 define KernelPackage/leds-ktd202x
   SUBMENU:=LED modules
   TITLE:=LED support for KTD202x Chips
