@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+#include "mt7628an_rakwireless_rak636.dtsi"
+
+/ {
+	compatible = "rakwireless,rak7268cv2", "mediatek,mt7628an-soc";
+	model = "RAKwireless RAK7268CV2";
+
+	gpio-export {
+		compatible = "gpio-export";
+
+		/* Quectel EG95 reset: pulse high, the vendor firmware for 1 s. */
+		modem-reset {
+			gpio-export,name = "modem-reset";
+			gpio-export,output = <0>;
+			gpios = <&gpio 42 GPIO_ACTIVE_HIGH>;
+		};
+	};
+};
+
+&spi0 {
+	pinctrl-0 = <&spi_pins>, <&spi_cs1_pins>;
+
+	/*
+	 * SX1302 LoRa concentrator, driven from userspace by Semtech's HAL;
+	 * spidev binds "semtech,sx1301". Its reset is GPIO 11.
+	 */
+	lora@1 {
+		compatible = "semtech,sx1301";
+		reg = <1>;
+		spi-max-frequency = <40000000>;
+	};
+};
+
+&i2c {
+	status = "okay";
+
+	/* The RGB status light on the top of the case. */
+	led-controller@45 {
+		compatible = "awinic,aw2013";
+		reg = <0x45>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		led@0 {
+			reg = <0>;
+			color = <LED_COLOR_ID_RED>;
+			function = LED_FUNCTION_STATUS;
+			led-max-microamp = <15000>;
+		};
+
+		led@1 {
+			reg = <1>;
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_STATUS;
+			led-max-microamp = <15000>;
+		};
+
+		led@2 {
+			reg = <2>;
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
+			led-max-microamp = <15000>;
+		};
+	};
+};
