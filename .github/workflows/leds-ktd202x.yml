@@ -1,0 +1,187 @@
+name: leds-ktd202x upstream checks
+
+# Builds and checks the ET6326/KTD202x LED series in ci/leds-ktd202x/patches
+# on top of linux-next, the way the kernel test robot and the maintainers
+# would look at it.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/leds-ktd202x.yml'
+      - 'ci/leds-ktd202x/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TAG: next-20261026
+  NEXT_URL: https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+  OBJ: drivers/leds/rgb/leds-ktd202x.o
+
+jobs:
+  build:
+    name: build ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: x86_64 gcc W=1 sparse
+            arch: x86_64
+            make: W=1 C=1
+          - name: x86_64 clang W=1
+            arch: x86_64
+            make: W=1 LLVM=1
+          - name: i386 gcc W=1 (32 bit)
+            arch: i386
+            make: W=1
+          - name: mips 32 bit gcc W=1
+            arch: mips
+            cross: mips-linux-gnu-
+            defconfig: malta_defconfig
+            make: W=1
+          - name: arm64 gcc W=1
+            arch: arm64
+            cross: aarch64-linux-gnu-
+            make: W=1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ci-src
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bc bison flex libssl-dev libelf-dev \
+            sparse clang lld llvm gcc-multilib \
+            gcc-aarch64-linux-gnu gcc-mips-linux-gnu
+
+      - name: Fetch linux-next and apply the series
+        run: |
+          git clone -q --depth 1 --branch "$NEXT_TAG" "$NEXT_URL" linux
+          cd linux
+          git config user.name ci
+          git config user.email ci@example.invalid
+          git am -q ../ci-src/ci/leds-ktd202x/patches/*.patch
+          git log --oneline -12
+
+      - name: Configure
+        working-directory: linux
+        run: |
+          m="ARCH=${{ matrix.arch }} ${{ matrix.cross && format('CROSS_COMPILE={0}', matrix.cross) || '' }} ${{ matrix.make }}"
+          echo "MAKEARGS=$m" >> "$GITHUB_ENV"
+          make $m ${{ matrix.defconfig || 'defconfig' }} >/dev/null
+          scripts/config -e I2C -e NEW_LEDS -e LEDS_CLASS \
+            -e LEDS_CLASS_MULTICOLOR -e LEDS_TRIGGERS \
+            -m LEDS_TRIGGER_PATTERN -m LEDS_TRIGGER_TIMER -m LEDS_KTD202X
+          make $m olddefconfig >/dev/null
+          grep -E 'CONFIG_(LEDS_KTD202X|LEDS_CLASS_MULTICOLOR|OF)=' .config || true
+          make $m -j"$(nproc)" prepare >/dev/null
+
+      - name: Build every commit (bisectability, warnings)
+        working-directory: linux
+        run: |
+          fail=0
+          for c in $(git rev-list --reverse HEAD~11..HEAD); do
+            git checkout -q "$c"
+            subj=$(git log -1 --format=%s)
+            rm -f "$OBJ"
+            if ! make $MAKEARGS -j"$(nproc)" "$OBJ" > build.log 2>&1; then
+              echo "::error::build failed at: $subj"; cat build.log; fail=1; continue
+            fi
+            if grep -E 'leds-ktd202x\.c.*(warning|error)' build.log; then
+              echo "::error::warnings at: $subj"; fail=1
+            else
+              echo "ok: $subj"
+            fi
+          done
+          git checkout -q -
+          exit $fail
+
+      - name: No 64 bit division helpers in the object
+        working-directory: linux
+        run: |
+          nm -u "$OBJ" | tee undefined.txt
+          if grep -E '__(u?divdi3|u?moddi3)|__aeabi_uldivmod' undefined.txt; then
+            echo "::error::open-coded 64 bit division"; exit 1
+          fi
+
+  checks:
+    name: checkpatch, dt_binding_check, docs, coccicheck
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ci-src
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bc bison flex libssl-dev libelf-dev \
+            coccinelle python3-venv yamllint swig libyaml-dev
+          python3 -m venv ~/venv
+          ~/venv/bin/pip install -q dtschema yamllint
+          echo "$HOME/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch linux-next and apply the series
+        run: |
+          git clone -q --depth 1 --branch "$NEXT_TAG" "$NEXT_URL" linux
+          cd linux
+          git config user.name ci
+          git config user.email ci@example.invalid
+          git am -q ../ci-src/ci/leds-ktd202x/patches/*.patch
+
+      - name: checkpatch --strict with the tree
+        working-directory: linux
+        run: |
+          # The Fixes: commit predates this shallow clone; it was checked
+          # by hand: 0ebdb7210943 ("leds: Add ktd202x driver"). The
+          # MAINTAINERS reminder on the new doc file is answered by the
+          # last patch of the series.
+          scripts/checkpatch.pl --strict --ignore UNKNOWN_COMMIT_ID,FILE_PATH_CHANGES \
+            --summary-file --show-types ../ci-src/ci/leds-ktd202x/patches/*.patch
+
+      - name: dt_binding_check
+        working-directory: linux
+        run: |
+          make dt_binding_check DT_SCHEMA_FILES=leds/kinetic,ktd202x.yaml 2>&1 | tee dt.log
+          if grep -E 'kinetic,ktd202x.*(error|warning)' dt.log; then exit 1; fi
+
+      - name: coccicheck
+        working-directory: linux
+        run: |
+          make defconfig >/dev/null
+          make coccicheck MODE=report M=drivers/leds/rgb 2>&1 | tee cocci.log
+          if grep -E 'leds-ktd202x\.c:[0-9]+' cocci.log; then exit 1; fi
+
+      - name: Docs build for Documentation/leds
+        working-directory: linux
+        run: |
+          ~/venv/bin/pip install -q -r Documentation/sphinx/requirements.txt
+          make SPHINXDIRS=leds htmldocs 2>&1 | tee docs.log
+          if grep -E 'leds-ktd202x\.rst.*(WARNING|ERROR)' docs.log; then exit 1; fi
+
+  harness:
+    name: harness with ASan and UBSan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ci-src
+
+      - name: Fetch linux-next and apply the series
+        run: |
+          git clone -q --depth 1 --branch "$NEXT_TAG" "$NEXT_URL" linux
+          cd linux
+          git config user.name ci
+          git config user.email ci@example.invalid
+          git am -q ../ci-src/ci/leds-ktd202x/patches/*.patch
+
+      - name: Run the simulated-chip harness
+        run: |
+          h=ci-src/ci/leds-ktd202x/harness
+          clang -std=gnu11 -g -O1 -fsanitize=address,undefined \
+            -fno-sanitize-recover=all -Wno-everything \
+            -I"$h/inc" -Ilinux/drivers/leds/rgb -o harness "$h/test.c"
+          ./harness

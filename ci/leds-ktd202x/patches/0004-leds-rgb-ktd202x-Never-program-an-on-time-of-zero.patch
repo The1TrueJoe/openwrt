@@ -1,0 +1,40 @@
+From 9c8cd2021deb69f5cbc8ac4835d2dc6e64506f22 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Mon, 26 Oct 2026 21:25:12 -0400
+Subject: [PATCH 04/11] leds: rgb: ktd202x: Never program an on time of zero
+
+blink_set() turns delay_on into a fraction of the period in 1/256 steps.
+When delay_on is less than 1/256 of the period, for example 1 ms on and
+1000 ms off, that fraction is 0: the LED stays dark, while the timer
+trigger reports that it is blinking with delay_on = 0.
+
+Use the shortest on time the hardware has, 1/256 of the period, and
+report it back.
+
+Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ drivers/leds/rgb/leds-ktd202x.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
+index 482af28..8c890ea 100644
+--- a/drivers/leds/rgb/leds-ktd202x.c
++++ b/drivers/leds/rgb/leds-ktd202x.c
+@@ -304,8 +304,12 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+ 				  (delay_total_ms - KTD202X_FLASH_PERIOD_MIN_MS) /
+ 				  KTD202X_FLASH_PERIOD_STEP_MS);
+ 
+-	/* Integer representation of percentage of LED ON time */
++	/*
++	 * Integer representation of percentage of LED ON time. A value of 0
++	 * keeps the LED dark, so use the shortest on time instead.
++	 */
+ 	on = (*delay_on * KTD202X_FLASH_ON_MAX) / (*delay_on + *delay_off);
++	on = max(on, 1);
+ 
+ 	/* Actually used delay_{on,off} values */
+ 	delay_total_ms = num_steps * KTD202X_FLASH_PERIOD_STEP_MS + KTD202X_FLASH_PERIOD_MIN_MS;
+-- 
+2.50.1 (Apple Git-155)
+

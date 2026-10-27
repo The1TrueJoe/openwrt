@@ -1,0 +1,37 @@
+From e89edb1870ebb76df445607d4ad2a1efe05da4f0 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 00:06:15 -0400
+Subject: [PATCH 11/11] MAINTAINERS: Add an entry for the KTD202x LED driver
+
+The driver had no entry of its own, so get_maintainer.pl only found the
+LED subsystem maintainers. List the original author and the author of
+the ET6326 and hardware pattern support.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index fcff128..66be068 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -14971,6 +14971,15 @@ F:	Documentation/admin-guide/auxdisplay/ks0108.rst
+ F:	drivers/auxdisplay/ks0108.c
+ F:	include/linux/ks0108.h
+ 
++KTD202X LED DRIVER
++M:	André Apitzsch <git@apitzsch.eu>
++M:	Joseph Telaak <joseph@telaak.dev>
++L:	linux-leds@vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/leds/kinetic,ktd202x.yaml
++F:	Documentation/leds/leds-ktd202x.rst
++F:	drivers/leds/rgb/leds-ktd202x.c
++
+ KTD253 BACKLIGHT DRIVER
+ M:	Linus Walleij <linusw@kernel.org>
+ S:	Maintained
+-- 
+2.50.1 (Apple Git-155)
+
