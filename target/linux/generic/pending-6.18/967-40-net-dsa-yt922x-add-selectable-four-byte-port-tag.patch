@@ -171,17 +171,17 @@ Signed-off-by: Shi Jiayang <shi05275@163.com>
  #define DSA_TAG_PROTO_YT921X_VALUE		32
  #define DSA_TAG_PROTO_YT922X_VALUE		33
 +#define DSA_TAG_PROTO_YT922X_4B_VALUE		34
+ #define DSA_TAG_PROTO_MXL_GSW1XX_VALUE		35
  
  enum dsa_tag_protocol {
- 	DSA_TAG_PROTO_NONE		= DSA_TAG_PROTO_NONE_VALUE,
-@@ -95,6 +96,7 @@ enum dsa_tag_protocol {
+@@ -96,6 +97,7 @@ enum dsa_tag_protocol {
  	DSA_TAG_PROTO_MXL862_8021Q	= DSA_TAG_PROTO_MXL862_8021Q_VALUE,
  	DSA_TAG_PROTO_YT921X		= DSA_TAG_PROTO_YT921X_VALUE,
  	DSA_TAG_PROTO_YT922X		= DSA_TAG_PROTO_YT922X_VALUE,
 +	DSA_TAG_PROTO_YT922X_4B		= DSA_TAG_PROTO_YT922X_4B_VALUE,
+ 	DSA_TAG_PROTO_MXL_GSW1XX	= DSA_TAG_PROTO_MXL_GSW1XX_VALUE,
  };
  
- struct dsa_switch;
 --- a/net/dsa/tag_yt922x.c
 +++ b/net/dsa/tag_yt922x.c
 @@ -7,6 +7,7 @@

@@ -71,7 +71,7 @@ Signed-off-by: Paolo Abeni <pabeni@redhat.com>
  
 --- a/include/net/dsa.h
 +++ b/include/net/dsa.h
-@@ -214,12 +214,6 @@ struct dsa_mall_mirror_tc_entry {
+@@ -216,12 +216,6 @@ struct dsa_mall_mirror_tc_entry {
  	bool ingress;
  };
  
@@ -84,7 +84,7 @@ Signed-off-by: Paolo Abeni <pabeni@redhat.com>
  /* TC matchall entry */
  struct dsa_mall_tc_entry {
  	struct list_head list;
-@@ -227,7 +221,7 @@ struct dsa_mall_tc_entry {
+@@ -229,7 +223,7 @@ struct dsa_mall_tc_entry {
  	enum dsa_port_mall_action_type type;
  	union {
  		struct dsa_mall_mirror_tc_entry mirror;
@@ -93,7 +93,7 @@ Signed-off-by: Paolo Abeni <pabeni@redhat.com>
  	};
  };
  
-@@ -1124,7 +1118,7 @@ struct dsa_switch_ops {
+@@ -1126,7 +1120,7 @@ struct dsa_switch_ops {
  	void	(*port_mirror_del)(struct dsa_switch *ds, int port,
  				   struct dsa_mall_mirror_tc_entry *mirror);
  	int	(*port_policer_add)(struct dsa_switch *ds, int port,
