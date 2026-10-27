@@ -45,6 +45,7 @@ static int sfgmac_set_delay_from_nvmem(struct sf19a2890_gmac_priv *priv)
 	struct nvmem_cell *cell;
 	const void *data;
 	size_t retlen;
+	char delay_str[SFGMAC_DELAY_STR_LEN + 1];
 	u16 gmac_delay;
 	u8 delay_tx, delay_rx;
 
@@ -63,7 +64,11 @@ static int sfgmac_set_delay_from_nvmem(struct sf19a2890_gmac_priv *priv)
 		goto exit;
 	}
 
-	ret = kstrtou16(data, 16, &gmac_delay);
+	/* The cell holds no terminating NUL; kstrtou16() needs one. */
+	memcpy(delay_str, data, SFGMAC_DELAY_STR_LEN);
+	delay_str[SFGMAC_DELAY_STR_LEN] = '\0';
+
+	ret = kstrtou16(delay_str, 16, &gmac_delay);
 	if (ret == 0) {
 		delay_tx = (gmac_delay >> 8) & 0xff;
 		delay_rx = gmac_delay & 0xff;
