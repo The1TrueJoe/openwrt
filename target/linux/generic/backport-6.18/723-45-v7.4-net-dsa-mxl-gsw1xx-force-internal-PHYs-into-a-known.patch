@@ -1,0 +1,142 @@
+From 82e2c7db0830d67d335ed4d1174fb2a9a2becb34 Mon Sep 17 00:00:00 2001
+From: Alexander Sverdlin <alexander.sverdlin@siemens.com>
+Date: Tue, 29 Sep 2026 14:51:41 +0200
+Subject: [PATCH] net: dsa: mxl-gsw1xx: force internal PHYs into a known reset
+ state
+
+When bootstrapped with PS_NOWAIT = 0 the internal PHYs stay held in
+reset, so the driver only worked with PS_NOWAIT = 1 where they are
+released automatically.
+
+Add a ->setup() hook, run before the MDIO bus is registered so PHY IDs
+are readable during the bus scan, that programs the RST_REQ PHY reset
+lines: release the PHYs of used ports and hold all other internal PHYs
+in reset. Driving both directions yields the same state regardless of
+the PS_NOWAIT bootstrap and keeps unused PHYs from staying powered.
+
+A single 300ms settle delay is applied only when at least one PHY is
+released.
+
+Signed-off-by: Alexander Sverdlin <alexander.sverdlin@siemens.com>
+Link: https://patch.msgid.link/20260929125143.2890583-1-alexander.sverdlin@siemens.com
+Signed-off-by: Jakub Kicinski <kuba@kernel.org>
+---
+ drivers/net/dsa/lantiq/lantiq_gswip.h        |  2 ++
+ drivers/net/dsa/lantiq/lantiq_gswip_common.c | 10 ++++++
+ drivers/net/dsa/lantiq/mxl-gsw1xx.c          | 35 ++++++++++++++++++++
+ drivers/net/dsa/lantiq/mxl-gsw1xx.h          |  2 ++
+ 4 files changed, 49 insertions(+)
+
+--- a/drivers/net/dsa/lantiq/lantiq_gswip.h
++++ b/drivers/net/dsa/lantiq/lantiq_gswip.h
+@@ -261,6 +261,8 @@ struct gswip_hw_info {
+ 	const struct gswip_pce_microcode (*pce_microcode)[];
+ 	size_t pce_microcode_size;
+ 	enum dsa_tag_protocol tag_protocol;
++
++	int (*setup)(struct dsa_switch *ds);
+ 	void (*phylink_get_caps)(struct dsa_switch *ds, int port,
+ 				 struct phylink_config *config);
+ 	struct phylink_pcs *(*mac_select_pcs)(struct phylink_config *config,
+--- a/drivers/net/dsa/lantiq/lantiq_gswip_common.c
++++ b/drivers/net/dsa/lantiq/lantiq_gswip_common.c
+@@ -689,6 +689,16 @@ static int gswip_setup(struct dsa_switch
+ 	 */
+ 	regmap_write(priv->mdio, GSWIP_MDIO_MDC_CFG0, 0x0);
+ 
++	/* GSW1xx will wake up the PHYs here, so it makes sense that it happens
++	 * after the auto-polling deactivation above, but before the MDIO bus
++	 * registration below
++	 */
++	if (priv->hw_info->setup) {
++		err = priv->hw_info->setup(ds);
++		if (err)
++			return err;
++	}
++
+ 	/* Configure the MDIO Clock 2.5 MHz */
+ 	regmap_write_bits(priv->mdio, GSWIP_MDIO_MDC_CFG1, 0xff, 0x09);
+ 
+--- a/drivers/net/dsa/lantiq/mxl-gsw1xx.c
++++ b/drivers/net/dsa/lantiq/mxl-gsw1xx.c
+@@ -589,6 +589,37 @@ static void gsw150_phylink_get_caps(stru
+ 	gsw1xx_phylink_get_lpi_caps(config);
+ }
+ 
++static int gsw1xx_setup(struct dsa_switch *ds)
++{
++	struct gsw1xx_priv *priv = container_of(ds->priv, struct gsw1xx_priv, gswip);
++	struct gswip_priv *gswip_priv = ds->priv;
++	u32 active_mask = 0;
++	u32 phy_mask = 0;
++	int port, ret;
++
++	for (port = 0; port < gswip_priv->hw_info->max_ports; port++) {
++		struct phylink_config cfg = {};
++
++		gswip_priv->hw_info->phylink_get_caps(ds, port, &cfg);
++		if (!test_bit(PHY_INTERFACE_MODE_INTERNAL, cfg.supported_interfaces))
++			break;
++
++		phy_mask |= GSW1XX_RST_REQ_PHY(port);
++
++		if (!dsa_is_unused_port(ds, port))
++			active_mask |= GSW1XX_RST_REQ_PHY(port);
++	}
++
++	ret = regmap_update_bits(priv->shell, GSW1XX_SHELL_RST_REQ, phy_mask, ~active_mask);
++	if (ret)
++		return ret;
++
++	if (active_mask)
++		msleep(300);
++
++	return 0;
++}
++
+ static struct phylink_pcs *gsw1xx_phylink_mac_select_pcs(struct phylink_config *config,
+ 							 phy_interface_t interface)
+ {
+@@ -830,6 +861,7 @@ static const struct gswip_hw_info gsw12x
+ 		[GSW1XX_MII_PORT] = GSWIP_MII_PCDU0,
+ 		[GSW1XX_MII_PORT + 1 ... GSWIP_MAX_PORTS - 1] = -1,
+ 	},
++	.setup			= gsw1xx_setup,
+ 	.mac_select_pcs		= gsw1xx_phylink_mac_select_pcs,
+ 	.phylink_get_caps	= &gsw1xx_phylink_get_caps,
+ 	.supports_2500m		= true,
+@@ -852,6 +884,7 @@ static const struct gswip_hw_info gsw140
+ 		[GSW1XX_MII_PORT] = GSWIP_MII_PCDU0,
+ 		[GSW1XX_MII_PORT + 1 ... GSWIP_MAX_PORTS - 1] = -1,
+ 	},
++	.setup			= gsw1xx_setup,
+ 	.mac_select_pcs		= gsw1xx_phylink_mac_select_pcs,
+ 	.phylink_get_caps	= &gsw1xx_phylink_get_caps,
+ 	.supports_2500m		= true,
+@@ -874,6 +907,7 @@ static const struct gswip_hw_info gsw141
+ 		[GSW1XX_MII_PORT] = GSWIP_MII_PCDU0,
+ 		[GSW1XX_MII_PORT + 1 ... GSWIP_MAX_PORTS - 1] = -1,
+ 	},
++	.setup			= gsw1xx_setup,
+ 	.mac_select_pcs		= gsw1xx_phylink_mac_select_pcs,
+ 	.phylink_get_caps	= gsw1xx_phylink_get_caps,
+ 	.port_setup		= gsw1xx_port_setup,
+@@ -895,6 +929,7 @@ static const struct gswip_hw_info gsw150
+ 		[5] = 1,
+ 		[6] = 11,
+ 	},
++	.setup			= gsw1xx_setup,
+ 	.phylink_get_caps	= gsw150_phylink_get_caps,
+ 	/* There is only a single RGMII_SLEW_CFG register in GSW150 and it is
+ 	 * unknown if RGMII slew configuration affects both RGMII ports
+--- a/drivers/net/dsa/lantiq/mxl-gsw1xx.h
++++ b/drivers/net/dsa/lantiq/mxl-gsw1xx.h
+@@ -110,6 +110,8 @@
+ #define GSW1XX_SHELL_BASE			0xfa00
+ #define  GSW1XX_SHELL_RST_REQ			0x01
+ #define   GSW1XX_RST_REQ_SGMII_SHELL		BIT(5)
++/* Valid only for internal-PHY ports (vary per switch type) */
++#define   GSW1XX_RST_REQ_PHY(p)			BIT(p)
+ #define  GSW1XX_SHELL_MANU_ID			0x10
+ #define   GSW1XX_SHELL_MANU_ID_PNUML		GENMASK(15, 12)
+ #define   GSW1XX_SHELL_MANU_ID_MANID		GENMASK(11, 1)

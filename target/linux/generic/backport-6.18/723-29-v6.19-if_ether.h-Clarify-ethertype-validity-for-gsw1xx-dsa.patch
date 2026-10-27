@@ -1,0 +1,36 @@
+From 6557cae0a2a1952645e5df50e1d6eb7267ea2131 Mon Sep 17 00:00:00 2001
+From: Peter Enderborg <peterend@axis.com>
+Date: Wed, 26 Nov 2025 14:54:06 +0100
+Subject: [PATCH] if_ether.h: Clarify ethertype validity for gsw1xx dsa
+
+This 0x88C3 is registered to Infineon Technologies Corporate Research ST
+and are used by MaxLinear.
+Infineon made a spin off called Lantiq.
+Lantiq was acquired by Intel
+MaxLinear acquired Intels Connected Home division.
+
+The product FAQ from MaxLinear describes it's history from the F24S.
+The driver for the gsw1xx is based on Lantiq showing it's similarities.
+
+Ref https://standards-oui.ieee.org/ethertype/eth.txt
+
+Signed-off-by: Peter Enderborg <Peter.Enderborg@axis.com>
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Jakub Kicinski <kuba@kernel.org>
+---
+ include/uapi/linux/if_ether.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+--- a/include/uapi/linux/if_ether.h
++++ b/include/uapi/linux/if_ether.h
+@@ -92,7 +92,9 @@
+ #define ETH_P_ETHERCAT	0x88A4		/* EtherCAT			*/
+ #define ETH_P_8021AD	0x88A8          /* 802.1ad Service VLAN		*/
+ #define ETH_P_802_EX1	0x88B5		/* 802.1 Local Experimental 1.  */
+-#define ETH_P_MXLGSW	0x88C3		/* MaxLinear GSW DSA [ NOT AN OFFICIALLY REGISTERED ID ] */
++#define ETH_P_MXLGSW	0x88C3		/* Infineon Technologies Corporate Research ST
++					 * Used by MaxLinear GSW DSA
++					 */
+ #define ETH_P_PREAUTH	0x88C7		/* 802.11 Preauthentication */
+ #define ETH_P_TIPC	0x88CA		/* TIPC 			*/
+ #define ETH_P_LLDP	0x88CC		/* Link Layer Discovery Protocol */
