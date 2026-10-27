@@ -1,0 +1,13 @@
+. /lib/functions/uci-defaults.sh
+
+board_config_update
+
+case "$(board_name)" in
+glinet,gl-sft1200)
+	ucidef_set_led_netdev "wan" "WAN" "white:wan-online" "wan"
+	;;
+esac
+
+board_config_flush
+
+exit 0
