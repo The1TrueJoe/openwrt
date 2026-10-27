@@ -1,4 +1,4 @@
-name: GL-SFT1200 images
+name: GL-SFT1200 debug modules
 
 # Test builds for the GL.iNet GL-SFT1200 (siflower/sf19a2890) series.
 # Not part of the series sent upstream.
@@ -6,7 +6,7 @@ name: GL-SFT1200 images
 on:
   push:
     branches:
-      - siflower-gl-sft1200-ci
+      - siflower-gl-sft1200-debug
   workflow_dispatch:
 
 permissions:
@@ -59,6 +59,13 @@ jobs:
         id: toolchain
         run: make -j$(nproc) tools/install toolchain/install || make -j1 V=s tools/install toolchain/install
 
+      - name: Debug-patch mxl-gsw1xx in the prepared kernel tree
+        run: |
+          make target/linux/prepare V=s > prepare.log 2>&1 || { tail -50 prepare.log; exit 1; }
+          src=$(ls build_dir/target-*/linux-siflower_sf19a2890/linux-6.18*/drivers/net/dsa/lantiq/mxl-gsw1xx.c)
+          python3 -I .github/gl-sft1200/debug/gsw1xx-dump-id.py "$src"
+          grep -n DEBUG "$src"
+
       - name: Build images
         id: build
         run: make -j$(nproc) || make -j1 V=s
@@ -82,72 +89,36 @@ jobs:
         if: always() && steps.build.outcome == 'success'
         run: bash .github/gl-sft1200/test-sysupgrade.sh . bin/targets/siflower/sf19a2890 | tee -a verify.txt
 
-      - name: Validate the DTB against Linux v7.3 bindings
-        if: always() && steps.build.outcome == 'success'
-        continue-on-error: true
-        run: |
-          pip install --user dtschema
-          git clone --depth 1 --branch v7.3 --filter=blob:none --sparse \
-            https://github.com/torvalds/linux.git linux-bindings
-          git -C linux-bindings sparse-checkout set Documentation/devicetree/bindings
-          dt-mk-schema -j linux-bindings/Documentation/devicetree/bindings > processed-schema.json
-          dtb=$(ls build_dir/target-*/linux-siflower_sf19a2890/image-sf19a2890_glinet_gl-sft1200.dtb)
-          dt-validate -s processed-schema.json "$dtb" 2>&1 | tee dt-validate.txt
-
       - name: Upload images
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: glinet_gl-sft1200-images
+          name: glinet_gl-sft1200-debug-images
           path: |
             bin/targets/siflower/sf19a2890/
             verify.txt
             dt-validate.txt
           if-no-files-found: warn
 
-      - name: Negative test, a kernel over the limit must not give images
+      - name: Collect the debug modules
         if: always() && steps.build.outcome == 'success'
         run: |
-          kdir=$(ls -d build_dir/target-*/linux-siflower_sf19a2890)
-          rm -f "$kdir"/glinet_gl-sft1200-* bin/targets/siflower/sf19a2890/*glinet_gl-sft1200*
-          make target/linux/install KERNEL_SIZE=1024k V=s > small-kernel.log 2>&1 || true
-          grep 'is too big' small-kernel.log
-          if ls bin/targets/siflower/sf19a2890/*glinet_gl-sft1200*squashfs* 2>/dev/null; then
-            echo "::error::images were produced with a kernel over KERNEL_SIZE"
-            exit 1
-          fi
-          echo "no factory or sysupgrade image produced, as expected"
+          mkdir debug-modules
+          k=$(ls -d build_dir/target-*/linux-siflower_sf19a2890/linux-6.18*)
+          cp "$k"/drivers/net/dsa/lantiq/*.ko "$k"/net/dsa/tag_mxl-gsw1xx.ko debug-modules/
+          for f in debug-modules/*.ko; do
+            echo "$f: $(strings "$f" | grep -m1 '^vermagic=')"
+          done | tee debug-modules/VERMAGIC
+          strings debug-modules/mxl-gsw1xx.ko | grep -c DEBUG
+          cp bin/targets/siflower/sf19a2890/*glinet_gl-sft1200-squashfs-sysupgrade.bin debug-modules/DEBUG-sysupgrade.bin
+          (cd debug-modules && sha256sum * | tee SHA256SUMS)
 
-      - name: Check kernel patches are refreshed
-        if: always()
-        run: |
-          make target/linux/refresh V=s
-          git status --porcelain
-          git diff > kernel-patch-refresh.diff
-          [ ! -s kernel-patch-refresh.diff ] || echo "::warning::kernel patches need a refresh, see the artifact"
-
-      - name: Upload refresh diff
-        if: always()
+      - name: Upload the debug modules
+        if: always() && steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-patch-refresh
-          path: kernel-patch-refresh.diff
-          if-no-files-found: ignore
-
-      - name: Kernel size experiments
-        if: always() && steps.toolchain.outcome == 'success'
-        timeout-minutes: 180
-        run: bash .github/gl-sft1200/kernel-size.sh
-
-      - name: Upload kernel size results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-size
-          path: |
-            kernel-size.txt
-            build-*.log
-          if-no-files-found: ignore
+          name: glinet_gl-sft1200-DEBUG-gsw1xx-modules
+          path: debug-modules/
 
       - name: Upload logs on failure
         if: failure()
