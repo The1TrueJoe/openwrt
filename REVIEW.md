@@ -41,6 +41,9 @@ OpenWrt image has run on it yet.
 | 20 | ET6326 LED controller at I2C 0x30 | U-Boot `i2c mw 0x30 ...` strings, stock DTB | yes (read); out of this series |
 | 21 | Series applies with no fuzz and is refresh-clean | `patch -F0` on the build host; `make target/linux/refresh` in CI run 40448141508 leaves an empty diff (generic + siflower); OpenWrt's kernel.yml on all 98 subtargets (run 40486566465): every kernel builds; 25 patches in 8 other targets needed hunk-header-only refreshes (MAINTAINERS and DSA context moved by the backport), now folded into the backport commit | yes (CI) |
 | 22 | GMAC fix and the newest backports are checkpatch clean | `checkpatch.pl --strict` from 6.18.55 | yes (host) |
+| 23 | First boot on hardware (52f3163837, via GL sysupgrade) | serial log: SPL, U-Boot, kernel, SPI NAND GD5F1GQ5 (c8:51), UBI attach, ubiblock root, overlay, procd, login shell; GMAC probes with the factory MAC. The switch did not probe: chip-ID read at SMI 0 fails (-ENODEV) | yes (unit) |
+| 24 | GSW150 reset is GPIO 0, active low | stock DT `esw-rst-gpio = <0>`; stock sgmac.ko `sf_trigger_eswitch_hwReset`: output high, low for 2 ms, high, then 100 ms. Without it the switch stays in reset. Now `reset-gpios` on the switch node | inferred; confirmation on the unit pending |
+| 25 | All-target kernel check on a1710648ff | kernel.yml run 40542009664: 383/383 jobs green | yes (CI) |
 
 ## Tests
 
@@ -131,9 +134,17 @@ Not testable without the unit:
     interAptiv has 16 KiB L1 I-caches, where -Os rarely loses speed. Moving
     stmmac and DSA to modules is measured as a further option.
 16. **"The target is source-only."** Unchanged here; a call for the maintainers.
+17. **"`reset-gpios` is not in lantiq,gswip.yaml."** mdio.yaml defines it for
+    every MDIO child and the MDIO core handles it, but the switch schema has
+    `unevaluatedProperties: false`, so dt-validate flags it. Linux needs a
+    one-line binding patch allowing `reset-gpios` for the GSW1xx parts. The MDIO
+    core reads no `reset-deassert-us` for non-PHY devices; here the driver is a
+    module that probes seconds after the bus deasserts the reset, but a
+    built-in driver would need the vendor's 100 ms in the driver.
 
 ## Open risks
 
+- The switch reset (row 24) is inferred from the vendor driver; the first boot showed the switch not answering at all.
 - The all-target `Build Kernel` check passed on the build but needed 25 hunk-header refreshes in other targets (folded in). Re-run it on every rebase: the backport moves MAINTAINERS and DSA context that many target patches share.
 - Kernel margin on 25.12 is 145 KB, against 227 KB on main.
 - -Os is a subtarget-wide default in config/Config-kernel.in. Precedent exists (`default y if TARGET_...`), but reviewers may prefer another way.
