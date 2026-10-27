@@ -27,24 +27,31 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # gcc-multilib conflicts with the cross compilers, so each
+          # build installs only what it needs
           - name: x86_64 gcc W=1 sparse
             arch: x86_64
             make: W=1 C=1
+            pkgs: sparse
           - name: x86_64 clang W=1
             arch: x86_64
             make: W=1 LLVM=1
+            pkgs: clang lld llvm
           - name: i386 gcc W=1 (32 bit)
             arch: i386
             make: W=1
+            pkgs: gcc-multilib
           - name: mips 32 bit gcc W=1
             arch: mips
             cross: mips-linux-gnu-
             defconfig: malta_defconfig
             make: W=1
+            pkgs: gcc-mips-linux-gnu
           - name: arm64 gcc W=1
             arch: arm64
             cross: aarch64-linux-gnu-
             make: W=1
+            pkgs: gcc-aarch64-linux-gnu
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,8 +61,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq bc bison flex libssl-dev libelf-dev \
-            sparse clang lld llvm gcc-multilib \
-            gcc-aarch64-linux-gnu gcc-mips-linux-gnu
+            ${{ matrix.pkgs }}
 
       - name: Fetch linux-next and apply the series
         run: |
@@ -179,6 +185,9 @@ jobs:
           git am -q ../ci-src/ci/leds-ktd202x/patches/*.patch
 
       - name: Run the simulated-chip harness
+        # The fake devm allocator never frees, like devm before unbind
+        env:
+          ASAN_OPTIONS: detect_leaks=0
         run: |
           h=ci-src/ci/leds-ktd202x/harness
           clang -std=gnu11 -g -O1 -fsanitize=address,undefined \
