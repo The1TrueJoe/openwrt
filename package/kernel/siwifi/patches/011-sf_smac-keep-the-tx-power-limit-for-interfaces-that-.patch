@@ -1,0 +1,165 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Wed, 28 Oct 2026 01:33:29 -0400
+Subject: [PATCH] sf_smac: keep the tx power limit for interfaces that are not
+ up yet
+
+siwifi_cfg80211_set_tx_power() sends the limit straight to the firmware
+and keeps nothing. OpenWrt's wifi-scripts set it, with "iw phy set
+txpower" and "iw dev set txpower", before hostapd has brought the
+interfaces up, so no interface has a firmware instance yet:
+
+- before the first interface is up the firmware is not started, and
+  siwifi_send_msg() drops MM_SET_POWER_REQ ("bypassing
+  (SIWIFI_DEV_RESTARTING set) 0x31") with -EBUSY;
+- once another interface is up, the request for an interface that is
+  down goes out with its stale vif_index, which can be the index of
+  another interface.
+
+Starting an AP then passes the firmware the channel's maximum and sets
+the reported power to it. On a GL-SFT1200, iw reports 30 and 23 dBm on
+the two radios whatever the uci txpower is, while the same "iw phy set
+txpower fixed 1000" with the AP up reads back 10 dBm.
+
+Keep the limit per interface, and per wiphy for interfaces created
+later, as mac80211 does. Send it only to interfaces that are up, from
+siwifi_open() for interfaces brought up later, and again once an AP has
+started.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h |  7 +++
+ sf_smac/src/bb_src/umac/fullmac/siwifi_main.c | 43 ++++++++++++++-----
+ 2 files changed, 40 insertions(+), 10 deletions(-)
+
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h b/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h
+index 02fd5a9..a4ff4e4 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h
+@@ -177,6 +177,8 @@ struct siwifi_vif {
+     bool tdls_chsw_prohibited;
+     s8 txpower;
+     u8 txpower_idx;
++    /* limit set through cfg80211, SIWIFI_TXPOWER_AUTO if none */
++    s8 user_txpower;
+     union
+     {
+         struct
+@@ -668,6 +670,9 @@ void report_sf_notify_event(const sf_notify_event_data *event_data);
+ #ifdef CONFIG_SIWIFI_SORT_SCAN
+ #define MAX_SCAN_BSS_CNT 64
+ #endif
++/* MM_SET_POWER_REQ value for no limit other than the channel's */
++#define SIWIFI_TXPOWER_AUTO 0x7f
++
+ struct siwifi_hw {
+     struct siwifi_mod_params *mod_params;
+     bool use_phy_bw_tweaks;
+@@ -782,6 +787,8 @@ struct siwifi_hw {
+     u8 chan_ctxt_req;
+     u8 avail_idx_map;
+     u8 vif_started;
++    /* limit set for the whole wiphy, inherited by new interfaces */
++    s8 user_txpower;
+     bool adding_sta;
+     struct phy_cfg_tag phy_config;
+     struct siwifi_radar radar;
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+index 2325c20..0c7e547 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+@@ -704,6 +704,21 @@ void siwifi_external_auth_disable(struct siwifi_vif *vif)
+     siwifi_txq_unk_vif_deinit(vif);
+     spin_unlock_bh(&vif->siwifi_hw->tx_lock);
+ }
++/* The firmware holds the limit per interface instance, which
++ * siwifi_open() creates, and APM_START_REQ hands it the channel's
++ * maximum, so send the user's limit after both. */
++static int siwifi_send_user_txpower(struct siwifi_hw *siwifi_hw,
++                                    struct siwifi_vif *vif)
++{
++    struct mm_set_power_cfm cfm;
++    int res;
++    res = siwifi_send_set_power(siwifi_hw, vif->vif_index, vif->user_txpower, &cfm);
++    if (!res) {
++        vif->txpower = cfm.power;
++        vif->txpower_idx = cfm.radio_idx;
++    }
++    return res;
++}
+ static int siwifi_open(struct net_device *dev)
+ {
+     struct siwifi_vif *siwifi_vif = netdev_priv(dev);
+@@ -745,6 +760,9 @@ static int siwifi_open(struct net_device *dev)
+ #endif
+     siwifi_hw->vif_table[add_if_cfm.inst_nbr] = siwifi_vif;
+     spin_unlock_bh(&siwifi_hw->cb_lock);
++    if (SIWIFI_VIF_TYPE(siwifi_vif) != NL80211_IFTYPE_AP_VLAN &&
++        siwifi_vif->user_txpower != SIWIFI_TXPOWER_AUTO)
++        siwifi_send_user_txpower(siwifi_hw, siwifi_vif);
+     if (SIWIFI_VIF_TYPE(siwifi_vif) == NL80211_IFTYPE_MONITOR){
+         siwifi_hw->monitor_vif = siwifi_vif->vif_index;
+         if (siwifi_vif->ch_index != SIWIFI_CH_NOT_SET){
+@@ -971,6 +989,7 @@ static struct wireless_dev *siwifi_interface_add(struct siwifi_hw *siwifi_hw,
+  vif->wdev.iftype = type;
+  vif->up = false;
+  vif->ch_index = SIWIFI_CH_NOT_SET;
++ vif->user_txpower = siwifi_hw->user_txpower;
+  memset(&vif->net_stats, 0, sizeof(vif->net_stats));
+  switch (type) {
+  case NL80211_IFTYPE_STATION:
+@@ -2051,6 +2070,8 @@ static int siwifi_cfg80211_start_ap(struct wiphy *wiphy, struct net_device *dev,
+                 siwifi_radar_detection_enable_on_cur_channel(siwifi_hw);
+                 spin_unlock_bh(&siwifi_hw->cb_lock);
+             }
++            if (siwifi_vif->user_txpower != SIWIFI_TXPOWER_AUTO)
++                siwifi_send_user_txpower(siwifi_hw, siwifi_vif);
+             break;
+         }
+         case CO_BUSY:
+@@ -2226,26 +2247,27 @@ static int siwifi_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev
+     struct siwifi_vif *vif;
+     s8 pwr;
+     int res = 0;
+-    struct mm_set_power_cfm cfm;
+     if (type == NL80211_TX_POWER_AUTOMATIC) {
+-        pwr = 0x7f;
++        pwr = SIWIFI_TXPOWER_AUTO;
+     } else {
+         pwr = MBM_TO_DBM(mbm);
+     }
++    /* An interface that is down has no firmware instance to send the
++     * limit to; keep it and send it from siwifi_open(). */
+     if (wdev) {
+         vif = container_of(wdev, struct siwifi_vif, wdev);
+-        res = siwifi_send_set_power(siwifi_hw, vif->vif_index, pwr, &cfm);
+-        if (!res) {
+-            vif->txpower = cfm.power;
+-            vif->txpower_idx = cfm.radio_idx;
+-        }
++        vif->user_txpower = pwr;
++        if (vif->up)
++            res = siwifi_send_user_txpower(siwifi_hw, vif);
+     } else {
++        siwifi_hw->user_txpower = pwr;
+         list_for_each_entry(vif, &siwifi_hw->vifs, list) {
+-            res = siwifi_send_set_power(siwifi_hw, vif->vif_index, pwr, &cfm);
++            vif->user_txpower = pwr;
++            if (!vif->up || SIWIFI_VIF_TYPE(vif) == NL80211_IFTYPE_AP_VLAN)
++                continue;
++            res = siwifi_send_user_txpower(siwifi_hw, vif);
+             if (res)
+                 break;
+-            vif->txpower = cfm.power;
+-            vif->txpower_idx = cfm.radio_idx;
+         }
+     }
+     return res;
+@@ -3975,6 +3997,7 @@ int siwifi_cfg80211_init(struct siwifi_plat *siwifi_plat, void **platform_data)
+     siwifi_hw->sec_phy_chan.center_freq1 = 5500;
+     siwifi_hw->sec_phy_chan.center_freq2 = 0;
+     siwifi_hw->vif_started = 0;
++    siwifi_hw->user_txpower = SIWIFI_TXPOWER_AUTO;
+     siwifi_hw->monitor_vif = SIWIFI_INVALID_VIF;
+     siwifi_hw->adding_sta = false;
+     siwifi_hw->scan_ie.addr = NULL;

@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 00:09:14 -0400
+Subject: [PATCH] sf_smac: do not overrun the RF gain table index arrays
+
+The parser reads each index into an unsigned int and memcpy()s all four
+bytes into a u8 array of four entries, so the last entry writes three
+bytes past the end of lb_rf_gain_tb_idx or hb_rf_gain_tb_idx. Store the
+value as a u8.
+
+The same defect in the tx-power gain table parser was found by fortify
+in the napoluluna/bpi-wifi5-openwrt port; that parser already reads into
+a u8 here.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/siwifi_cfgfile.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sf_smac/src/bb_src/umac/siwifi_cfgfile.c b/sf_smac/src/bb_src/umac/siwifi_cfgfile.c
+index ed1314f..cf812cb 100644
+--- a/sf_smac/src/bb_src/umac/siwifi_cfgfile.c
++++ b/sf_smac/src/bb_src/umac/siwifi_cfgfile.c
+@@ -426,9 +426,9 @@ int siwifi_parse_rf_gain_table_configfile(struct siwifi_hw *siwifi_hw) {
+             }
+             else{
+                 if(siwifi_hw->mod_params->is_hb) {
+-                    memcpy(&siwifi_hw->phy_config.hb_rf_gain_tb_idx[i],tb_idx,sizeof(tb_idx[0]));
++                    siwifi_hw->phy_config.hb_rf_gain_tb_idx[i] = (u8)tb_idx[0];
+                 } else
+-                    memcpy(&siwifi_hw->phy_config.lb_rf_gain_tb_idx[i],tb_idx,sizeof(tb_idx[0]));
++                    siwifi_hw->phy_config.lb_rf_gain_tb_idx[i] = (u8)tb_idx[0];
+             }
+         } else {
+             if(siwifi_hw->mod_params->is_hb) {

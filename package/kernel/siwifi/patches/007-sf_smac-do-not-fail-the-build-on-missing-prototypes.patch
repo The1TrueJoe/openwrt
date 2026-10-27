@@ -1,0 +1,54 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 00:59:50 -0400
+Subject: [PATCH] sf_smac: do not fail the build on missing prototypes
+
+Kernel 6.18 builds with -Werror=missing-prototypes, and the driver has
+about two hundred non-static functions that no header declares, so the
+build stops at the first of them. Turn the warning off for the three
+modules.
+
+The real fix is to make those functions static or declare them; it is
+left for later because it touches most files of the vendor code.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/fmac/Makefile      | 2 ++
+ sf_smac/src/rf/Makefile        | 2 ++
+ sf_smac/src/startcore/Makefile | 2 ++
+ 3 files changed, 6 insertions(+)
+
+diff --git a/sf_smac/src/fmac/Makefile b/sf_smac/src/fmac/Makefile
+index 184586d..75f24a6 100644
+--- a/sf_smac/src/fmac/Makefile
++++ b/sf_smac/src/fmac/Makefile
+@@ -14,5 +14,7 @@ include $(umac_dir)/fullmac/fullmac.mk
+ 
+ ccflags-y += -I$(DRV_PATH)/rf/
+ ccflags-y += -DCONFIG_SFAX8_FACTORY_READ
++# vendor code: many non-static functions are declared nowhere
++ccflags-y += -Wno-missing-prototypes -Wno-missing-declarations
+ 
+ sf16a18_fmac-y += $(SF16A18_FULLMAC_SRC_OBJS)
+diff --git a/sf_smac/src/rf/Makefile b/sf_smac/src/rf/Makefile
+index 6006c41..f6d91d1 100644
+--- a/sf_smac/src/rf/Makefile
++++ b/sf_smac/src/rf/Makefile
+@@ -10,6 +10,8 @@ endif
+ 
+ #Header dir list
+ ccflags-y += -I$(top_dir)
++# vendor code: many non-static functions are declared nowhere
++ccflags-y += -Wno-missing-prototypes -Wno-missing-declarations
+ 
+ #Define macro
+ #ccflags-y += -Wno-unused-function
+diff --git a/sf_smac/src/startcore/Makefile b/sf_smac/src/startcore/Makefile
+index baabfbb..88940ee 100644
+--- a/sf_smac/src/startcore/Makefile
++++ b/sf_smac/src/startcore/Makefile
+@@ -1,2 +1,4 @@
+ obj-$(CONFIG_SF16A18_WIFI_MAC_HOST_OFFLOAD)		+= startcore.o
+ startcore-y				 = start_core.o platform.o
++# vendor code: many non-static functions are declared nowhere
++ccflags-y += -Wno-missing-prototypes -Wno-missing-declarations

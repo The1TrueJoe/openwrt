@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 00:09:14 -0400
+Subject: [PATCH] sf_smac: hold the wiphy lock when removing interfaces on
+ unload
+
+cfg80211_unregister_netdevice() must be called with the wiphy lock held,
+and the unload path only took RTNL. Taking the wiphy lock around the
+loop is not enough on its own: unregistering an interface that is still
+up closes it, and cfg80211's netdev notifier takes the wiphy lock again
+on that close. Close every interface under RTNL first, then take the
+wiphy lock and unregister them.
+
+The deadlock was found on the Banana Pi BPI-WiFi5 by the
+napoluluna/bpi-wifi5-openwrt port.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_main.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+index 06a821f..e9ec102 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+@@ -3803,9 +3803,20 @@ static void siwifi_wdev_unregister(struct siwifi_hw *siwifi_hw)
+ {
+     struct siwifi_vif *siwifi_vif, *tmp;
+     rtnl_lock();
++    /*
++     * cfg80211_unregister_netdevice() wants the wiphy lock, but closing an
++     * interface that is still up takes it again from cfg80211's netdev
++     * notifier. Close them all first, then unregister.
++     */
++    list_for_each_entry(siwifi_vif, &siwifi_hw->vifs, list) {
++        if (siwifi_vif->ndev)
++            dev_close(siwifi_vif->ndev);
++    }
++    wiphy_lock(siwifi_hw->wiphy);
+     list_for_each_entry_safe(siwifi_vif, tmp, &siwifi_hw->vifs, list) {
+         siwifi_cfg80211_del_iface(siwifi_hw->wiphy, &siwifi_vif->wdev);
+     }
++    wiphy_unlock(siwifi_hw->wiphy);
+     rtnl_unlock();
+ }
+ static void siwifi_set_vers(struct siwifi_hw *siwifi_hw)

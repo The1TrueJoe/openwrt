@@ -1,0 +1,63 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 00:09:14 -0400
+Subject: [PATCH] sf_smac: let a failed probe fail
+
+When the LMAC did not come up at probe, the driver scheduled a reprobe
+of itself, and so did every reprobe after it. Each round loads the
+firmware, allocates the IPC rings and runs the user-mode helper, so a
+board whose firmware does not start (a mismatched LMAC image, say) runs
+out of memory within seconds instead of reporting the error.
+
+Return the error from probe. Keep the reprobe that recovers a radio
+which failed at run time, but give up after three per module load.
+
+Found on the Banana Pi BPI-WiFi5 by the napoluluna/bpi-wifi5-openwrt
+port.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_main.c | 4 +---
+ sf_smac/src/bb_src/umac/siwifi_mpw0.c         | 8 ++++++++
+ 2 files changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+index e9ec102..44a35ef 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+@@ -4081,10 +4081,8 @@ int siwifi_cfg80211_init(struct siwifi_plat *siwifi_plat, void **platform_data)
+   siwifi_hw->skb_pool_dev_param->use_skb_pool = 1;
+  }
+ #endif
+-    if ((ret = siwifi_platform_on(siwifi_hw))) {
+-        siwifi_reprobe_driver(siwifi_hw);
++    if ((ret = siwifi_platform_on(siwifi_hw)))
+         goto err_platon;
+-    }
+     if (siwifi_ipc_elem_var_allocs(siwifi_hw, &siwifi_hw->dying_gasp_info_elem,
+                 sizeof(struct mm_dying_gasp), DMA_FROM_DEVICE,
+                 NULL, NULL, ipc_host_dying_gasp_addr_push, NULL))
+diff --git a/sf_smac/src/bb_src/umac/siwifi_mpw0.c b/sf_smac/src/bb_src/umac/siwifi_mpw0.c
+index 61a2fd8..8b56127 100644
+--- a/sf_smac/src/bb_src/umac/siwifi_mpw0.c
++++ b/sf_smac/src/bb_src/umac/siwifi_mpw0.c
+@@ -81,11 +81,19 @@ void siwifi_reprobe_work(struct work_struct *wk)
+ #endif
+     SIWIFI_DBG(SIWIFI_FN_EXIT_STR);
+ }
++/* Recovery reprobes per module load before the radio is left dead. */
++#define SIWIFI_REPROBE_MAX 3
++static atomic_t siwifi_reprobe_count = ATOMIC_INIT(0);
+ void siwifi_reprobe_driver(struct siwifi_hw *siwifi_hw)
+ {
+     struct siwifi_reprobe *reprobe;
+     printk("siwifi_reprobe_driver\n");
+     set_bit(SIWIFI_DEV_HW_DEAD, &siwifi_hw->drv_flags);
++    if (atomic_inc_return(&siwifi_reprobe_count) > SIWIFI_REPROBE_MAX) {
++        printk(KERN_CRIT "%s: gave up after %d reprobes\n", __func__,
++               SIWIFI_REPROBE_MAX);
++        return;
++    }
+     if (!try_module_get(THIS_MODULE)) {
+         printk(KERN_CRIT "%s: Module is being unloaded - abort\n", __func__);
+         return;

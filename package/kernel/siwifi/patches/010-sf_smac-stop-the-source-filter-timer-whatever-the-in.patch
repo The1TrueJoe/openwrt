@@ -1,0 +1,78 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 23:21:55 -0400
+Subject: [PATCH] sf_smac: stop the source filter timer whatever the interface
+ type
+
+siwifi_interface_add() arms the source filter aging timer for station
+interfaces, and siwifi_cfg80211_del_iface() stops it only if the
+interface is still a station. OpenWrt brings an AP up by changing the
+type of the wlan0 that the driver creates at probe, so the timer stays
+armed on an AP interface. When that interface is deleted, the netdev
+and its siwifi_vif are freed with the timer still pending, and the next
+expiry, up to 30 s later, walks freed memory. On a GL-SFT1200 a `wifi`
+reload with APs up ended in:
+
+  Unhandled kernel unaligned access[#1]:
+  epc   : src_filter_aging+0x94/0xb8 [sf16a18_fmac]
+  Call Trace: src_filter_aging <- call_timer_fn <- __run_timer_base
+  Kernel panic - not syncing: Fatal exception in interrupt
+
+Set the timer and its lock up for every interface, arm it only while
+the interface is a station (including when change_iface makes it one),
+stop it and free the table when change_iface turns a station into
+something else, and shut it down unconditionally in del_iface before
+the table is freed.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_main.c | 21 ++++++++++++-------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
+
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+index e2ebc7d..2325c20 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+@@ -1051,11 +1051,10 @@ static struct wireless_dev *siwifi_interface_add(struct siwifi_hw *siwifi_hw,
+     siwifi_hw->avail_idx_map &= ~BIT(vif_idx);
+     spin_unlock_bh(&siwifi_hw->cb_lock);
+     siwifi_hw->dying_gasp_valid = false;
+-    if (type == NL80211_IFTYPE_STATION) {
+-        spin_lock_init(&vif->src_filter_lock);
+-        timer_setup(&(vif->src_filter_timer), src_filter_aging, 0);
++    spin_lock_init(&vif->src_filter_lock);
++    timer_setup(&(vif->src_filter_timer), src_filter_aging, 0);
++    if (type == NL80211_IFTYPE_STATION)
+         mod_timer(&(vif->src_filter_timer), jiffies + SRC_FILTER_AGING_TIME * HZ);
+-    }
+     return &vif->wdev;
+ err:
+     if (vif->lm_ctl)
+@@ -1155,10 +1154,8 @@ static int siwifi_cfg80211_del_iface(struct wiphy *wiphy, struct wireless_dev *w
+   siwifi_chanctx_unlink(siwifi_vif);
+   siwifi_hw->monitor_vif = SIWIFI_INVALID_VIF;
+  }
+-    if (SIWIFI_VIF_TYPE(siwifi_vif) == NL80211_IFTYPE_STATION) {
+-     siwifi_src_filter_hash_free(siwifi_vif);
+-        timer_delete_sync(&(siwifi_vif->src_filter_timer));
+-    }
++    timer_shutdown_sync(&(siwifi_vif->src_filter_timer));
++    siwifi_src_filter_hash_free(siwifi_vif);
+  siwifi_vif->ndev = NULL;
+     dev->ieee80211_ptr = NULL;
+     netdev_info(dev, "Remove Interface Over");
+@@ -1226,6 +1223,14 @@ static int siwifi_cfg80211_change_iface(struct wiphy *wiphy,
+         dev->type = ARPHRD_ETHER;
+         dev->netdev_ops = &siwifi_netdev_ops;
+     }
++    if (SIWIFI_VIF_TYPE(vif) == NL80211_IFTYPE_STATION &&
++        type != NL80211_IFTYPE_STATION) {
++        timer_delete_sync(&(vif->src_filter_timer));
++        siwifi_src_filter_hash_free(vif);
++    } else if (SIWIFI_VIF_TYPE(vif) != NL80211_IFTYPE_STATION &&
++               type == NL80211_IFTYPE_STATION) {
++        mod_timer(&(vif->src_filter_timer), jiffies + SRC_FILTER_AGING_TIME * HZ);
++    }
+     vif->wdev.iftype = type;
+     if (params->use_4addr != -1)
+         vif->use_4addr = params->use_4addr;
