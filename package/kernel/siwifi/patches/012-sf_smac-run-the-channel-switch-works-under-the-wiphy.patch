@@ -1,0 +1,256 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Mon, 2 Nov 2026 17:47:31 -0500
+Subject: [PATCH] sf_smac: run the channel switch works under the wiphy mutex
+
+Two works around channel switches can run into freed memory.
+
+The CSA completion (siwifi_csa_finish(), and siwifi_acs_csa_finish() for
+the internal ACS) is queued from the firmware's CSA-finish indication
+and frees the struct siwifi_csa that contains it. siwifi_del_csa()
+frees the same struct from stop_ap, from a new channel switch and from
+the firmware restart path, without cancelling the work. A stop_ap while
+the completion is queued or running leaves it working on freed memory.
+A plain cancel_work_sync() in siwifi_del_csa() is not possible: the
+completion takes the wiphy mutex, which stop_ap already holds.
+
+The internal ACS queues siwifi_hw->csa_work, which walks the interfaces
+and starts channel switches without any lock. Nothing cancels it when
+the driver is unloaded.
+
+Make both wiphy works. They then run under the wiphy mutex, so they
+cannot run while a cfg80211 operation is in progress. siwifi_del_csa()
+can drop a queued completion with wiphy_work_cancel(), and
+wiphy_unregister() deals with a pending ACS work. Initialise the
+completion when the CSA is allocated, because the error paths of the
+channel switch free it before the old INIT_WORK() was reached. Take the
+wiphy mutex in the restart path around the part that frees the CSA.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_acs.c  | 23 +++++++++----------
+ sf_smac/src/bb_src/umac/fullmac/siwifi_acs.h  |  2 +-
+ sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h |  5 ++--
+ sf_smac/src/bb_src/umac/fullmac/siwifi_main.c | 18 ++++++++-------
+ sf_smac/src/bb_src/umac/siwifi_msg_rx.c       |  2 +-
+ 5 files changed, 26 insertions(+), 24 deletions(-)
+
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_acs.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_acs.c
+@@ -98,7 +98,7 @@ int siwifi_calc_acs_select_chan(struct s
+         siwifi_hw->last_time = ktime_get_seconds();
+         WARN_ON(!vif->ap_settings);
+         siwifi_chandef_create(&siwifi_hw->csa_chandef, chan, ch_width);
+-        schedule_work(&siwifi_hw->csa_work);
++        wiphy_work_queue(siwifi_hw->wiphy, &siwifi_hw->csa_work);
+     } else {
+ #endif
+ #ifdef CONFIG_SIWIFI_ACS
+@@ -364,7 +364,7 @@ int siwifi_do_acs(struct siwifi_hw *siwi
+     }
+     if ((siwifi_hw->last_time > 0) && (ktime_get_seconds() - siwifi_hw->last_time < 5)) {
+   printk("report last scan result\n");
+-        schedule_work(&siwifi_hw->csa_work);
++        wiphy_work_queue(siwifi_hw->wiphy, &siwifi_hw->csa_work);
+   return 0;
+     }
+     sband = (siwifi_hw->mod_params->is_hb) ? wiphy->bands[NL80211_BAND_5GHZ] : wiphy->bands[NL80211_BAND_2GHZ];
+@@ -670,14 +670,17 @@ static void siwifi_del_csa(struct siwifi
+     struct siwifi_csa *csa = vif->ap.csa;
+     if (!csa)
+         return;
++    /* Callers hold the wiphy mutex, which the completion also runs
++     * under, so it is not running; drop it if it is still queued. */
++    wiphy_work_cancel(siwifi_hw->wiphy, &csa->work);
+     siwifi_ipc_elem_var_deallocs(siwifi_hw, &csa->elem);
+     siwifi_del_bcn(&csa->bcn);
+     kfree(csa);
+     vif->ap.csa = NULL;
+ }
+-static void siwifi_acs_csa_finish(struct work_struct *ws)
++static void siwifi_acs_csa_finish(struct wiphy *wiphy, struct wiphy_work *work)
+ {
+-    struct siwifi_csa *csa = container_of(ws, struct siwifi_csa, work);
++    struct siwifi_csa *csa = container_of(work, struct siwifi_csa, work);
+     struct siwifi_vif *vif = csa->vif;
+     struct siwifi_hw *siwifi_hw = vif->siwifi_hw;
+     int error = csa->status;
+@@ -688,8 +691,6 @@ static void siwifi_acs_csa_finish(struct
+     if (error)
+         cfg80211_stop_iface(siwifi_hw->wiphy, &vif->wdev, GFP_KERNEL);
+     else {
+-        mutex_lock(&vif->wdev.wiphy->mtx);
+-        __acquire(&vif->wdev.wiphy->mtx);
+         spin_lock_bh(&siwifi_hw->cb_lock);
+         siwifi_chanctx_unlink(vif);
+         siwifi_chanctx_link(vif, csa->ch_idx, &csa->chandef);
+@@ -702,8 +703,6 @@ static void siwifi_acs_csa_finish(struct
+         }
+         spin_unlock_bh(&siwifi_hw->cb_lock);
+         cfg80211_ch_switch_notify(vif->ndev, &csa->chandef, 0);
+-        mutex_unlock(&vif->wdev.wiphy->mtx);
+-        __release(&vif->wdev.wiphy->mtx);
+     }
+     vif->ap.channel_switching = false;
+     siwifi_del_csa(vif);
+@@ -744,6 +743,7 @@ static int siwifi_acs_channel_switch(str
+         error = -ENOMEM;
+         goto end;
+     }
++    wiphy_work_init(&csa->work, siwifi_acs_csa_finish);
+     bcn_after = &csa->bcn;
+     new = &ap_settings->beacon;
+     buf = siwifi_build_bcn_after(bcn_after, new, &real_addr, vif, siwifi_hw->csa_chandef.width);
+@@ -774,16 +774,15 @@ static int siwifi_acs_channel_switch(str
+         goto end;
+     } else {
+         printk("siwifi_send_bcn_change success\n");
+-        INIT_WORK(&csa->work, siwifi_acs_csa_finish);
+         cfg80211_ch_switch_started_notify(vif->ndev, &csa->chandef, 0, csa_count, false);
+     }
+ end:
+     siwifi_ipc_elem_var_deallocs(siwifi_hw, &elem);
+     return error;
+ }
+-void siwifi_channel_ctxt_switch(struct work_struct *ws)
++void siwifi_channel_ctxt_switch(struct wiphy *wiphy, struct wiphy_work *work)
+ {
+-    struct siwifi_hw *siwifi_hw = container_of(ws, struct siwifi_hw, csa_work);
++    struct siwifi_hw *siwifi_hw = container_of(work, struct siwifi_hw, csa_work);
+     struct siwifi_vif *siwifi_vif, *__siwifi_vif;
+     int ret;
+     list_for_each_entry_safe(siwifi_vif, __siwifi_vif, &siwifi_hw->vifs, list)
+@@ -909,7 +908,7 @@ int siwifi_fast_channel_switch(struct si
+         printk("!vif->ap_settings\n");
+     }
+     siwifi_chandef_create(&siwifi_hw->csa_chandef, chan, ch_width);
+-    schedule_work(&siwifi_hw->csa_work);
++    wiphy_work_queue(siwifi_hw->wiphy, &siwifi_hw->csa_work);
+     siwifi_hw->fast_csa_time = current_second;
+     spin_unlock_bh(&siwifi_hw->cb_lock);
+     return 1;
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_acs.h
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_acs.h
+@@ -39,7 +39,7 @@ int siwifi_acs_scan_abord(struct siwifi_
+ #ifdef CONFIG_SIWIFI_ACS_INTERNAL
+ int siwifi_check_cca(struct siwifi_vif *siwifi_vif);
+ int siwifi_do_acs(struct siwifi_hw *siwifi_hw, struct siwifi_vif *siwifi_vif);
+-void siwifi_channel_ctxt_switch(struct work_struct *ws);
++void siwifi_channel_ctxt_switch(struct wiphy *wiphy, struct wiphy_work *work);
+ void siwifi_chandef_create(struct cfg80211_chan_def *chandef, struct ieee80211_channel *chan, enum nl80211_chan_width width);
+ int siwifi_acs_scan_abord(struct siwifi_hw *siwifi_hw, bool abord);
+ int siwifi_fast_channel_switch(struct siwifi_hw *siwifi_hw);
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h
+@@ -93,7 +93,8 @@ struct siwifi_csa {
+     int count;
+     int status;
+     int ch_idx;
+-    struct work_struct work;
++    /* runs under the wiphy mutex, see siwifi_del_csa() */
++    struct wiphy_work work;
+ };
+ enum tdls_status_tag {
+         TDLS_LINK_IDLE,
+@@ -697,7 +698,7 @@ struct siwifi_hw {
+     struct siwifi_trace_ctx trace_ctx;
+ #ifdef CONFIG_SIWIFI_ACS_INTERNAL
+     bool acs_internal;
+-    struct work_struct csa_work;
++    struct wiphy_work csa_work;
+     struct cfg80211_chan_def csa_chandef;
+     uint32_t last_time;
+ #endif
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+@@ -651,14 +651,17 @@ static void siwifi_del_csa(struct siwifi
+     struct siwifi_csa *csa = vif->ap.csa;
+     if (!csa)
+         return;
++    /* Callers hold the wiphy mutex, which the completion also runs
++     * under, so it is not running; drop it if it is still queued. */
++    wiphy_work_cancel(siwifi_hw->wiphy, &csa->work);
+     siwifi_ipc_elem_var_deallocs(siwifi_hw, &csa->elem);
+     siwifi_del_bcn(&csa->bcn);
+     siwifi_kfree(csa);
+     vif->ap.csa = NULL;
+ }
+-static void siwifi_csa_finish(struct work_struct *ws)
++static void siwifi_csa_finish(struct wiphy *wiphy, struct wiphy_work *work)
+ {
+-    struct siwifi_csa *csa = container_of(ws, struct siwifi_csa, work);
++    struct siwifi_csa *csa = container_of(work, struct siwifi_csa, work);
+     struct siwifi_vif *vif = csa->vif;
+     struct siwifi_hw *siwifi_hw = vif->siwifi_hw;
+     int error = csa->status;
+@@ -669,8 +672,6 @@ static void siwifi_csa_finish(struct wor
+     if (error)
+         cfg80211_stop_iface(siwifi_hw->wiphy, &vif->wdev, GFP_KERNEL);
+     else {
+-        mutex_lock(&vif->wdev.wiphy->mtx);
+-        __acquire(&vif->wdev.wiphy->mtx);
+         spin_lock_bh(&siwifi_hw->cb_lock);
+         siwifi_chanctx_unlink(vif);
+         siwifi_chanctx_link(vif, csa->ch_idx, &csa->chandef);
+@@ -681,8 +682,6 @@ static void siwifi_csa_finish(struct wor
+             siwifi_txq_vif_stop(vif, SIWIFI_TXQ_STOP_CHAN, siwifi_hw);
+         spin_unlock_bh(&siwifi_hw->cb_lock);
+         cfg80211_ch_switch_notify(vif->ndev, &csa->chandef, 0);
+-        mutex_unlock(&vif->wdev.wiphy->mtx);
+-        __release(&vif->wdev.wiphy->mtx);
+     }
+     vif->ap.channel_switching = false;
+     siwifi_del_csa(vif);
+@@ -2588,6 +2587,7 @@ int siwifi_cfg80211_channel_switch(struc
+         error = -ENOMEM;
+         goto end;
+     }
++    wiphy_work_init(&csa->work, siwifi_csa_finish);
+     bcn_after = &csa->bcn;
+     buf = siwifi_build_bcn(bcn_after, &params->beacon_after, &real_addr);
+     if (!buf) {
+@@ -2614,7 +2614,6 @@ int siwifi_cfg80211_channel_switch(struc
+         siwifi_del_csa(vif);
+         goto end;
+     } else {
+-        INIT_WORK(&csa->work, siwifi_csa_finish);
+         cfg80211_ch_switch_started_notify(dev, &csa->chandef, 0, params->count, false);
+     }
+   end:
+@@ -3691,6 +3690,8 @@ static void siwifi_restart_driver(struct
+     flush_work(&siwifi_hw->debugfs.helper_work);
+ #endif
+     rtnl_lock();
++    /* for siwifi_del_csa() below */
++    wiphy_lock(siwifi_hw->wiphy);
+     spin_lock_bh(&siwifi_hw->cb_lock);
+     if (siwifi_hw->scan_request) {
+         struct cfg80211_scan_info info = {
+@@ -3758,6 +3759,7 @@ static void siwifi_restart_driver(struct
+     INIT_LIST_HEAD(&siwifi_hw->stuck_check_list);
+     spin_unlock_bh(&siwifi_hw->tx_lock);
+     spin_unlock_bh(&siwifi_hw->cb_lock);
++    wiphy_unlock(siwifi_hw->wiphy);
+     if((ret = siwifi_platform_restart(siwifi_hw))){
+         printk(KERN_CRIT "%s: Couldn't restart the platform(), ret : %d\n", __func__, ret);
+         goto REPROBE;
+@@ -4187,7 +4189,7 @@ int siwifi_cfg80211_init(struct siwifi_p
+     timer_setup(&siwifi_hw->sta_timer_info.timer, siwifi_notify_sta_info_timer_callback, 0);
+ #endif
+ #ifdef CONFIG_SIWIFI_ACS_INTERNAL
+-    INIT_WORK(&siwifi_hw->csa_work, siwifi_channel_ctxt_switch);
++    wiphy_work_init(&siwifi_hw->csa_work, siwifi_channel_ctxt_switch);
+ #endif
+     return 0;
+ err_add_interface:
+--- a/sf_smac/src/bb_src/umac/siwifi_msg_rx.c
++++ b/sf_smac/src/bb_src/umac/siwifi_msg_rx.c
+@@ -336,7 +336,7 @@ static inline int siwifi_rx_csa_finish_i
+             if (vif->ap.csa) {
+                 vif->ap.csa->status = ind->status;
+                 vif->ap.csa->ch_idx = ind->chan_idx;
+-                schedule_work(&vif->ap.csa->work);
++                wiphy_work_queue(siwifi_hw->wiphy, &vif->ap.csa->work);
+             } else
+                 netdev_err(vif->ndev, "CSA finish indication but no active CSA");
+         } else {

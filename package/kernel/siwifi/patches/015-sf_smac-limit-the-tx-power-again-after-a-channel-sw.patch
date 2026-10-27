@@ -1,0 +1,166 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 3 Nov 2026 01:05:14 -0500
+Subject: [PATCH] sf_smac: limit the tx power again after a channel switch
+
+APM_START_REQ hands the firmware the start channel's maximum tx power,
+and the firmware keeps it as the interface's limit for as long as the
+AP runs. A channel switch only changes the beacons; it does not send
+the new channel's maximum, and MM_SET_POWER_REQ can lower the kept
+limit but not raise it. So an AP started on a channel with a higher
+limit keeps it on the new channel. On a GL-SFT1200 with country US, an
+AP started on channel 153 (30 dBm) and switched to channel 36 (23 dBm)
+with hostapd's chan_switch reads 30 dBm, and the firmware confirms 30
+dBm for a fresh request.
+
+Every switch goes through siwifi_chanctx_link() with the new chandef:
+the cfg80211 switch, the internal ACS switch, a DFS move (which hostapd
+makes as a cfg80211 switch) and a station following its AP. The
+repeater code that moves APs to the station's channel sets ch_index
+directly. Have these mark the interface and queue the wiphy work that
+sends the user's limit, now capped at the current channel's maximum.
+A regulatory change leaves the running interfaces with the old
+domain's limits in the same way, so the reg notifier marks them all.
+Some of these callers hold cb_lock or run in the message handler, so
+the request cannot be sent from there. The station connect path links
+a chandef too, so it no longer needs to queue the work itself.
+
+The limit cannot go above the start channel's maximum, so after a
+switch to a channel with a higher limit the AP stays at the lower one,
+as before; restarting the AP lifts it.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h |  1 +
+ sf_smac/src/bb_src/umac/fullmac/siwifi_main.c | 38 ++++++++++++++++---
+ sf_smac/src/bb_src/umac/siwifi_msg_rx.c       |  3 --
+ sf_smac/src/bb_src/umac/siwifi_utils.c        |  1 +
+ 4 files changed, 35 insertions(+), 8 deletions(-)
+
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h
+@@ -876,6 +876,7 @@ struct siwifi_temp_ctl temp_ctl;
+ extern struct kmem_cache *sw_txhdr_cache;
+ #endif
+ u8 *siwifi_build_bcn(struct siwifi_bcn *bcn, struct cfg80211_beacon_data *new, u8 **real_addr);
++void siwifi_txpower_resend(struct siwifi_vif *vif);
+ void siwifi_chanctx_link(struct siwifi_vif *vif, u8 idx,
+                         struct cfg80211_chan_def *chandef);
+ void siwifi_chanctx_unlink(struct siwifi_vif *vif);
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+@@ -557,6 +557,14 @@ static void siwifi_del_bcn(struct siwifi
+     bcn->dtim = 0;
+     bcn->len = 0;
+ }
++/* The firmware keeps the tx power limit of the channel an interface
++ * started on, so ask for the limit to be sent again whenever the
++ * interface moves to another channel. Callers may be atomic. */
++void siwifi_txpower_resend(struct siwifi_vif *vif)
++{
++    vif->txpower_resend = true;
++    wiphy_work_queue(vif->siwifi_hw->wiphy, &vif->siwifi_hw->txpower_work);
++}
+ static int siwifi_check_vif_channel_same(struct siwifi_vif *vif, u8 ch_idx,
+                                         struct cfg80211_chan_def *chandef, struct siwifi_chanctx *ctxt)
+ {
+@@ -596,6 +604,7 @@ static int siwifi_check_vif_channel_same
+         siwifi_chanctx_unlink(vif_tmp);
+         vif_tmp->ch_index = sta_ch_idx;
+         ctxt_sta->count++;
++        siwifi_txpower_resend(vif_tmp);
+         siwifi_txq_vif_start(vif_tmp, SIWIFI_TXQ_STOP_CHAN, vif_tmp->siwifi_hw);
+     }
+     return 0;
+@@ -613,6 +622,7 @@ void siwifi_chanctx_link(struct siwifi_v
+     ctxt->count++;
+     if (chandef) {
+         ctxt->chan_def = *chandef;
++        siwifi_txpower_resend(vif);
+         siwifi_check_vif_channel_same(vif, ch_idx, chandef, ctxt);
+     }
+ }
+@@ -705,21 +715,33 @@ void siwifi_external_auth_disable(struct
+ }
+ /* The firmware holds the limit per interface instance, which
+  * siwifi_open() creates, and APM_START_REQ hands it the channel's
+- * maximum, so send the user's limit after both. */
++ * maximum, so send the user's limit after both. It keeps that maximum
++ * when a channel switch moves the interface, and can only lower it
++ * afterwards, so cap the limit at the current channel's maximum. */
+ static int siwifi_send_user_txpower(struct siwifi_hw *siwifi_hw,
+                                     struct siwifi_vif *vif)
+ {
+     struct mm_set_power_cfm cfm;
++    struct ieee80211_channel *chan = NULL;
++    s8 pwr = vif->user_txpower;
+     int res;
+-    res = siwifi_send_set_power(siwifi_hw, vif->vif_index, vif->user_txpower, &cfm);
++    spin_lock_bh(&siwifi_hw->cb_lock);
++    if (vif->ch_index != SIWIFI_CH_NOT_SET)
++        chan = siwifi_hw->chanctx_table[vif->ch_index].chan_def.chan;
++    if (chan && chan->max_power < pwr)
++        pwr = chan->max_power;
++    spin_unlock_bh(&siwifi_hw->cb_lock);
++    res = siwifi_send_set_power(siwifi_hw, vif->vif_index, pwr, &cfm);
+     if (!res) {
+         vif->txpower = cfm.power;
+         vif->txpower_idx = cfm.radio_idx;
+     }
+     return res;
+ }
+-/* A station only gets a channel when it connects; until then the
+- * firmware confirms SIWIFI_TXPOWER_AUTO, so ask again. */
++/* Send the limit for the interfaces that siwifi_txpower_resend()
++ * marked. A station only gets a channel when it connects; until then
++ * the firmware confirms SIWIFI_TXPOWER_AUTO, so it is asked again then
++ * too. */
+ static void siwifi_txpower_work(struct wiphy *wiphy, struct wiphy_work *work)
+ {
+     struct siwifi_hw *siwifi_hw = container_of(work, struct siwifi_hw, txpower_work);
+@@ -728,7 +750,7 @@ static void siwifi_txpower_work(struct w
+         if (!vif->txpower_resend)
+             continue;
+         vif->txpower_resend = false;
+-        if (vif->up)
++        if (vif->up && SIWIFI_VIF_TYPE(vif) != NL80211_IFTYPE_AP_VLAN)
+             siwifi_send_user_txpower(siwifi_hw, vif);
+     }
+ }
+@@ -3881,8 +3903,14 @@ static void siwifi_reg_notifier(struct w
+                               struct regulatory_request *request)
+ {
+     struct siwifi_hw *siwifi_hw = wiphy_priv(wiphy);
++    struct siwifi_vif *vif;
+     siwifi_radar_set_domain(&siwifi_hw->radar, request->dfs_region);
+     siwifi_send_me_chan_config_req(siwifi_hw);
++    /* the interfaces keep the limits of the old domain */
++    spin_lock_bh(&siwifi_hw->cb_lock);
++    list_for_each_entry(vif, &siwifi_hw->vifs, list)
++        siwifi_txpower_resend(vif);
++    spin_unlock_bh(&siwifi_hw->cb_lock);
+ }
+ static void siwifi_enable_mesh(struct siwifi_hw *siwifi_hw)
+ {
+--- a/sf_smac/src/bb_src/umac/siwifi_msg_rx.c
++++ b/sf_smac/src/bb_src/umac/siwifi_msg_rx.c
+@@ -825,9 +825,6 @@ static inline int siwifi_rx_sm_connect_i
+             } while (0);
+         }
+ #endif
+-        /* the station has a channel now */
+-        siwifi_vif->txpower_resend = true;
+-        wiphy_work_queue(siwifi_hw->wiphy, &siwifi_hw->txpower_work);
+     }
+     if(SIWIFI_VIF_TYPE(siwifi_vif) == NL80211_IFTYPE_STATION){
+         siwifi_vif->wds_success = 1;
+--- a/sf_smac/src/bb_src/umac/siwifi_utils.c
++++ b/sf_smac/src/bb_src/umac/siwifi_utils.c
+@@ -1274,6 +1274,7 @@ int siwifi_channel_recovery_check(struct
+                 siwifi_chanctx_unlink(vif);
+                 vif->ch_index = vif_sta->ch_index;
+                 ctxt_sta->count++;
++                siwifi_txpower_resend(vif);
+                 siwifi_txq_vif_start(vif, SIWIFI_TXQ_STOP_CHAN, vif->siwifi_hw);
+             }
+         }
