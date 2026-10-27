@@ -1504,6 +1504,7 @@ config KERNEL_SQUASHFS_XATTR
 choice
 	prompt "Compiler optimization level"
 	default KERNEL_CC_OPTIMIZE_FOR_SIZE if SMALL_FLASH
+	default KERNEL_CC_OPTIMIZE_FOR_SIZE if TARGET_siflower_sf19a2890
 
 config KERNEL_CC_OPTIMIZE_FOR_PERFORMANCE
 	bool "Optimize for performance"
