@@ -178,7 +178,8 @@ define KernelPackage/leds-ktd202x/description
   This option enables support for the Kinetic KTD2026/KTD2027
   RGB/White LED driver found in different BQ mobile phones, and for
   the compatible Etek ET6326 found in the GL.iNet GL-SFT1200.
-  It is a 3 or 4 channel LED driver programmed via an I2C interface.
+  It is a 3 or 4 channel LED driver programmed via an I2C interface,
+  with hardware blinking and breathing (pattern trigger hw_pattern).
 endef
 
 $(eval $(call KernelPackage,leds-ktd202x))
