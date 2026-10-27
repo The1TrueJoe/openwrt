@@ -1,0 +1,40 @@
+From eb8f5143ebebd5b09130719f43494cdb187614be Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Mon, 26 Oct 2026 21:24:31 -0400
+Subject: [PATCH 01/10] leds: rgb: ktd202x: Fix the flash period of short
+ blinks on 32 bit
+
+When delay_on + delay_off is below 256 ms, the unsigned subtraction of
+KTD202X_FLASH_PERIOD_MIN_MS wraps. On 64 bit the result happens to
+truncate to -1 and gets clamped to the shortest period, but on 32 bit it
+truncates to 33554431 and gets clamped to the longest one, so asking for
+a fast blink gives a blink every 16 seconds.
+
+Compare before subtracting.
+
+Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
+Cc: stable@vger.kernel.org
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ drivers/leds/rgb/leds-ktd202x.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+--- a/drivers/leds/rgb/leds-ktd202x.c
++++ b/drivers/leds/rgb/leds-ktd202x.c
+@@ -296,9 +296,13 @@ static int ktd202x_blink_set(struct ktd2
+ 	/* Convert into values the HW will understand. */
+ 
+ 	/* Integer representation of time of flash period */
+-	num_steps = (*delay_on + *delay_off - KTD202X_FLASH_PERIOD_MIN_MS) /
+-		    KTD202X_FLASH_PERIOD_STEP_MS;
+-	num_steps = clamp(num_steps, 0, KTD202X_FLASH_PERIOD_MAX_STEPS);
++	delay_total_ms = *delay_on + *delay_off;
++	if (delay_total_ms < KTD202X_FLASH_PERIOD_MIN_MS)
++		num_steps = 0;
++	else
++		num_steps = min_t(unsigned long, KTD202X_FLASH_PERIOD_MAX_STEPS,
++				  (delay_total_ms - KTD202X_FLASH_PERIOD_MIN_MS) /
++				  KTD202X_FLASH_PERIOD_STEP_MS);
+ 
+ 	/* Integer representation of percentage of LED ON time */
+ 	on = (*delay_on * KTD202X_FLASH_ON_MAX) / (*delay_on + *delay_off);
