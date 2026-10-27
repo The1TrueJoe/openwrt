@@ -167,7 +167,7 @@ $(eval $(call KernelPackage,leds-apu))
 
 define KernelPackage/leds-ktd202x
   SUBMENU:=LED modules
-  TITLE:=LED support for KTD202x Chips
+  TITLE:=LED support for KTD202x and ET6326 Chips
   DEPENDS:=+kmod-i2c-core +kmod-regmap-i2c
   KCONFIG:=CONFIG_LEDS_KTD202X
   FILES:= $(LINUX_DIR)/drivers/leds/rgb/leds-ktd202x.ko
@@ -176,7 +176,8 @@ endef
 
 define KernelPackage/leds-ktd202x/description
   This option enables support for the Kinetic KTD2026/KTD2027
-  RGB/White LED driver found in different BQ mobile phones.
+  RGB/White LED driver found in different BQ mobile phones, and for
+  the compatible Etek ET6326 found in the GL.iNet GL-SFT1200.
   It is a 3 or 4 channel LED driver programmed via an I2C interface.
 endef
 
