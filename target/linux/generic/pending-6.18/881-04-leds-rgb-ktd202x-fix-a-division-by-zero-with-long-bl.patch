@@ -1,0 +1,63 @@
+From 2d55e60ad33db71b8e1ab1dce5f3ef9d3fc9832a Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 00:01:02 -0400
+Subject: [PATCH 04/10] leds: rgb: ktd202x: Fix a division by zero with long
+ blinks
+
+blink_set() works out the on time as delay_on * 256 / (delay_on +
+delay_off) in unsigned long, with delays straight from the timer
+trigger's sysfs files:
+
+- when the two delays add up to exactly 2^32 on 32 bit, or 2^64 on
+  64 bit, the sum wraps to 0 and the kernel divides by zero, for
+  example with "echo 2147483648" into both delay_on and delay_off.
+  That oopses on x86 and gives an arbitrary result on MIPS and arm64.
+- on 32 bit the product already overflows once delay_on is above about
+  4.6 hours, and a sum that wraps sets the wrong period, so long blinks
+  get an arbitrary duty cycle
+
+Saturate the sum, and compute the on time with mul_u64_u64_div_u64().
+
+Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
+Cc: stable@vger.kernel.org
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ drivers/leds/rgb/leds-ktd202x.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+--- a/drivers/leds/rgb/leds-ktd202x.c
++++ b/drivers/leds/rgb/leds-ktd202x.c
+@@ -9,10 +9,12 @@
+ 
+ #include <linux/i2c.h>
+ #include <linux/led-class-multicolor.h>
++#include <linux/math64.h>
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/overflow.h>
+ #include <linux/regmap.h>
+ #include <linux/regulator/consumer.h>
+ 
+@@ -296,7 +298,8 @@ static int ktd202x_blink_set(struct ktd2
+ 	/* Convert into values the HW will understand. */
+ 
+ 	/* Integer representation of time of flash period */
+-	delay_total_ms = *delay_on + *delay_off;
++	if (check_add_overflow(*delay_on, *delay_off, &delay_total_ms))
++		delay_total_ms = ULONG_MAX;
+ 	if (delay_total_ms < KTD202X_FLASH_PERIOD_MIN_MS)
+ 		num_steps = 0;
+ 	else
+@@ -308,8 +311,8 @@ static int ktd202x_blink_set(struct ktd2
+ 	 * Integer representation of percentage of LED ON time. A value of 0
+ 	 * keeps the LED dark, so use the shortest on time instead.
+ 	 */
+-	on = (*delay_on * KTD202X_FLASH_ON_MAX) / (*delay_on + *delay_off);
+-	on = max(on, 1);
++	on = mul_u64_u64_div_u64(*delay_on, KTD202X_FLASH_ON_MAX, delay_total_ms);
++	on = clamp(on, 1, KTD202X_FLASH_ON_MAX - 1);
+ 
+ 	/* Actually used delay_{on,off} values */
+ 	delay_total_ms = num_steps * KTD202X_FLASH_PERIOD_STEP_MS + KTD202X_FLASH_PERIOD_MIN_MS;

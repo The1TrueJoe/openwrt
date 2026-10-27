@@ -1,0 +1,55 @@
+From ecd273f51b5d91290849cf11c478a650117e1b07 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Mon, 26 Oct 2026 21:24:58 -0400
+Subject: [PATCH 02/10] leds: rgb: ktd202x: Fix an out-of-bounds read with
+ unused channels
+
+The LED array is allocated for the number of child nodes, but
+ktd202x_chip_in_use() walks it up to num_leds, the number of channels of
+the chip. With fewer LEDs in the device tree than channels, for example
+two LEDs on a KTD2026, it reads past the end of the allocation and the
+__counted_by() annotation hides that from the bounds checkers.
+
+Allocate one entry per channel.
+
+Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
+Cc: stable@vger.kernel.org
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ drivers/leds/rgb/leds-ktd202x.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+--- a/drivers/leds/rgb/leds-ktd202x.c
++++ b/drivers/leds/rgb/leds-ktd202x.c
+@@ -537,6 +537,7 @@ static int ktd202x_probe(struct i2c_clie
+ {
+ 	struct device *dev = &client->dev;
+ 	struct ktd202x *chip;
++	unsigned long num_leds;
+ 	int count;
+ 	int ret;
+ 
+@@ -544,10 +545,13 @@ static int ktd202x_probe(struct i2c_clie
+ 	if (!count || count > KTD202X_MAX_LEDS)
+ 		return dev_err_probe(dev, -EINVAL, "Incorrect number of leds (%d)", count);
+ 
+-	chip = devm_kzalloc(dev, struct_size(chip, leds, count), GFP_KERNEL);
++	/* Loops over the LEDs go up to the number of channels, not of child nodes */
++	num_leds = (unsigned long)i2c_get_match_data(client);
++	chip = devm_kzalloc(dev, struct_size(chip, leds, num_leds), GFP_KERNEL);
+ 	if (!chip)
+ 		return -ENOMEM;
+ 
++	chip->num_leds = num_leds;
+ 	chip->dev = dev;
+ 	i2c_set_clientdata(client, chip);
+ 
+@@ -562,8 +566,6 @@ static int ktd202x_probe(struct i2c_clie
+ 	if (ret)
+ 		return ret;
+ 
+-	chip->num_leds = (unsigned long)i2c_get_match_data(client);
+-
+ 	chip->regulators[0].supply = "vin";
+ 	chip->regulators[1].supply = "vio";
+ 	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(chip->regulators), chip->regulators);
