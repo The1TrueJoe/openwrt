@@ -1,0 +1,163 @@
+#!/bin/sh
+# Diagnostic image only, for bring-up without a serial console.
+#
+# The kernel command line sends the kernel log as netconsole UDP broadcasts
+# to port 6666 through eth0, untagged; the switch is still as U-Boot left
+# it, because its DSA driver does not autoload here. This service copies the
+# system state into the kernel log, loads the switch driver, moves
+# netconsole to br-lan and copies the state again. It sets the LED beacons
+# (see /lib/opal-diag-led.sh) and writes the logs to any FAT USB stick every
+# 20 s, into opal-diag/boot-<id>/.
+#
+# On the host: tcpdump -i <if> -n -l -A 'udp port 6666'
+#
+# Usage: opal-diag          the boot service
+#        opal-diag usb <dev> dump the logs to one stick partition now
+
+. /lib/opal-diag-led.sh
+
+NC=/sys/kernel/config/netconsole/cmdline0
+LOG=/tmp/opal-diag.log
+BOOT=boot-$(cut -c1-8 /proc/sys/kernel/random/boot_id)
+
+say() {
+	echo "opal-diag: $*" > /dev/kmsg
+	echo "$*" >> "$LOG"
+}
+
+run() {
+	say "### $*"
+	"$@" 2>&1 | grep -v 'opal-diag:' | while IFS= read -r l; do
+		echo "opal-diag: $l" > /dev/kmsg
+	done
+}
+
+fail() {
+	say "FAILED: $*"
+	touch /tmp/opal-diag.failed
+	opal_led fail
+}
+
+nc_dev() {
+	[ -d "$NC" ] || return 1
+	echo 0 > "$NC/enabled"
+	echo "$1" > "$NC/dev_name"
+	echo 1 > "$NC/enabled" 2>/dev/null || return 1
+	say "netconsole now on $1"
+}
+
+state() {
+	local c i
+
+	for c in "cat /proc/cmdline" uptime "cat /proc/mtd" "ubinfo -a" mount \
+		 df free lsmod "ip -d link" "ip addr" "bridge link" \
+		 "cat /proc/interrupts" "ls -l /sys/class/net" "swconfig list"; do
+		echo "### $c"
+		$c 2>&1
+	done
+	for i in eth0 lan1 lan2 wan br-lan; do
+		echo "### ethtool $i"
+		ethtool "$i" 2>&1
+		ethtool -S "$i" 2>&1
+	done
+}
+
+state_kmsg() {
+	run cat /proc/cmdline
+	run cat /proc/mtd
+	run sh -c 'for v in /sys/class/ubi/ubi*_*; do [ -e "$v/name" ] && echo "$v $(cat $v/name) $(cat $v/data_bytes)"; done'
+	run mount
+	run lsmod
+	run ip -d link
+	run ip addr
+	run sh -c 'for n in /sys/class/net/*; do echo "$n carrier=$(cat $n/carrier 2>/dev/null) oper=$(cat $n/operstate)"; done'
+	run sh -c 'logread | tail -n 80'
+}
+
+usb_dump() {
+	local dev mnt=/tmp/opal-diag.mnt dir
+
+	mkdir /tmp/opal-diag.usb.lock 2>/dev/null || return 0
+	mkdir -p "$mnt"
+	for dev in ${1:-/dev/sd[a-z][0-9]*}; do
+		[ -b "$dev" ] || continue
+		mount -t vfat "$dev" "$mnt" 2>/dev/null || continue
+		dir=$mnt/opal-diag/$BOOT
+		mkdir -p "$dir"
+		dmesg > "$dir/dmesg.txt" 2>&1
+		logread > "$dir/logread.txt" 2>&1
+		state > "$dir/state.txt" 2>&1
+		cp "$LOG" "$dir/opal-diag.txt" 2>/dev/null
+		echo "$(cat /proc/uptime) written from $dev" > "$dir/written.txt"
+		sync
+		umount "$mnt"
+	done
+	rmdir /tmp/opal-diag.usb.lock
+}
+
+links_up() {
+	local n
+
+	grep -q 1 /sys/class/net/br-lan/carrier 2>/dev/null || return 1
+	for n in lan1 lan2 wan; do
+		grep -q 1 /sys/class/net/$n/carrier 2>/dev/null && return 0
+	done
+	return 1
+}
+
+if [ "$1" = usb ]; then
+	usb_dump "$2"
+	exit 0
+fi
+
+mount -t configfs configfs /sys/kernel/config 2>/dev/null
+if [ "$(cat "$NC/enabled" 2>/dev/null)" != 1 ]; then
+	# The boot-time target failed, probably because eth0 came up late
+	nc_dev eth0 && run dmesg
+fi
+
+say "stage 1: before the switch driver ($BOOT)"
+state_kmsg
+[ -d /sys/class/ubi/ubi0 ] || fail "UBI not attached"
+grep -q ' /overlay ' /proc/mounts || fail "no overlay, rootfs_data not mounted"
+usb_dump
+
+say "stage 2: loading the switch driver"
+mkdir -p /tmp/opal-diag.d
+printf 'tag_mxl-gsw1xx\nmxl-gsw1xx\n' > /tmp/opal-diag.d/42-dsa-mxl-gsw1xx
+run kmodloader /tmp/opal-diag.d/
+t=0
+while [ $t -lt 60 ] && ! [ -d /sys/class/net/lan1 ]; do
+	sleep 2
+	t=$((t + 2))
+done
+[ -d /sys/class/net/lan1 ] || fail "no DSA ports after 60 s"
+sleep 10
+# netpoll refuses bridge ports, so br-lan rather than lan1
+nc_dev br-lan || nc_dev lan1 || nc_dev eth0
+# The kernel messages since the driver loaded may not have got out on eth0
+run sh -c "dmesg | sed -n '/opal-diag: stage 2/,\$p'"
+say "stage 2: after the switch driver"
+state_kmsg
+usb_dump
+
+i=0
+while :; do
+	sleep 20
+	i=$((i + 1))
+	if links_up; then
+		[ -e /tmp/opal-diag.failed ] || [ -e /tmp/opal-diag.blink ] || {
+			touch /tmp/opal-diag.blink
+			say "br-lan up with carrier"
+			opal_led blink
+		}
+	elif [ $i -eq 6 ] && ! [ -e /tmp/opal-diag.blink ]; then
+		fail "no carrier on br-lan after 2 min"
+	fi
+	[ $((i % 3)) -eq 0 ] && [ $i -le 45 ] && {
+		say "alive $((i / 3)) min"
+		run ip addr
+	}
+	# Every 20 s for 30 min, then every 5 min
+	[ $i -le 90 ] || [ $((i % 15)) -eq 0 ] && usb_dump
+done

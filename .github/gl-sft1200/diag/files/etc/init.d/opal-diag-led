@@ -1,0 +1,9 @@
+#!/bin/sh /etc/rc.common
+# Diagnostic image only: blue LED once every other init script has started.
+
+START=99
+
+boot() {
+	. /lib/opal-diag-led.sh
+	[ -e /tmp/opal-diag.failed ] || opal_led blue
+}

@@ -1,0 +1,3 @@
+# Diagnostic image only: dump the logs to a newly inserted FAT stick.
+[ "$ACTION" = add ] && [ "$DEVTYPE" = partition ] || exit 0
+/usr/sbin/opal-diag usb "/dev/$DEVNAME" &

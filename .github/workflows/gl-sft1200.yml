@@ -1,12 +1,12 @@
-name: GL-SFT1200 images
+name: GL-SFT1200 diagnostic images
 
-# Test builds for the GL.iNet GL-SFT1200 (siflower/sf19a2890) series.
-# Not part of the series sent upstream.
+# Diagnostic builds for bring-up without a serial console: the kernel log
+# goes out as netconsole UDP broadcasts. Never for upstream.
 
 on:
   push:
     branches:
-      - siflower-gl-sft1200-ci
+      - siflower-gl-sft1200-diag
   workflow_dispatch:
 
 permissions:
@@ -48,9 +48,31 @@ jobs:
           CONFIG_TARGET_ROOTFS_INITRAMFS=y
           CONFIG_DEVEL=y
           CONFIG_BUILD_LOG=y
+          CONFIG_PACKAGE_i2c-tools=y
+          CONFIG_PACKAGE_kmod-i2c-designware-platform=y
+          CONFIG_PACKAGE_kmod-usb-storage=y
+          CONFIG_PACKAGE_kmod-fs-vfat=y
+          CONFIG_PACKAGE_kmod-nls-cp437=y
+          CONFIG_PACKAGE_kmod-nls-iso8859-1=y
+          CONFIG_PACKAGE_ubi-utils=y
+          CONFIG_PACKAGE_ip-full=y
+          CONFIG_PACKAGE_ip-bridge=y
+          CONFIG_PACKAGE_ethtool=y
           EOF
           make defconfig
-          grep -E 'DEVICE_glinet|ROOTFS_(INITRAMFS|SQUASHFS)|kmod-dsa' .config
+          grep -E 'DEVICE_glinet|ROOTFS_(INITRAMFS|SQUASHFS)|kmod-dsa|i2c|usb-storage|vfat|ubi-utils|ip-full|ip-bridge|ethtool' .config
+
+      - name: Diagnostic rootfs overlay
+        run: |
+          cp -a .github/gl-sft1200/diag/files files
+          mkdir -p files/etc/rc.d
+          ln -s ../init.d/opal-diag files/etc/rc.d/S98opal-diag
+          ln -s ../init.d/opal-diag-led files/etc/rc.d/S99opal-diag-led
+          # Keep the DSA switch driver from autoloading: opal-diag loads it
+          # later, once the untagged netconsole has sent the boot log.
+          mkdir -p files/etc/modules.d
+          : > files/etc/modules.d/42-dsa-mxl-gsw1xx
+          find files -ls
 
       - name: Download sources
         run: make -j$(nproc) download || make -j1 download V=s
@@ -94,60 +116,27 @@ jobs:
           dtb=$(ls build_dir/target-*/linux-siflower_sf19a2890/image-sf19a2890_glinet_gl-sft1200.dtb)
           dt-validate -s processed-schema.json "$dtb" 2>&1 | tee dt-validate.txt
 
+      - name: Name the diagnostic images
+        if: always() && steps.build.outcome == 'success'
+        run: |
+          mkdir diag
+          cd bin/targets/siflower/sf19a2890
+          for f in *glinet_gl-sft1200-squashfs-factory.img *glinet_gl-sft1200-squashfs-sysupgrade.bin *glinet_gl-sft1200-initramfs-kernel.bin; do
+            [ -f "$f" ] && cp "$f" "../../../../diag/DIAG-$f"
+          done
+          cd ../../../../diag
+          sha256sum * | tee SHA256SUMS
+
       - name: Upload images
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: glinet_gl-sft1200-images
+          name: glinet_gl-sft1200-DIAGNOSTIC-images
           path: |
-            bin/targets/siflower/sf19a2890/
+            diag/
             verify.txt
             dt-validate.txt
           if-no-files-found: warn
-
-      - name: Negative test, a kernel over the limit must not give images
-        if: always() && steps.build.outcome == 'success'
-        run: |
-          kdir=$(ls -d build_dir/target-*/linux-siflower_sf19a2890)
-          rm -f "$kdir"/glinet_gl-sft1200-* bin/targets/siflower/sf19a2890/*glinet_gl-sft1200*
-          make target/linux/install KERNEL_SIZE=1024k V=s > small-kernel.log 2>&1 || true
-          grep 'is too big' small-kernel.log
-          if ls bin/targets/siflower/sf19a2890/*glinet_gl-sft1200*squashfs* 2>/dev/null; then
-            echo "::error::images were produced with a kernel over KERNEL_SIZE"
-            exit 1
-          fi
-          echo "no factory or sysupgrade image produced, as expected"
-
-      - name: Check kernel patches are refreshed
-        if: always()
-        run: |
-          make target/linux/refresh V=s
-          git status --porcelain
-          git diff > kernel-patch-refresh.diff
-          [ ! -s kernel-patch-refresh.diff ] || echo "::warning::kernel patches need a refresh, see the artifact"
-
-      - name: Upload refresh diff
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-patch-refresh
-          path: kernel-patch-refresh.diff
-          if-no-files-found: ignore
-
-      - name: Kernel size experiments
-        if: always() && steps.toolchain.outcome == 'success'
-        timeout-minutes: 180
-        run: bash .github/gl-sft1200/kernel-size.sh
-
-      - name: Upload kernel size results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-size
-          path: |
-            kernel-size.txt
-            build-*.log
-          if-no-files-found: ignore
 
       - name: Upload logs on failure
         if: failure()

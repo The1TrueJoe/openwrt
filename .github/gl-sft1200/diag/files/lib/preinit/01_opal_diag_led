@@ -1,0 +1,8 @@
+# Diagnostic image only: white LED as soon as preinit runs.
+
+opal_diag_preinit_led() {
+	. /lib/opal-diag-led.sh
+	opal_led reset && opal_led white
+}
+
+boot_hook_add preinit_main opal_diag_preinit_led

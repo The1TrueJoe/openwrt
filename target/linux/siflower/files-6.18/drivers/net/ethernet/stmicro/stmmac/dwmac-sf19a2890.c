@@ -141,6 +141,13 @@ static int sf19a2890_gmac_probe(struct platform_device *pdev)
 	ret = sfgmac_set_delay_from_nvmem(priv);
 	if (ret == -EPROBE_DEFER)
 		return -EPROBE_DEFER;
+	if (ret) {
+		/* Diagnostic build: the GL-SFT1200 factory value */
+		dev_warn(&pdev->dev, "diag: no rgmii-delay cell (%d), using 0x110a\n", ret);
+		writel(0x11, priv->gmac_cfg + REG_CLK_TX_DELAY);
+		writel(0x0a, priv->gmac_cfg + REG_CLK_RX_PHY_DELAY);
+		writel(1, priv->gmac_cfg + REG_CLK_RX_PHY_DELAY_EN);
+	}
 
 	ret = sfgmac_setup_phy_interface(priv);
 	if (ret)
