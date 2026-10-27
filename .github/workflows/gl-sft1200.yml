@@ -1,4 +1,4 @@
-name: GL-SFT1200 debug modules
+name: GL-SFT1200 mdio-gpio test
 
 # Test builds for the GL.iNet GL-SFT1200 (siflower/sf19a2890) series.
 # Not part of the series sent upstream.
@@ -6,7 +6,7 @@ name: GL-SFT1200 debug modules
 on:
   push:
     branches:
-      - siflower-gl-sft1200-debug
+      - siflower-gl-sft1200-mdiogpio
   workflow_dispatch:
 
 permissions:
@@ -93,7 +93,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: glinet_gl-sft1200-debug-images
+          name: glinet_gl-sft1200-mdiogpio-images
           path: |
             bin/targets/siflower/sf19a2890/
             verify.txt
@@ -110,14 +110,14 @@ jobs:
             echo "$f: $(strings "$f" | grep -m1 '^vermagic=')"
           done | tee debug-modules/VERMAGIC
           strings debug-modules/mxl-gsw1xx.ko | grep -c DEBUG
-          cp bin/targets/siflower/sf19a2890/*glinet_gl-sft1200-squashfs-sysupgrade.bin debug-modules/DEBUG-sysupgrade.bin
+          cp bin/targets/siflower/sf19a2890/*glinet_gl-sft1200-squashfs-sysupgrade.bin debug-modules/MDIOGPIO-DEBUG-sysupgrade.bin
           (cd debug-modules && sha256sum * | tee SHA256SUMS)
 
       - name: Upload the debug modules
         if: always() && steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: glinet_gl-sft1200-DEBUG-gsw1xx-modules
+          name: glinet_gl-sft1200-MDIOGPIO-test
           path: debug-modules/
 
       - name: Upload logs on failure

@@ -38,10 +38,88 @@
 			linux,input-type = <EV_SW>;
 		};
 	};
+
+	/* Bit-banged like stock: the GMAC MDIO block does not reach the switch */
+	mdio-gpio {
+		compatible = "virtual,mdio-gpio";
+		gpios = <&gpio 28 GPIO_ACTIVE_HIGH>, <&gpio 29 GPIO_ACTIVE_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		switch@0 {
+			compatible = "intel,gsw150";
+			reg = <0>;
+			reset-gpios = <&gpio 0 GPIO_ACTIVE_LOW>;
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+					label = "wan";
+					phy-handle = <&switchphy0>;
+					phy-mode = "internal";
+					nvmem-cells = <&macaddr_factory_0 0>;
+					nvmem-cell-names = "mac-address";
+				};
+
+				port@1 {
+					reg = <1>;
+					label = "lan2";
+					phy-handle = <&switchphy1>;
+					phy-mode = "internal";
+					nvmem-cells = <&macaddr_factory_0 1>;
+					nvmem-cell-names = "mac-address";
+				};
+
+				port@2 {
+					reg = <2>;
+					label = "lan1";
+					phy-handle = <&switchphy2>;
+					phy-mode = "internal";
+					nvmem-cells = <&macaddr_factory_0 1>;
+					nvmem-cell-names = "mac-address";
+				};
+
+				/* The GMAC adds both RGMII delays (rgmii-delay above). */
+				port@5 {
+					reg = <5>;
+					phy-mode = "rgmii-id";
+					tx-internal-delay-ps = <0>;
+					rx-internal-delay-ps = <0>;
+					ethernet = <&gmac>;
+
+					fixed-link {
+						speed = <1000>;
+						full-duplex;
+					};
+				};
+			};
+
+			mdio {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				switchphy0: ethernet-phy@0 {
+					reg = <0>;
+				};
+
+				switchphy1: ethernet-phy@1 {
+					reg = <1>;
+				};
+
+				switchphy2: ethernet-phy@2 {
+					reg = <2>;
+				};
+			};
+		};
+	};
 };
 
 &gmac {
 	status = "okay";
+	pinctrl-0 = <&rgmii_pins>;
 	phy-mode = "rgmii";
 	snps,ps-speed = <1000>;
 	nvmem-cells = <&macaddr_factory_0 0>, <&rgmii_delay_factory_b2>;
@@ -66,76 +144,6 @@
 	};
 };
 
-&mdio {
-	switch@0 {
-		compatible = "intel,gsw150";
-		reg = <0>;
-		reset-gpios = <&gpio 0 GPIO_ACTIVE_LOW>;
-
-		ports {
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			port@0 {
-				reg = <0>;
-				label = "wan";
-				phy-handle = <&switchphy0>;
-				phy-mode = "internal";
-				nvmem-cells = <&macaddr_factory_0 0>;
-				nvmem-cell-names = "mac-address";
-			};
-
-			port@1 {
-				reg = <1>;
-				label = "lan2";
-				phy-handle = <&switchphy1>;
-				phy-mode = "internal";
-				nvmem-cells = <&macaddr_factory_0 1>;
-				nvmem-cell-names = "mac-address";
-			};
-
-			port@2 {
-				reg = <2>;
-				label = "lan1";
-				phy-handle = <&switchphy2>;
-				phy-mode = "internal";
-				nvmem-cells = <&macaddr_factory_0 1>;
-				nvmem-cell-names = "mac-address";
-			};
-
-			/* The GMAC adds both RGMII delays (rgmii-delay above). */
-			port@5 {
-				reg = <5>;
-				phy-mode = "rgmii-id";
-				tx-internal-delay-ps = <0>;
-				rx-internal-delay-ps = <0>;
-				ethernet = <&gmac>;
-
-				fixed-link {
-					speed = <1000>;
-					full-duplex;
-				};
-			};
-		};
-
-		mdio {
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			switchphy0: ethernet-phy@0 {
-				reg = <0>;
-			};
-
-			switchphy1: ethernet-phy@1 {
-				reg = <1>;
-			};
-
-			switchphy2: ethernet-phy@2 {
-				reg = <2>;
-			};
-		};
-	};
-};
 
 &spi {
 	status = "okay";
