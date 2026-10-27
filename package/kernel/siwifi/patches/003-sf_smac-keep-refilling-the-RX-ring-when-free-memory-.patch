@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 00:09:14 -0400
+Subject: [PATCH] sf_smac: keep refilling the RX ring when free memory is low
+
+Each received buffer is replaced one for one in a fixed ring of RX
+buffers. The refill refused to allocate whenever free memory was under
+5 MB and left the slot empty. The vendor kernel never reached that
+branch, because it allocates from a private skb pool (CONFIG_SF_SKB_POOL)
+that mainline does not have. On mainline the ring drains under memory
+pressure until the radio stops receiving.
+
+Drop the check and let the page allocator's watermarks decide; an
+allocation failure is still counted and handled as before.
+
+Found and measured on the Banana Pi BPI-WiFi5 by the
+napoluluna/bpi-wifi5-openwrt port.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/siwifi_utils.c | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/sf_smac/src/bb_src/umac/siwifi_utils.c b/sf_smac/src/bb_src/umac/siwifi_utils.c
+index 2392b8d..e7300b8 100644
+--- a/sf_smac/src/bb_src/umac/siwifi_utils.c
++++ b/sf_smac/src/bb_src/umac/siwifi_utils.c
+@@ -257,12 +257,6 @@ int siwifi_ipc_rxbuf_elem_allocs(struct siwifi_hw *siwifi_hw)
+ #ifdef CONFIG_SF_SKB_POOL
+     skb = __netdev_alloc_skb_from_pool(NULL, size, GFP_ATOMIC, siwifi_hw->skb_pool_dev_param);
+ #else
+-    unsigned long long free_mem;
+-    free_mem = global_zone_page_state(NR_FREE_PAGES) << (PAGE_SHIFT -10);
+-    if (free_mem < SIWIFI_RX_LOW_MEM_SIZE) {
+-        siwifi_hw->rx_skb_alloc_fail_cnt++;
+-        return 1;
+-    }
+     skb = siwifi_dev_alloc_rxskb(size);
+ #endif
+     if (unlikely(!skb)) {

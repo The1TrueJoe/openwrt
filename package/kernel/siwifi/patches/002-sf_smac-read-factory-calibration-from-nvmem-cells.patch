@@ -1,0 +1,281 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 00:09:14 -0400
+Subject: [PATCH] sf_smac: read factory calibration from nvmem cells
+
+The per-unit tx-power and XO calibration lives in the factory partition
+at 0x800. The vendor kernel read it through its own sfax8_factory_read
+module, which the open release does not ship, so the code that uses it
+was compiled out and every board fell back to the generic tables. On
+the Banana Pi BPI-WiFi5 that was measured as about 32 dB low on 2.4 GHz
+and 11 dB low on 5 GHz.
+
+Provide sf_get_value_from_factory() in the RF module instead, reading
+nvmem cells on the "siflower,sf19a2890-rf" node: "calibration" for the
+block at 0x800 (version tag, XO trim, tables) and an optional
+"cooling-temp". The cells are looked up on demand, so the MAC driver
+does not depend on the RF device having probed. The MAC addresses keep
+coming from each MAC node's "mac-address" cell.
+
+The header keeps the vendor's name and interface, so the call sites do
+not change, and the driver now always builds with
+CONFIG_SFAX8_FACTORY_READ.
+
+Not compile-tested.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_main.c |   2 +-
+ sf_smac/src/bb_src/umac/siwifi_factory_info.c |   2 +-
+ sf_smac/src/bb_src/umac/siwifi_factory_info.h |   2 +-
+ sf_smac/src/bb_src/umac/siwifi_mpw0.c         |   2 +-
+ sf_smac/src/fmac/Makefile                     |   1 +
+ sf_smac/src/rf/Makefile                       |   2 +
+ sf_smac/src/rf/rf_entry.c                     |   2 +-
+ sf_smac/src/rf/sf_factory.c                   | 102 ++++++++++++++++++
+ sf_smac/src/rf/sfax8_factory_read.h           |  31 ++++++
+ 9 files changed, 141 insertions(+), 5 deletions(-)
+ create mode 100644 sf_smac/src/rf/sf_factory.c
+ create mode 100644 sf_smac/src/rf/sfax8_factory_read.h
+
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+index 589a8ed..06a821f 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+@@ -10,7 +10,7 @@
+ #include <linux/of_device.h>
+ #include <linux/timer.h>
+ #ifdef CONFIG_SFAX8_FACTORY_READ
+-#include <sfax8_factory_read.h>
++#include "sfax8_factory_read.h"
+ #endif
+ #include "siwifi_defs.h"
+ #include "siwifi_mpw0.h"
+diff --git a/sf_smac/src/bb_src/umac/siwifi_factory_info.c b/sf_smac/src/bb_src/umac/siwifi_factory_info.c
+index 1cb689b..00111e3 100644
+--- a/sf_smac/src/bb_src/umac/siwifi_factory_info.c
++++ b/sf_smac/src/bb_src/umac/siwifi_factory_info.c
+@@ -3,7 +3,7 @@
+ #include "siwifi_lmac_glue.h"
+ #include "siwifi_cfgfile.h"
+ #ifdef CONFIG_SFAX8_FACTORY_READ
+-#include <sfax8_factory_read.h>
++#include "sfax8_factory_read.h"
+ #else
+ #define XO_CONFIG_SIZE 2
+ #define WIFI_INFO_SIZE 2046
+diff --git a/sf_smac/src/bb_src/umac/siwifi_factory_info.h b/sf_smac/src/bb_src/umac/siwifi_factory_info.h
+index 18093c5..16193db 100644
+--- a/sf_smac/src/bb_src/umac/siwifi_factory_info.h
++++ b/sf_smac/src/bb_src/umac/siwifi_factory_info.h
+@@ -2,7 +2,7 @@
+ #define _SIWIFI_FACTORY_INFO_H_ 
+ #include "siwifi_defs.h"
+ #ifdef CONFIG_SFAX8_FACTORY_READ
+-#include <sfax8_factory_read.h>
++#include "sfax8_factory_read.h"
+ #endif
+ #define LB_ONE_CHAN_GAIN_NUM 28
+ #define HB_ONE_CHAN_GAIN_NUM 53
+diff --git a/sf_smac/src/bb_src/umac/siwifi_mpw0.c b/sf_smac/src/bb_src/umac/siwifi_mpw0.c
+index c3ff67e..61a2fd8 100644
+--- a/sf_smac/src/bb_src/umac/siwifi_mpw0.c
++++ b/sf_smac/src/bb_src/umac/siwifi_mpw0.c
+@@ -10,7 +10,7 @@
+ #include <linux/of_device.h>
+ #include <linux/reset.h>
+ #ifdef CONFIG_SFAX8_FACTORY_READ
+-#include <sfax8_factory_read.h>
++#include "sfax8_factory_read.h"
+ #endif
+ #ifdef CONFIG_SF16A18_WIFI_RF
+ #include "rf_pl_ref.h"
+diff --git a/sf_smac/src/fmac/Makefile b/sf_smac/src/fmac/Makefile
+index ff2a665..184586d 100644
+--- a/sf_smac/src/fmac/Makefile
++++ b/sf_smac/src/fmac/Makefile
+@@ -13,5 +13,6 @@ export root_src_ref_dir
+ include $(umac_dir)/fullmac/fullmac.mk
+ 
+ ccflags-y += -I$(DRV_PATH)/rf/
++ccflags-y += -DCONFIG_SFAX8_FACTORY_READ
+ 
+ sf16a18_fmac-y += $(SF16A18_FULLMAC_SRC_OBJS)
+diff --git a/sf_smac/src/rf/Makefile b/sf_smac/src/rf/Makefile
+index 3fcaf45..6006c41 100644
+--- a/sf_smac/src/rf/Makefile
++++ b/sf_smac/src/rf/Makefile
+@@ -21,6 +21,7 @@ ccflags-$(CONFIG_UPDATE_GAIN_TABLE) += -DUPDATE_GAIN_TABLE
+ #ccflags-y += -DFORCE_UPDATE_GAIN_TABLE
+ 
+ ccflags-y += -DENABLE_DIGGAIN_TABLE
++ccflags-y += -DCONFIG_SFAX8_FACTORY_READ
+ 
+ ccflags-$(CONFIG_SF16A18_COOLING_TEMP) += -DCOOLING_TEMP
+ ccflags-$(CONFIG_DUAL_ANTENNA_CALIBRATE) += -DCFG_DUAL_ANTENNA_CALIBRATE
+@@ -31,6 +32,7 @@ ccflags-$(CONFIG_SIWIFI_TEMPERATURE_CONTROL) += -DCONFIG_SIWIFI_TEMPERATURE_CONT
+ sf16a18_rf-$(CONFIG_SF16A18_WIFI_IQ_TESTENGINE_ENABLE) += iq_te_core.o
+ sf16a18_rf-y += rf_entry.o
+ sf16a18_rf-y += rf_access.o
++sf16a18_rf-y += sf_factory.o
+ sf16a18_rf-$(CONFIG_SF16A18_RF_SYSFS_DEBUG) += rf_sysfs.o
+ ccflags-$(CONFIG_SF16A18_RF_SYSFS_DEBUG) += -DCONFIG_SF16A18_RF_SYSFS_DEBUG
+ 
+diff --git a/sf_smac/src/rf/rf_entry.c b/sf_smac/src/rf/rf_entry.c
+index 95ab86c..3ed92ec 100644
+--- a/sf_smac/src/rf/rf_entry.c
++++ b/sf_smac/src/rf/rf_entry.c
+@@ -19,7 +19,7 @@
+ #include <sfax8_thermal.h>
+ #endif
+ #ifdef CONFIG_SFAX8_FACTORY_READ
+-#include <sfax8_factory_read.h>
++#include "sfax8_factory_read.h"
+ #endif
+ #ifdef CONFIG_SF16A18_RF_SYSFS_DEBUG
+ #include "rf_sysfs.h"
+diff --git a/sf_smac/src/rf/sf_factory.c b/sf_smac/src/rf/sf_factory.c
+new file mode 100644
+index 0000000..e9ad0dc
+--- /dev/null
++++ b/sf_smac/src/rf/sf_factory.c
+@@ -0,0 +1,102 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Per-board Wi-Fi factory data for the SF19A2890 radios.
++ *
++ * The vendor kernel had a separate sfax8_factory_read module that read the
++ * "factory" MTD partition at offsets hard-wired in its own DT node. Here the
++ * same data comes from nvmem cells on the RF node instead:
++ *
++ *   "calibration"   the block at factory offset 0x800: a two-byte version
++ *                   tag ("XO", "V2", "V3" or "V4"), the two-byte XO trim and
++ *                   the per-band tx-power tables. 0x800 bytes cover the
++ *                   single-antenna formats, "V4" needs 0xd36.
++ *   "cooling-temp"  optional, two bytes (factory offset 0xae on most boards)
++ *
++ * The cells are looked up when they are needed, so the MAC driver does not
++ * depend on the RF device having probed first.
++ */
++#include <linux/minmax.h>
++#include <linux/module.h>
++#include <linux/nvmem-consumer.h>
++#include <linux/of.h>
++#include <linux/slab.h>
++#include "sfax8_factory_read.h"
++
++#define SF_RF_COMPATIBLE	"siflower,sf19a2890-rf"
++
++static int sf_factory_read_cell(const char *name, size_t off, void *buf,
++				size_t len)
++{
++	struct device_node *np;
++	struct nvmem_cell *cell;
++	size_t cell_len;
++	void *data;
++	int ret = 0;
++
++	np = of_find_compatible_node(NULL, NULL, SF_RF_COMPATIBLE);
++	if (!np)
++		return -ENODEV;
++
++	cell = of_nvmem_cell_get(np, name);
++	of_node_put(np);
++	if (IS_ERR(cell))
++		return PTR_ERR(cell);
++
++	data = nvmem_cell_read(cell, &cell_len);
++	nvmem_cell_put(cell);
++	if (IS_ERR(data))
++		return PTR_ERR(data);
++
++	if (off + len > cell_len)
++		ret = -EINVAL;
++	else
++		memcpy(buf, data + off, len);
++
++	kfree(data);
++	return ret;
++}
++
++/* An erased block reads 0xff; only a known tag means a table follows. */
++static bool sf_factory_cali_valid(void)
++{
++	char v[WIFI_VERSION_SIZE];
++
++	if (sf_factory_read_cell("calibration", 0, v, sizeof(v)))
++		return false;
++
++	return (v[0] == 'X' && v[1] == 'O') ||
++	       (v[0] == 'V' && v[1] >= '2' && v[1] <= '4');
++}
++
++int sf_get_value_from_factory(enum sfax8_factory_read_action action,
++			      void *buffer, int len)
++{
++	if (!buffer || len <= 0)
++		return -EINVAL;
++
++	switch (action) {
++	case READ_WIFI_VERSION:
++		return sf_factory_read_cell("calibration", 0, buffer,
++					    min(len, WIFI_VERSION_SIZE));
++	case READ_RF_XO_CONFIG:
++		if (!sf_factory_cali_valid())
++			return -ENOENT;
++		return sf_factory_read_cell("calibration", WIFI_VERSION_SIZE,
++					    buffer, min(len, XO_CONFIG_SIZE));
++	case READ_WIFI_INFO:
++		if (!sf_factory_cali_valid())
++			return -ENOENT;
++		return sf_factory_read_cell("calibration", WIFI_VERSION_SIZE,
++					    buffer, len);
++	case READ_COOLING_TEMP:
++		return sf_factory_read_cell("cooling-temp", 0, buffer,
++					    min(len, COOLING_TEMP_SIZE));
++	default:
++		/*
++		 * The MACs take their address from the "mac-address" cell on
++		 * their own nodes; returning an error here selects that path.
++		 */
++		return -ENOENT;
++	}
++}
++EXPORT_SYMBOL_GPL(sf_get_value_from_factory);
+diff --git a/sf_smac/src/rf/sfax8_factory_read.h b/sf_smac/src/rf/sfax8_factory_read.h
+new file mode 100644
+index 0000000..5b13d4b
+--- /dev/null
++++ b/sf_smac/src/rf/sfax8_factory_read.h
+@@ -0,0 +1,31 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Factory data accessor shared by the RF and MAC drivers. The name and the
++ * interface follow the vendor's sfax8_factory_read module, so the drivers'
++ * call sites stay as they are; the implementation is in sf_factory.c.
++ */
++#ifndef _SFAX8_FACTORY_READ_H_
++#define _SFAX8_FACTORY_READ_H_
++
++/* sizes in bytes */
++#define WIFI_VERSION_SIZE	2
++#define XO_CONFIG_SIZE		2
++#define COOLING_TEMP_SIZE	2
++/* the rest of the 0x800-byte block; 2 (XO) + 364 + 1325 + 83 = 1774 are used */
++#define WIFI_INFO_SIZE		2046
++/* "V4": 2 (XO) + (364 + 1325) * 2 antennas */
++#define WIFI_INFO_SIZE_V4	3380
++
++enum sfax8_factory_read_action {
++	READ_WIFI_LB_MAC_ADDRESS,
++	READ_WIFI_HB_MAC_ADDRESS,
++	READ_WIFI_VERSION,
++	READ_RF_XO_CONFIG,
++	READ_WIFI_INFO,
++	READ_COOLING_TEMP,
++};
++
++int sf_get_value_from_factory(enum sfax8_factory_read_action action,
++			      void *buffer, int len);
++
++#endif /* _SFAX8_FACTORY_READ_H_ */

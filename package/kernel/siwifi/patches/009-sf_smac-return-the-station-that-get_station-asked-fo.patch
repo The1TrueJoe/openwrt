@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 04:07:31 -0400
+Subject: [PATCH] sf_smac: return the station that get_station asked for
+
+In AP mode siwifi_cfg80211_get_station() picked the first entry of the
+station list that was either valid or had the requested address, so a
+query for any associated client returned the statistics of whichever
+valid client came first. hostapd uses get_station for its inactivity
+timer, so one busy client kept every other client looking active, and
+the per-station signal and rate shown by iw were wrong.
+
+Match on the address, and only for valid entries.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_main.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+index 4166721..e2ebc7d 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+@@ -3007,7 +3007,7 @@ static int siwifi_cfg80211_get_station(struct wiphy *wiphy, struct wireless_dev
+         struct siwifi_sta *sta;
+         spin_lock_bh(&siwifi_hw->cb_lock);
+         list_for_each_entry(sta, &siwifi_vif->ap.sta_list, list) {
+-            if (sta->valid || ether_addr_equal(sta->mac_addr, mac)){
++            if (sta->valid && ether_addr_equal(sta->mac_addr, mac)) {
+                 found_sta = sta;
+                 break;
+             }

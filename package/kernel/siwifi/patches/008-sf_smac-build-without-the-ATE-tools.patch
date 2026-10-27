@@ -1,0 +1,137 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 01:37:46 -0400
+Subject: [PATCH] sf_smac: build without the ATE tools
+
+The vendor build always enabled CONFIG_SF16A18_WIFI_ATE_TOOLS, so code
+outside the ATE tools came to depend on them in two ways:
+
+- siwifi_hw.ate_env exists only with the ATE tools, but the TX
+  statistics work and the heart-beat check read it regardless. Read it
+  only when they are built.
+
+- The internal ACS code calls siwifi_freq_to_idx(), whose only global
+  definition is in siwifi_ioctl.c, so the module fails at modpost:
+
+    ERROR: modpost: "siwifi_freq_to_idx" [fmac/sf16a18_fmac.ko] undefined!
+
+  siwifi_msg_rx.c has a static copy that the survey handler uses to
+  index the same siwifi_hw->survey[] array. Export that one through
+  siwifi_msg_rx.h, use it from ACS, and drop the ATE copy, which nothing
+  in siwifi_ioctl.c calls. The copies differed only for a frequency
+  missing from the wiphy, where the ATE one returned -1 and ACS then
+  read survey[-1]; ACS takes its frequencies from the cfg80211 ACS
+  request, which only holds channels of this wiphy.
+
+The ATE tools add private ioctls that write the calibration back to
+flash, so this package leaves them out.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_acs.c  |  2 +-
+ .../src/bb_src/umac/fullmac/siwifi_ioctl.c    | 23 -------------------
+ sf_smac/src/bb_src/umac/fullmac/siwifi_main.c |  2 ++
+ sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c   |  2 ++
+ sf_smac/src/bb_src/umac/siwifi_msg_rx.c       |  2 +-
+ sf_smac/src/bb_src/umac/siwifi_msg_rx.h       |  1 +
+ 6 files changed, 7 insertions(+), 25 deletions(-)
+
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_acs.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_acs.c
+index a1d661d..2eca0bb 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_acs.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_acs.c
+@@ -4,8 +4,8 @@
+ #include "siwifi_defs.h"
+ #include "hw_interface.h"
+ #include "siwifi_msg_tx.h"
++#include "siwifi_msg_rx.h"
+ #include "siwifi_mem.h"
+-extern int siwifi_freq_to_idx(struct siwifi_hw *siwifi_hw, int freq);
+ int siwifi_acs_scan_abord(struct siwifi_hw *siwifi_hw, bool abord)
+ {
+  printk("%s start \n", __func__);
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_ioctl.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_ioctl.c
+index 8f999b7..7cdf883 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_ioctl.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_ioctl.c
+@@ -204,29 +204,6 @@ static int siwifi_response_info_to_user(struct siwifi_ioctl_ate_dump_info *user,
+     }
+     return 0;
+ }
+-int siwifi_freq_to_idx(struct siwifi_hw *siwifi_hw, int freq)
+-{
+-    struct ieee80211_supported_band *sband;
+-    int band, ch, idx = 0;
+-    for (band = NL80211_BAND_2GHZ; band < NUM_NL80211_BANDS; band++) {
+-        sband = siwifi_hw->wiphy->bands[band];
+-        if (!sband) {
+-            continue;
+-        }
+-        printk("sband->n_channels = %d\n", sband->n_channels);
+-        for (ch = 0, idx = 0; ch < sband->n_channels; ch++, idx++) {
+-            if (sband->channels[ch].center_freq == freq) {
+-                goto exit;
+-            }
+-        }
+-    }
+-    idx = -1;
+-    if ((freq >= 4900) && (freq <= 5825)) {
+-        idx = 0;
+-    }
+-exit:
+-    return idx;
+-}
+ static int siwifi_char_to_int(char *tmp_data)
+ {
+     int tmp_int = 0;
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+index 44a35ef..4166721 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+@@ -530,7 +530,9 @@ static void heart_beat_handler(struct work_struct *wk)
+     }
+     schedule_delayed_work(&siwifi_hw->heart_work, MSECS(SIWIFI_HEART_BEAT_TIME_MS));
+     mutex_unlock(&siwifi_hw->dbgdump_elem.mutex);
++#ifdef CONFIG_SF16A18_WIFI_ATE_TOOLS
+     if(!(siwifi_hw->ate_env.ate_start))
++#endif
+         siwifi_channel_recovery_check(siwifi_hw);
+ }
+ #endif
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c
+index 554ac68..54415d1 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c
+@@ -35,7 +35,9 @@ void txq_stat_handler(struct work_struct *wk)
+     struct siwifi_sta *siwifi_sta = NULL;
+     struct siwifi_txq *txq = NULL;
+     int tid = 0;
++#ifdef CONFIG_SF16A18_WIFI_ATE_TOOLS
+     if(siwifi_hw->ate_env.ate_start) return;
++#endif
+     spin_lock_bh(&siwifi_hw->cb_lock);
+     list_for_each_entry(vif, &siwifi_hw->vifs, list) {
+         if (SIWIFI_VIF_TYPE(vif) == NL80211_IFTYPE_AP){
+diff --git a/sf_smac/src/bb_src/umac/siwifi_msg_rx.c b/sf_smac/src/bb_src/umac/siwifi_msg_rx.c
+index 05b5fe5..52275c7 100644
+--- a/sf_smac/src/bb_src/umac/siwifi_msg_rx.c
++++ b/sf_smac/src/bb_src/umac/siwifi_msg_rx.c
+@@ -20,7 +20,7 @@
+ #if defined(CONFIG_SIWIFI_ACS) || defined(CONFIG_SIWIFI_ACS_INTERNAL)
+ #include "siwifi_acs.h"
+ #endif
+-static int siwifi_freq_to_idx(struct siwifi_hw *siwifi_hw, int freq)
++int siwifi_freq_to_idx(struct siwifi_hw *siwifi_hw, int freq)
+ {
+     struct ieee80211_supported_band *sband;
+     int band, ch, idx = 0;
+diff --git a/sf_smac/src/bb_src/umac/siwifi_msg_rx.h b/sf_smac/src/bb_src/umac/siwifi_msg_rx.h
+index 79fdf8c..1d26324 100644
+--- a/sf_smac/src/bb_src/umac/siwifi_msg_rx.h
++++ b/sf_smac/src/bb_src/umac/siwifi_msg_rx.h
+@@ -1,4 +1,5 @@
+ #ifndef _SIWIFI_MSG_RX_H_
+ #define _SIWIFI_MSG_RX_H_ 
+ void siwifi_rx_handle_msg(struct siwifi_hw *siwifi_hw, struct ipc_e2a_msg *msg);
++int siwifi_freq_to_idx(struct siwifi_hw *siwifi_hw, int freq);
+ #endif
