@@ -1,0 +1,385 @@
+From 7858eeeccbaa9e13d5b310c02c37805842a50b3c Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Mon, 26 Oct 2026 21:33:42 -0400
+Subject: [PATCH 10/10] leds: rgb: ktd202x: Don't let a blinking LED retime
+ another one
+
+Every LED blinks with the PWM1 flash timer. So when a second LED blinks,
+its period and on time silently replace those of the first one, while
+the sysfs of the first one still shows its old delays. The same happens
+between a blink and a hardware pattern, and the ramps a pattern sets
+leak into a later blink.
+
+The PWM2 timer can't take the second LED: in timer slot 1, which the
+driver uses, it repeats PWM1 (Reg3 has no effect, measured on an
+ET6326), and in the other slots it only runs after PWM1 within the same
+period.
+
+Track which LEDs are on the timer instead of reading the channel state
+back. A LED may join the timer while no other LED uses it, or when it
+asks for the very same period, on time and ramps. Otherwise it stays on
+and gets -EBUSY, which makes the LED core blink it in software. Only
+write the timer registers when they change, so that a LED joining the
+timer does not restart the blink of the others. Also never program an
+on time of zero for a hardware pattern.
+
+The match is on the programmed values. The timer trigger writes delay_on
+and delay_off one at a time, and each write is rounded against the other's
+rounded value, so two LEDs set to the same delays can get on times a few
+steps apart. The second one then blinks in software, at the timing it
+asked for. The documentation says how to make them share.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ Documentation/leds/leds-ktd202x.rst |  13 +-
+ drivers/leds/rgb/leds-ktd202x.c     | 218 +++++++++++++++++-----------
+ 2 files changed, 146 insertions(+), 85 deletions(-)
+
+--- a/Documentation/leds/leds-ktd202x.rst
++++ b/Documentation/leds/leds-ktd202x.rst
+@@ -31,9 +31,16 @@ equal and not 0. ``repeat`` must be -1,
+ The sum of the four times is the flash period. The driver rounds it up to the
+ next step of 128 ms, between 256 ms (128 ms on the ET6326) and 16384 ms.
+ 
+-The flash period, the on time and the ramp times are shared by all LEDs of a
+-chip. When several LEDs blink or breathe at once, they all follow the timing
+-that was set last.
++All LEDs of a chip blink and breathe with one flash timer. Several LEDs can
++use it at once only with the same period, on time and ramps. A LED that asks
++for different ones while another LED is on the timer gets -EBUSY: blinking
++then falls back to the software timer, and ``hw_pattern`` returns the error.
++
++The match is on the values programmed into the chip. The timer trigger sets
++``delay_on`` and ``delay_off`` one at a time and the driver rounds each pair,
++so two LEDs given the same delays can end up with slightly different on times,
++and then the second one blinks in software. To share the timer, give the
++second LED the delays that the first one reads back.
+ 
+ For example, to breathe with a period of 4 seconds::
+ 
+--- a/drivers/leds/rgb/leds-ktd202x.c
++++ b/drivers/leds/rgb/leds-ktd202x.c
+@@ -128,6 +128,8 @@ struct ktd202x_led {
+ 		struct led_classdev_mc mcdev;
+ 	};
+ 	u32 index;
++	/* Blinking or breathing with the flash timer */
++	bool on_timer;
+ };
+ 
+ struct ktd202x {
+@@ -137,6 +139,10 @@ struct ktd202x {
+ 	struct regmap *regmap;
+ 	const struct ktd202x_info *info;
+ 	bool enabled;
++	/* Settings of the flash timer, valid while a LED is on it */
++	u8 flash_period;
++	u8 flash_on;
++	u8 ramp_times;
+ 	unsigned long num_leds;
+ 	struct ktd202x_led leds[] __counted_by(num_leds);
+ };
+@@ -196,13 +202,20 @@ static bool ktd202x_chip_in_use(struct k
+ 	return false;
+ }
+ 
++/* The channel mode of a lit LED: on, or blinking with the flash timer */
++static unsigned int ktd202x_channel_mode(struct ktd202x_led *led, int channel)
++{
++	if (led->on_timer)
++		return KTD202X_CHANNEL_CTRL_PWM1(channel);
++
++	return KTD202X_CHANNEL_CTRL_ON(channel);
++}
++
+ static int ktd202x_brightness_set(struct ktd202x_led *led,
+ 				  struct mc_subled *subleds,
+ 				  unsigned int num_channels)
+ {
+-	bool mode_blink = false;
+ 	int channel;
+-	int state;
+ 	int ret;
+ 	int i;
+ 
+@@ -212,24 +225,9 @@ static int ktd202x_brightness_set(struct
+ 			return ret;
+ 	}
+ 
+-	ret = regmap_read(led->chip->regmap, KTD202X_REG_CHANNEL_CTRL, &state);
+-	if (ret)
+-		return ret;
+-
+-	/*
+-	 * In multicolor case, assume blink mode if PWM is set for at least one
+-	 * channel because another channel cannot be in state ON at the same time
+-	 */
+-	for (i = 0; i < num_channels; i++) {
+-		int channel_state;
+-
+-		channel = subleds[i].channel;
+-		channel_state = (state >> 2 * channel) & KTD202X_CHANNEL_CTRL_MASK(0);
+-		if (channel_state == KTD202X_CHANNEL_CTRL_OFF)
+-			continue;
+-		mode_blink = channel_state == KTD202X_CHANNEL_CTRL_PWM1(0);
+-		break;
+-	}
++	/* A LED that is turned off stops blinking and leaves the timer */
++	if (!led->cdev.brightness)
++		led->on_timer = false;
+ 
+ 	for (i = 0; i < num_channels; i++) {
+ 		enum led_brightness brightness;
+@@ -245,10 +243,7 @@ static int ktd202x_brightness_set(struct
+ 			if (ret)
+ 				return ret;
+ 
+-			if (mode_blink)
+-				mode = KTD202X_CHANNEL_CTRL_PWM1(channel);
+-			else
+-				mode = KTD202X_CHANNEL_CTRL_ON(channel);
++			mode = ktd202x_channel_mode(led, channel);
+ 		} else {
+ 			mode = KTD202X_CHANNEL_CTRL_OFF;
+ 		}
+@@ -320,6 +315,89 @@ static unsigned long ktd202x_flash_perio
+ 	return num_steps * KTD202X_FLASH_PERIOD_STEP_MS + info->flash_period_min_ms;
+ }
+ 
++/*
++ * All LEDs blink with the PWM1 flash timer. PWM2 is no help: in timer slot 1
++ * it repeats PWM1, and in the other slots it only runs after PWM1 within the
++ * same period. So a LED may only join the timer while it is unused, or used
++ * with the very same period, on time and ramps, so that it never retimes
++ * another LED behind its back.
++ */
++static bool ktd202x_timer_busy(struct ktd202x_led *led, u8 flash_period,
++			       u8 flash_on, u8 ramp_times)
++{
++	struct ktd202x *chip = led->chip;
++	int i;
++
++	for (i = 0; i < chip->num_leds; i++) {
++		struct ktd202x_led *other = &chip->leds[i];
++
++		if (other == led || !other->on_timer)
++			continue;
++
++		if (flash_period != chip->flash_period ||
++		    flash_on != chip->flash_on || ramp_times != chip->ramp_times)
++			return true;
++	}
++
++	return false;
++}
++
++/* Called with the chip mutex held */
++static int ktd202x_timer_set(struct ktd202x_led *led, struct mc_subled *subleds,
++			     unsigned int num_channels, u8 flash_period, u8 flash_on,
++			     u8 ramp_times)
++{
++	struct ktd202x *chip = led->chip;
++	u8 ctrl_mask = 0;
++	u8 ctrl_mode = 0;
++	bool busy;
++	int ret;
++	int i;
++
++	busy = ktd202x_timer_busy(led, flash_period, flash_on, ramp_times);
++	led->on_timer = !busy;
++
++	for (i = 0; i < num_channels; i++) {
++		int channel = subleds[i].channel;
++
++		ctrl_mask |= KTD202X_CHANNEL_CTRL_MASK(channel);
++		ctrl_mode |= ktd202x_channel_mode(led, channel);
++	}
++
++	/* Without the timer, leave the LED steadily on */
++	if (busy) {
++		ret = regmap_update_bits(chip->regmap, KTD202X_REG_CHANNEL_CTRL,
++					 ctrl_mask, ctrl_mode);
++		return ret ? ret : -EBUSY;
++	}
++
++	chip->flash_period = flash_period;
++	chip->flash_on = flash_on;
++	chip->ramp_times = ramp_times;
++
++	/*
++	 * Update the timer registers only when they change, so that the
++	 * blink of another LED on the timer is not restarted.
++	 */
++	ret = regmap_update_bits(chip->regmap, KTD202X_REG_FLASH_PERIOD, 0xff,
++				 flash_period);
++	if (ret)
++		return ret;
++
++	ret = regmap_update_bits(chip->regmap, KTD202X_REG_PWM1_TIMER, 0xff,
++				 flash_on);
++	if (ret)
++		return ret;
++
++	ret = regmap_update_bits(chip->regmap, KTD202X_REG_TRISE_FALL, 0xff,
++				 ramp_times);
++	if (ret)
++		return ret;
++
++	return regmap_update_bits(chip->regmap, KTD202X_REG_CHANNEL_CTRL,
++				  ctrl_mask, ctrl_mode);
++}
++
+ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+ 			     unsigned long *delay_off, struct mc_subled *subleds,
+ 			     unsigned int num_channels)
+@@ -328,22 +406,21 @@ static int ktd202x_blink_set(struct ktd2
+ 	unsigned long delay_total_ms;
+ 	int ret, num_steps, on;
+ 	u8 ctrl_mask = 0;
+-	u8 ctrl_pwm1 = 0;
+ 	u8 ctrl_on = 0;
+ 	int i;
+ 
+ 	mutex_lock(&led->chip->mutex);
+ 
+-	for (i = 0; i < num_channels; i++) {
+-		int channel = subleds[i].channel;
+-
+-		ctrl_mask |= KTD202X_CHANNEL_CTRL_MASK(channel);
+-		ctrl_on |= KTD202X_CHANNEL_CTRL_ON(channel);
+-		ctrl_pwm1 |= KTD202X_CHANNEL_CTRL_PWM1(channel);
+-	}
+-
+ 	/* Never off - brightness is already set, disable blinking */
+ 	if (!*delay_off) {
++		for (i = 0; i < num_channels; i++) {
++			int channel = subleds[i].channel;
++
++			ctrl_mask |= KTD202X_CHANNEL_CTRL_MASK(channel);
++			ctrl_on |= KTD202X_CHANNEL_CTRL_ON(channel);
++		}
++
++		led->on_timer = false;
+ 		ret = regmap_update_bits(led->chip->regmap, KTD202X_REG_CHANNEL_CTRL,
+ 					 ctrl_mask, ctrl_on);
+ 		goto out;
+@@ -363,28 +440,19 @@ static int ktd202x_blink_set(struct ktd2
+ 	on = mul_u64_u64_div_u64(*delay_on, KTD202X_FLASH_ON_MAX, delay_total_ms);
+ 	on = clamp(on, 1, KTD202X_FLASH_ON_MAX - 1);
+ 
++	/*
++	 * Without the ramps a hardware pattern may have set. On -EBUSY the
++	 * LED core falls back to software blinking.
++	 */
++	ret = ktd202x_timer_set(led, subleds, num_channels, num_steps, on,
++				KTD202X_RAMP_TIMES_2_MS);
++	if (ret)
++		goto out;
++
+ 	/* Actually used delay_{on,off} values */
+ 	delay_total_ms = ktd202x_flash_period_ms(info, num_steps);
+ 	*delay_on = (delay_total_ms * on) / KTD202X_FLASH_ON_MAX;
+ 	*delay_off = delay_total_ms - *delay_on;
+-
+-	/* Set timings */
+-	ret = regmap_write(led->chip->regmap, KTD202X_REG_FLASH_PERIOD, num_steps);
+-	if (ret)
+-		goto out;
+-
+-	ret = regmap_write(led->chip->regmap, KTD202X_REG_PWM1_TIMER, on);
+-	if (ret)
+-		goto out;
+-
+-	/* Drop the ramps a hardware pattern may have left behind */
+-	ret = regmap_write(led->chip->regmap, KTD202X_REG_TRISE_FALL,
+-			   KTD202X_RAMP_TIMES_2_MS);
+-	if (ret)
+-		goto out;
+-
+-	ret = regmap_update_bits(led->chip->regmap, KTD202X_REG_CHANNEL_CTRL,
+-				 ctrl_mask, ctrl_pwm1);
+ out:
+ 	mutex_unlock(&led->chip->mutex);
+ 	return ret;
+@@ -484,18 +552,9 @@ static int ktd202x_pattern_program(struc
+ 	unsigned int t[KTD202X_PATTERN_LEN];
+ 	unsigned int rise, fall, num_steps, on;
+ 	unsigned long period_ms, ton_ms;
+-	u8 ctrl_mask = 0;
+-	u8 ctrl_pwm1 = 0;
+ 	int ret;
+ 	int i;
+ 
+-	for (i = 0; i < num_channels; i++) {
+-		int channel = subleds[i].channel;
+-
+-		ctrl_mask |= KTD202X_CHANNEL_CTRL_MASK(channel);
+-		ctrl_pwm1 |= KTD202X_CHANNEL_CTRL_PWM1(channel);
+-	}
+-
+ 	for (i = 0; i < KTD202X_PATTERN_LEN; i++)
+ 		t[i] = min_t(u32, pattern[i].delta_t, KTD202X_PATTERN_MAX_MS);
+ 
+@@ -512,28 +571,15 @@ static int ktd202x_pattern_program(struc
+ 
+ 	/* The on time includes the rise time */
+ 	ton_ms = t[0] + t[1];
+-	on = min_t(unsigned long, KTD202X_FLASH_ON_MAX - 1,
+-		   DIV_ROUND_CLOSEST(ton_ms * KTD202X_FLASH_ON_MAX, period_ms));
++	on = clamp_t(unsigned long,
++		     DIV_ROUND_CLOSEST(ton_ms * KTD202X_FLASH_ON_MAX, period_ms),
++		     1, KTD202X_FLASH_ON_MAX - 1);
+ 
+ 	mutex_lock(&led->chip->mutex);
+-
+-	ret = regmap_write(led->chip->regmap, KTD202X_REG_FLASH_PERIOD, num_steps);
+-	if (ret)
+-		goto out;
+-
+-	ret = regmap_write(led->chip->regmap, KTD202X_REG_PWM1_TIMER, on);
+-	if (ret)
+-		goto out;
+-
+-	ret = regmap_write(led->chip->regmap, KTD202X_REG_TRISE_FALL,
+-			   KTD202X_RAMP_TFALL(fall) | KTD202X_RAMP_TRISE(rise));
+-	if (ret)
+-		goto out;
+-
+-	ret = regmap_update_bits(led->chip->regmap, KTD202X_REG_CHANNEL_CTRL,
+-				 ctrl_mask, ctrl_pwm1);
+-out:
++	ret = ktd202x_timer_set(led, subleds, num_channels, num_steps, on,
++				KTD202X_RAMP_TFALL(fall) | KTD202X_RAMP_TRISE(rise));
+ 	mutex_unlock(&led->chip->mutex);
++
+ 	return ret;
+ }
+ 
+@@ -555,7 +601,11 @@ static int ktd202x_pattern_single_set(st
+ 
+ 	info.channel = led->index;
+ 
+-	return ktd202x_pattern_program(led, pattern, &info, 1);
++	ret = ktd202x_pattern_program(led, pattern, &info, 1);
++	if (ret)
++		ktd202x_brightness_single_set(cdev, LED_OFF);
++
++	return ret;
+ }
+ 
+ static int ktd202x_pattern_single_clear(struct led_classdev *cdev)
+@@ -579,8 +629,12 @@ static int ktd202x_pattern_mc_set(struct
+ 	if (ret)
+ 		return ret;
+ 
+-	return ktd202x_pattern_program(led, pattern, mc->subled_info,
+-				       mc->num_colors);
++	ret = ktd202x_pattern_program(led, pattern, mc->subled_info,
++				      mc->num_colors);
++	if (ret)
++		ktd202x_brightness_mc_set(cdev, LED_OFF);
++
++	return ret;
+ }
+ 
+ static int ktd202x_pattern_mc_clear(struct led_classdev *cdev)
