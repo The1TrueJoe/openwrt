@@ -1,4 +1,4 @@
-From 9c8cd2021deb69f5cbc8ac4835d2dc6e64506f22 Mon Sep 17 00:00:00 2001
+From 20048a271b39be62bdf34773df54a66669b411c1 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:25:12 -0400
 Subject: [PATCH 04/11] leds: rgb: ktd202x: Never program an on time of zero

@@ -1,4 +1,4 @@
-From e89edb1870ebb76df445607d4ad2a1efe05da4f0 Mon Sep 17 00:00:00 2001
+From 4b706052a18edfbc26f640bfb7cc79d66f859cc7 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Tue, 27 Oct 2026 00:06:15 -0400
 Subject: [PATCH 11/11] MAINTAINERS: Add an entry for the KTD202x LED driver

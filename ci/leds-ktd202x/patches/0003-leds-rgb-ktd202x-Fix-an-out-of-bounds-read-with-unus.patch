@@ -1,4 +1,4 @@
-From 951165b9ea12c11bfa4400ada3b0ecfa2b483b7f Mon Sep 17 00:00:00 2001
+From ae5a27273b84aa88cb5573a727dc1237b7b585a5 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:58 -0400
 Subject: [PATCH 03/11] leds: rgb: ktd202x: Fix an out-of-bounds read with

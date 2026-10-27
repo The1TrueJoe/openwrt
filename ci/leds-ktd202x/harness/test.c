@@ -126,17 +126,16 @@ int main(void)
 	CHECK(on == 448 && off == 448, "reported %lu/%lu (896 ms period)", on, off);
 	CHECK(hw[6] == 0x0a, "blink from off uses max_brightness: IOUT 0x%02x", hw[6]);
 
-	printf("O13: second LED, same period, different duty -> PWM2\n");
-	int r1 = writes[1];
+	printf("O13: one flash timer; a second LED never retimes the first\n");
+	int r1 = writes[1], r2 = writes[2];
 	ret = blink(1, 100, 900, &on, &off);
-	CHECK(ret == 0 && CH(1) == 3 && hw[3] == 25, "white 100/900: ret %d mode %d Reg3 %u", ret, CH(1), hw[3]);
-	CHECK(hw[2] == 128 && CH(0) == 2, "blue untouched: Reg2 %u mode %d", hw[2], CH(0));
-	CHECK(writes[1] == r1, "Reg1 not rewritten (would restart blue's timer)");
-
-	printf("O13: different period while the other LED blinks -> -EBUSY\n");
+	CHECK(ret == -EBUSY && CH(1) == 1 && on == 100, "white 100/900 (other duty): ret %d, white steady (mode %d), delays untouched %lu", ret, CH(1), on);
+	CHECK(hw[2] == 128 && CH(0) == 2 && writes[1] == r1 && writes[2] == r2, "blue untouched: Reg2 %u mode %d, Reg1/Reg2 not rewritten", hw[2], CH(0));
 	ret = blink(1, 200, 200, &on, &off);
-	CHECK(ret == -EBUSY && CH(1) == 1 && on == 200, "white 200/200: ret %d, white steady on (mode %d), delays untouched %lu", ret, CH(1), on);
-	CHECK(hw[1] == 6 && hw[2] == 128 && CH(0) == 2, "blue still blinking at Reg1 %u Reg2 %u", hw[1], hw[2]);
+	CHECK(ret == -EBUSY && CH(1) == 1, "white 200/200 (other period): ret %d, steady", ret);
+	ret = blink(1, 500, 500, &on, &off);
+	CHECK(ret == 0 && CH(1) == 2 && CH(0) == 2 && writes[1] == r1 && writes[2] == r2, "white 500/500 (same timing): ret %d, shares the timer (mode %d), nothing rewritten", ret, CH(1));
+	CHECK(hw[3] == 1, "Reg3 (PWM2 on time) never used: 0x%02x", hw[3]);
 
 	printf("O13: pattern needs ramps the blinking LED does not use -> -EBUSY\n");
 	struct led_pattern p[4] = { { 1920, 0 }, { 384, 11 }, { 1920, 11 }, { 0, 0 } };

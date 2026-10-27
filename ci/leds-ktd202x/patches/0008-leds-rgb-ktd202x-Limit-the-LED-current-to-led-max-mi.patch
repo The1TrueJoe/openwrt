@@ -1,4 +1,4 @@
-From 1d6e41878da7a4233e2d373594203eb0a0e9a59f Mon Sep 17 00:00:00 2001
+From c92ab34f24213424aaf983fb4af945f67a363dd5 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 08/11] leds: rgb: ktd202x: Limit the LED current to
