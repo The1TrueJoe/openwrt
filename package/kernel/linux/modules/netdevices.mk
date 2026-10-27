@@ -868,6 +868,38 @@ endef
 
 $(eval $(call KernelPackage,dsa-mxl862xx))
 
+define KernelPackage/dsa-lantiq-common
+  SUBMENU:=$(NETWORK_DEVICES_MENU)
+  TITLE:=Lantiq / MaxLinear GSWIP switch common support
+  HIDDEN:=1
+  DEPENDS:=+kmod-dsa +kmod-regmap-core
+  KCONFIG:=CONFIG_NET_DSA_LANTIQ_COMMON
+  FILES:=$(LINUX_DIR)/drivers/net/dsa/lantiq/lantiq_gswip_common.ko
+  AUTOLOAD:=$(call AutoLoad,40,lantiq_gswip_common,1)
+endef
+
+$(eval $(call KernelPackage,dsa-lantiq-common))
+
+define KernelPackage/dsa-mxl-gsw1xx
+  SUBMENU:=$(NETWORK_DEVICES_MENU)
+  TITLE:=MaxLinear GSW1xx switch family support
+  DEPENDS:=+kmod-dsa-lantiq-common
+  KCONFIG:= \
+	CONFIG_NET_DSA_MXL_GSW1XX \
+	CONFIG_NET_DSA_TAG_MXL_GSW1XX
+  FILES:= \
+	$(LINUX_DIR)/drivers/net/dsa/lantiq/mxl-gsw1xx.ko \
+	$(LINUX_DIR)/net/dsa/tag_mxl-gsw1xx.ko
+  AUTOLOAD:=$(call AutoLoad,42,tag_mxl-gsw1xx mxl-gsw1xx,1)
+endef
+
+define KernelPackage/dsa-mxl-gsw1xx/description
+  DSA driver for the MaxLinear (formerly Intel / Lantiq) GSW1xx family of
+  switches: GSW120, GSW125, GSW140, GSW141, GSW145 and GSW150 (PEB7084)
+endef
+
+$(eval $(call KernelPackage,dsa-mxl-gsw1xx))
+
 define KernelPackage/dsa-qca8k
   SUBMENU:=$(NETWORK_DEVICES_MENU)
   TITLE:=Qualcomm Atheros QCA8xxx switch family DSA support

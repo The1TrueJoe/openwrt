@@ -46,7 +46,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
  	struct sja1105_private *priv = ds->priv;
 --- a/include/net/dsa.h
 +++ b/include/net/dsa.h
-@@ -1118,7 +1118,8 @@ struct dsa_switch_ops {
+@@ -1120,7 +1120,8 @@ struct dsa_switch_ops {
  	void	(*port_mirror_del)(struct dsa_switch *ds, int port,
  				   struct dsa_mall_mirror_tc_entry *mirror);
  	int	(*port_policer_add)(struct dsa_switch *ds, int port,
