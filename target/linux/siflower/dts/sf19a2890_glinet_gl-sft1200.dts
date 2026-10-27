@@ -187,6 +187,11 @@
 					rgmii_delay_factory_b2: rgmii-delay@b2 {
 						reg = <0xb2 0x4>;
 					};
+
+					/* "XO" tag, XO trim, then the per-band tx-power tables */
+					wifi_calibration_factory_800: calibration@800 {
+						reg = <0x800 0x800>;
+					};
 				};
 			};
 
@@ -218,5 +223,27 @@
 };
 
 &usb_phy {
+	status = "okay";
+};
+
+/* No external PA, single-antenna ("XO") calibration: no force_expa and no
+ * dual-antenna-calibrate.
+ */
+&wlan_rf {
+	nvmem-cells = <&wifi_calibration_factory_800>;
+	nvmem-cell-names = "calibration";
+	status = "okay";
+};
+
+/* The driver adds its own offset to the base MAC: +2 here, +6 on 5 GHz. */
+&wlan_lb {
+	nvmem-cells = <&macaddr_factory_0 0>;
+	nvmem-cell-names = "mac-address";
+	status = "okay";
+};
+
+&wlan_hb {
+	nvmem-cells = <&macaddr_factory_0 0>;
+	nvmem-cell-names = "mac-address";
 	status = "okay";
 };

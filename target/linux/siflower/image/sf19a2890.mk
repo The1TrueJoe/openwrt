@@ -19,7 +19,7 @@ define Device/glinet_gl-sft1200
   DEVICE_ALT0_MODEL := Opal
   DEVICE_DTS := sf19a2890_glinet_gl-sft1200
   DEVICE_PACKAGES := kmod-dsa-mxl-gsw1xx kmod-phy-intel-xway \
-	kmod-phy-sf19a2890-usb kmod-usb-dwc2
+	kmod-phy-sf19a2890-usb kmod-usb-dwc2 kmod-siwifi wpad-basic-mbedtls
   BLOCKSIZE := 128k
   PAGESIZE := 2048
   # U-Boot reads only the first 3 MiB of the 4 MiB kernel partition
