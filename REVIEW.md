@@ -37,9 +37,9 @@ OpenWrt image has run on it yet.
 | 16 | PL022 plus GPIO chip select drives the NAND | Hans Ulli Kroll's dmesg, from another unit; stock uses a vendor SPI driver | no |
 | 17 | GSW150 DSA driver brings up all three ports with this binding | Hans Ulli Kroll's report: another unit, initramfs, his DTS | no |
 | 18 | TX FIFO ≥ 2 KiB, so `tx-fifo-depth = <2048>` is a safe lower bound; `rx-fifo-depth = <2048>` keeps hardware flow control off as stock does | stock sends 1522-byte VLAN-tagged frames (CPU port `5t`, eth0.1/eth0.2 at MTU 1500) with TX store-and-forward set (vendor sf_gmac, `DMA_OPERATION_TSF`); vendor never sets `DMA_OPERATION_EFC`; 6.18 `dwmac1000_configure_fc()` enables EFC only at ≥ 4096. The real FIFO sizes are not documented and the 3.73a does not report them | config yes; sizes inferred |
-| 19 | Kernel uImage fits 3 MiB | CI run 40448141508: 2918848 bytes at -Os, 226880 under (3349991 at -O2; reserve options measured: no kallsyms 2638704, stmmac+DSA as modules 2820708) | yes (build) |
+| 19 | Kernel uImage fits 3 MiB | CI run 40448141508: 2918848 bytes at -Os, 226880 under; on the 25.12.6 toolchain (ParkezeOS build, run 40453704327) 3000258 bytes, 145470 under (3349991 at -O2 on main; reserve options measured: no kallsyms 2638704, stmmac+DSA as modules 2820708) | yes (build) |
 | 20 | ET6326 LED controller at I2C 0x30 | U-Boot `i2c mw 0x30 ...` strings, stock DTB | yes (read); out of this series |
-| 21 | Series applies with no fuzz and is refresh-clean | `patch -F0` on the build host; `make target/linux/refresh` in CI run 40448141508 leaves an empty diff (generic + siflower) | yes (CI) |
+| 21 | Series applies with no fuzz and is refresh-clean | `patch -F0` on the build host; `make target/linux/refresh` in CI run 40448141508 leaves an empty diff (generic + siflower); OpenWrt's kernel.yml on all 98 subtargets (run 40486566465): every kernel builds; 25 patches in 8 other targets needed hunk-header-only refreshes (MAINTAINERS and DSA context moved by the backport), now folded into the backport commit | yes (CI) |
 | 22 | GMAC fix and the newest backports are checkpatch clean | `checkpatch.pl --strict` from 6.18.55 | yes (host) |
 
 ## Tests
@@ -59,7 +59,7 @@ All passed in CI run 40448141508 (series 52f3163837).
 | fwtool metadata: good image lists `glinet,gl-sft1200`; EVB image does not | as stated | test-sysupgrade.sh |
 | Rebuild with `KERNEL_SIZE=1024k`: "is too big", and no factory or sysupgrade image produced | no images | workflow |
 | `make target/linux/refresh` leaves no diff | empty diff | workflow |
-| dt-validate against Linux v7.3 bindings | switch, partitions and nvmem layout: clean. Board findings: gpio-keys node names (`reset`, `mode` should be `key-reset`, `switch-mode`; to fix). SoC-level: `rgmii-delay` nvmem cell is not in the dwmac binding (shared with the EVB); siflower clock/reset vendor properties and cpu nodes have no schema | workflow, informational |
+| dt-validate against Linux v7.3 bindings | switch, partitions and nvmem layout: clean. Board findings: none since the gpio-keys nodes were renamed `key-reset` and `switch-mode`. SoC-level: `rgmii-delay` nvmem cell is not in the dwmac binding (shared with the EVB); siflower clock/reset vendor properties and cpu nodes have no schema | workflow, informational |
 
 The platform_check cases ran on macOS against synthetic images, with the real
 `common.sh`, `nand.sh` and `platform.sh`. The good, factory, oversized-kernel,
@@ -134,9 +134,8 @@ Not testable without the unit:
 
 ## Open risks
 
-- gpio-keys node names fail dt-validate (cosmetic; fix with the first-boot changes).
-- The all-target `Build Kernel` check (OpenWrt's kernel.yml, which refreshes every target's patches) has not finished on the series yet.
-
+- The all-target `Build Kernel` check passed on the build but needed 25 hunk-header refreshes in other targets (folded in). Re-run it on every rebase: the backport moves MAINTAINERS and DSA context that many target patches share.
+- Kernel margin on 25.12 is 145 KB, against 227 KB on main.
 - -Os is a subtarget-wide default in config/Config-kernel.in. Precedent exists (`default y if TARGET_...`), but reviewers may prefer another way.
 - No boot on hardware: SPI NAND through PL022, switch bring-up, the delay
   values and the port mapping are all inferred.
