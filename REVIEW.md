@@ -29,7 +29,7 @@ OpenWrt image has run on it yet.
 | 8 | U-Boot reads an env from 0x80000 and falls back to defaults on a bad CRC | env code present, the partition is all zeros, the stock unit boots | inferred |
 | 9 | Base MAC at factory 0x0 = label MAC; LAN = base + 1 | factory hexdump, stock `mtd-mac-address-increment`, stock interface MACs | yes (read) |
 | 10 | RGMII delay string `110a` at factory 0xb2 | factory hexdump, stock dmesg `get gmac delay: 110a` | yes (read) |
-| 11 | Switch is an Intel GSW150 at SMI address 0 | vendor driver picked `intel7084`; registers read through `esw_debug` at SMI 0 | yes (read through vendor driver) |
+| 11 | Switch is an Intel GSW150 at SMI address 31 (0x1f) | measured on the unit by bit-banging MDIO on GPIO 28/29: only SMI 31 answers; MANU_ID (0xfa10) = 0x1713 (FIX1 1, MANID 0x389), PNUM_ID (0xfa11) = 0x3003, so part 0x31 v1.3; MII_CFG5 (0xf100) = 0x4044 as stock. The vendor's `gsw_mdio_addr` table is {0, 0x1f}; the first image used 0 and failed | yes (unit) |
 | 12 | Switch port 5 adds no RGMII delay (PCDU 0xF101 = 0) | live register read | yes (read) |
 | 13 | Port 0 = WAN, ports 1 and 2 = LAN | stock swconfig VLANs; link test on port 2 | port 2 yes; port 1 by elimination; port 0 from config only |
 | 14 | Reset GPIO 27 and slide switch GPIO 1, both active low | stock DTB flags, `/sys/kernel/debug/gpio` idle high | yes (read) |
@@ -41,8 +41,8 @@ OpenWrt image has run on it yet.
 | 20 | ET6326 LED controller at I2C 0x30 | U-Boot `i2c mw 0x30 ...` strings, stock DTB | yes (read); out of this series |
 | 21 | Series applies with no fuzz and is refresh-clean | `patch -F0` on the build host; `make target/linux/refresh` in CI run 40448141508 leaves an empty diff (generic + siflower); OpenWrt's kernel.yml on all 98 subtargets (run 40486566465): every kernel builds; 25 patches in 8 other targets needed hunk-header-only refreshes (MAINTAINERS and DSA context moved by the backport), now folded into the backport commit | yes (CI) |
 | 22 | GMAC fix and the newest backports are checkpatch clean | `checkpatch.pl --strict` from 6.18.55 | yes (host) |
-| 23 | First boot on hardware (52f3163837, via GL sysupgrade) | serial log: SPL, U-Boot, kernel, SPI NAND GD5F1GQ5 (c8:51), UBI attach, ubiblock root, overlay, procd, login shell; GMAC probes with the factory MAC. The switch did not probe: chip-ID read at SMI 0 fails (-ENODEV) | yes (unit) |
-| 24 | GSW150 reset is GPIO 0, active low | stock DT `esw-rst-gpio = <0>`; stock sgmac.ko `sf_trigger_eswitch_hwReset`: output high, low for 2 ms, high, then 100 ms. Without it the switch stays in reset. Now `reset-gpios` on the switch node | inferred; confirmation on the unit pending |
+| 23 | First boot on hardware (52f3163837, via GL sysupgrade) | serial log: SPL, U-Boot, kernel, SPI NAND GD5F1GQ5 (c8:51), UBI attach, ubiblock root, overlay, procd, login shell; GMAC probes with the factory MAC. The switch did not probe: at SMI 0 nothing answers, so the chip-ID read sees 0xffff (-ENODEV). Fixed: `switch@1f` | yes (unit) |
+| 24 | GSW150 reset is GPIO 0, active low | stock DT `esw-rst-gpio = <0>`; stock sgmac.ko `sf_trigger_eswitch_hwReset`: output high, low for 2 ms, high, then 100 ms. U-Boot leaves it high (out of reset); kept as `reset-gpios` so Linux owns the line | yes (unit: GPIO 512 out-high) |
 | 25 | All-target kernel check on a1710648ff | kernel.yml run 40542009664: 383/383 jobs green | yes (CI) |
 
 ## Tests
@@ -144,7 +144,7 @@ Not testable without the unit:
 
 ## Open risks
 
-- The switch reset (row 24) is inferred from the vendor driver; the first boot showed the switch not answering at all.
+- The switch at SMI 31 (row 11) is measured but the DSA bring-up on it is not yet booted.
 - The all-target `Build Kernel` check passed on the build but needed 25 hunk-header refreshes in other targets (folded in). Re-run it on every rebase: the backport moves MAINTAINERS and DSA context that many target patches share.
 - Kernel margin on 25.12 is 145 KB, against 227 KB on main.
 - -Os is a subtarget-wide default in config/Config-kernel.in. Precedent exists (`default y if TARGET_...`), but reviewers may prefer another way.
