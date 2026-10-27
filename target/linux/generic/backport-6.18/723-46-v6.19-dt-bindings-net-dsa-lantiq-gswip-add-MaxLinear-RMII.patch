@@ -1,0 +1,60 @@
+From e836824116b5644eb681777cd58cba915f4cbe75 Mon Sep 17 00:00:00 2001
+From: Daniel Golle <daniel@makrotopia.org>
+Date: Mon, 3 Nov 2025 12:19:34 +0000
+Subject: [PATCH] dt-bindings: net: dsa: lantiq,gswip: add MaxLinear RMII
+ refclk output property
+
+Add support for the maxlinear,rmii-refclk-out boolean property on port
+nodes to configure the RMII reference clock to be an output rather than
+an input.
+
+This property is only applicable for ports in RMII mode and allows the
+switch to provide the reference clock for RMII-connected PHYs instead
+of requiring an external clock source.
+
+This corresponds to the driver changes that read this Device Tree
+property to configure the RMII clock direction.
+
+Signed-off-by: Daniel Golle <daniel@makrotopia.org>
+Reviewed-by: Alexander Sverdlin <alexander.sverdlin@siemens.com>
+Reviewed-by: Krzysztof Kozlowski <krzysztof.kozlowski@linaro.org>
+Link: https://patch.msgid.link/9813bb916ecce9bae366e6c50c081014fe5371ea.1762170107.git.daniel@makrotopia.org
+Signed-off-by: Jakub Kicinski <kuba@kernel.org>
+---
+ .../bindings/net/dsa/lantiq,gswip.yaml         | 18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
+
+--- a/Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml
++++ b/Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml
+@@ -6,8 +6,7 @@ $schema: http://devicetree.org/meta-sche
+ 
+ title: Lantiq GSWIP Ethernet switches
+ 
+-allOf:
+-  - $ref: dsa.yaml#/$defs/ethernet-ports
++$ref: dsa.yaml#
+ 
+ maintainers:
+   - Hauke Mehrtens <hauke@hauke-m.de>
+@@ -91,6 +90,21 @@ properties:
+ 
+     additionalProperties: false
+ 
++patternProperties:
++  "^(ethernet-)?ports$":
++    type: object
++    patternProperties:
++      "^(ethernet-)?port@[0-6]$":
++        $ref: dsa-port.yaml#
++        unevaluatedProperties: false
++
++        properties:
++          maxlinear,rmii-refclk-out:
++            type: boolean
++            description:
++              Configure the RMII reference clock to be a clock output
++              rather than an input. Only applicable for RMII mode.
++
+ required:
+   - compatible
+   - reg

@@ -20,7 +20,7 @@ $(eval $(call KernelPackage,i2c-lantiq))
 define KernelPackage/dsa-gswip
   SUBMENU:=$(NETWORK_DEVICES_MENU)
   TITLE:=Lantiq xRx200/xRx300/xRx330 switch support
-  DEPENDS:=@TARGET_lantiq_xrx200||TARGET_lantiq_xrx200_legacy
+  DEPENDS:=@TARGET_lantiq_xrx200||TARGET_lantiq_xrx200_legacy +kmod-dsa-lantiq-common
   KCONFIG:= \
 	CONFIG_NET_DSA_LANTIQ_GSWIP \
 	CONFIG_NET_DSA_TAG_GSWIP

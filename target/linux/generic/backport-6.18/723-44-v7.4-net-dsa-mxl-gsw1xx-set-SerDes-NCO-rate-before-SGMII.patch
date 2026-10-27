@@ -1,0 +1,75 @@
+From 40c578ceaeecb59c0e277d3bcf39c9af071b5592 Mon Sep 17 00:00:00 2001
+From: "Jan Havran (Advantech Czech)" <havran.jan@email.cz>
+Date: Mon, 7 Sep 2026 15:48:16 +0200
+Subject: [PATCH] net: dsa: mxl-gsw1xx: set SerDes NCO rate before SGMII reset
+
+gsw1xx_pcs_config() releases the SGMII shell from reset via
+gsw1xx_pcs_reset() and only afterwards programs NCO_CTRL to select the
+SerDes clock rate (1G NCO1 vs 2.5G NCO2). The chip boot loader uses the
+other order: NCO_CTRL -> RST_REQ -> SGMII_PHY_HWBU_CTRL (GSW145 data
+sheet, section 3.2.8, table 13).
+
+Program NCO_CTRL before gsw1xx_pcs_reset() to follow that order. On an
+Armada 7040 board driving a GSW145 whose switch comes up at 2.5G (pin strap
+PS_SUBTYPE_MD[2] = 1, pin LED42 / PS1 bit 14; GSW145 data sheet tables 23
+and 25), a 1 Gbps SGMII link only carried traffic with this change. It
+matters when the rate the switch is left at - by the straps or by the boot
+loader - differs from the rate the driver selects, which is likely why it
+has not been seen before.
+
+Cc: stable+noautosel@kernel.org # never worked
+Signed-off-by: Jan Havran (Advantech Czech) <havran.jan@email.cz>
+Reviewed-by: Daniel Golle <daniel@makrotopia.org>
+Reviewed-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+Link: https://patch.msgid.link/20260907134818.16670-2-havran.jan@email.cz
+Signed-off-by: Jakub Kicinski <kuba@kernel.org>
+---
+ drivers/net/dsa/lantiq/mxl-gsw1xx.c | 29 +++++++++++++++--------------
+ 1 file changed, 15 insertions(+), 14 deletions(-)
+
+--- a/drivers/net/dsa/lantiq/mxl-gsw1xx.c
++++ b/drivers/net/dsa/lantiq/mxl-gsw1xx.c
+@@ -352,8 +352,22 @@ static int gsw1xx_pcs_config(struct phyl
+ 	/* mark PCS configuration as incomplete */
+ 	priv->tbi_interface = PHY_INTERFACE_MODE_NA;
+ 
+-	if (!reconf)
++	if (!reconf) {
++		/* setup SerDes clock speed */
++		if (interface == PHY_INTERFACE_MODE_2500BASEX)
++			nco_ctrl = GSW1XX_SGMII_2G5 | GSW1XX_SGMII_2G5_NCO2;
++		else
++			nco_ctrl = GSW1XX_SGMII_1G | GSW1XX_SGMII_1G_NCO1;
++
++		ret = regmap_update_bits(priv->clk, GSW1XX_CLK_NCO_CTRL,
++					 GSW1XX_SGMII_HSP_MASK |
++					 GSW1XX_SGMII_SEL,
++					 nco_ctrl);
++		if (ret)
++			return ret;
++
+ 		ret = gsw1xx_pcs_reset(priv, interface);
++	}
+ 
+ 	if (ret)
+ 		return ret;
+@@ -423,19 +437,6 @@ static int gsw1xx_pcs_config(struct phyl
+ 		return ret;
+ 
+ 	if (!reconf) {
+-		/* setup SerDes clock speed */
+-		if (interface == PHY_INTERFACE_MODE_2500BASEX)
+-			nco_ctrl = GSW1XX_SGMII_2G5 | GSW1XX_SGMII_2G5_NCO2;
+-		else
+-			nco_ctrl = GSW1XX_SGMII_1G | GSW1XX_SGMII_1G_NCO1;
+-
+-		ret = regmap_update_bits(priv->clk, GSW1XX_CLK_NCO_CTRL,
+-					 GSW1XX_SGMII_HSP_MASK |
+-					 GSW1XX_SGMII_SEL,
+-					 nco_ctrl);
+-		if (ret)
+-			return ret;
+-
+ 		ret = gsw1xx_pcs_phy_xaui_write(priv, 0x30, 0x80);
+ 		if (ret)
+ 			return ret;

@@ -1,0 +1,41 @@
+From 6b597ba4c2f67ed268b229c2c7c71f542cf27289 Mon Sep 17 00:00:00 2001
+From: "Jan Havran (Advantech Czech)" <havran.jan@email.cz>
+Date: Mon, 7 Sep 2026 15:48:17 +0200
+Subject: [PATCH] net: dsa: lantiq_gswip: handle SPEED_2500 in
+ gswip_port_set_speed()
+
+The mxl-gsw1xx driver advertises 2500BASE-X on its SGMII port (via
+supports_2500m and gsw1xx_phylink_get_caps()), but the shared
+gswip_port_set_speed() has no SPEED_2500 case: at 2.5G every field keeps
+its initializer, so mdio_phy = 0 pins the MDIO speed override to 10 Mbps
+and no data passes.
+
+At the MAC/MDIO level 2500BASE-X is identical to 1 Gbps (same wide GMII
+datapath, same speed override); the rate itself is set in the PCS and
+SerDes, not here. This matches the boot loader's PHY_ADDR_4 = 0x32A4 for
+the 2.5G strap ("1 Gbps or above"), whose SPEED field is
+GSWIP_MDIO_PHY_SPEED_G1 (the field has no encoding above G1). Share the
+SPEED_1000 arm via a stacked case label. Its mii_cfg value is a no-op
+for 2.5G: gswip_mii_mask_cfg() writes it only for the RGMII port
+(mii_cfg[SGMII port] == -1), which cannot reach 2.5G anyway.
+
+Cc: stable+noautosel@kernel.org # never worked
+Signed-off-by: Jan Havran (Advantech Czech) <havran.jan@email.cz>
+Reviewed-by: Daniel Golle <daniel@makrotopia.org>
+Reviewed-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+Link: https://patch.msgid.link/20260907134818.16670-3-havran.jan@email.cz
+Signed-off-by: Jakub Kicinski <kuba@kernel.org>
+---
+ drivers/net/dsa/lantiq/lantiq_gswip_common.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/drivers/net/dsa/lantiq/lantiq_gswip_common.c
++++ b/drivers/net/dsa/lantiq/lantiq_gswip_common.c
+@@ -1339,6 +1339,7 @@ static void gswip_port_set_speed(struct
+ 		break;
+ 
+ 	case SPEED_1000:
++	case SPEED_2500:
+ 		mdio_phy = GSWIP_MDIO_PHY_SPEED_G1;
+ 
+ 		mii_cfg = GSWIP_MII_CFG_RATE_M125;

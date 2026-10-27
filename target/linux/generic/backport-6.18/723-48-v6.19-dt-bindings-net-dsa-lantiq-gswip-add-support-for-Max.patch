@@ -1,0 +1,188 @@
+From e1bb4b36a7ae0915f16abb5fd7073d2547235fa7 Mon Sep 17 00:00:00 2001
+From: Daniel Golle <daniel@makrotopia.org>
+Date: Mon, 3 Nov 2025 12:20:12 +0000
+Subject: [PATCH] dt-bindings: net: dsa: lantiq,gswip: add support for
+ MaxLinear GSW1xx switches
+
+Extend the Lantiq GSWIP device tree binding to also cover MaxLinear
+GSW1xx switches which are based on the same hardware IP but connected
+via MDIO instead of being memory-mapped.
+
+Add compatible strings for MaxLinear GSW120, GSW125, GSW140, GSW141,
+and GSW145 switches and adjust the schema to handle the different
+connection methods with conditional properties.
+
+Add MaxLinear GSW125 example showing MDIO-connected configuration.
+
+Signed-off-by: Daniel Golle <daniel@makrotopia.org>
+Reviewed-by: Krzysztof Kozlowski <krzysztof.kozlowski@linaro.org>
+Link: https://patch.msgid.link/fc96f1dedb2b418a63e69960356dde7f6eb86424.1762170107.git.daniel@makrotopia.org
+Signed-off-by: Jakub Kicinski <kuba@kernel.org>
+---
+ .../bindings/net/dsa/lantiq,gswip.yaml        | 128 +++++++++++++++++-
+ 1 file changed, 123 insertions(+), 5 deletions(-)
+
+--- a/Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml
++++ b/Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml
+@@ -4,7 +4,12 @@
+ $id: http://devicetree.org/schemas/net/dsa/lantiq,gswip.yaml#
+ $schema: http://devicetree.org/meta-schemas/core.yaml#
+ 
+-title: Lantiq GSWIP Ethernet switches
++title: Lantiq GSWIP and MaxLinear GSW1xx Ethernet switches
++
++description:
++  Lantiq GSWIP and MaxLinear GSW1xx switches share the same hardware IP.
++  Lantiq switches are embedded in SoCs and accessed via memory-mapped I/O,
++  while MaxLinear switches are standalone ICs connected via MDIO.
+ 
+ $ref: dsa.yaml#
+ 
+@@ -17,9 +22,14 @@ properties:
+       - lantiq,xrx200-gswip
+       - lantiq,xrx300-gswip
+       - lantiq,xrx330-gswip
++      - maxlinear,gsw120
++      - maxlinear,gsw125
++      - maxlinear,gsw140
++      - maxlinear,gsw141
++      - maxlinear,gsw145
+ 
+   reg:
+-    minItems: 3
++    minItems: 1
+     maxItems: 3
+ 
+   reg-names:
+@@ -36,9 +46,6 @@ properties:
+       compatible:
+         const: lantiq,xrx200-mdio
+ 
+-    required:
+-      - compatible
+-
+   gphy-fw:
+     type: object
+     properties:
+@@ -123,6 +130,30 @@ required:
+   - compatible
+   - reg
+ 
++allOf:
++  - if:
++      properties:
++        compatible:
++          contains:
++            enum:
++              - lantiq,xrx200-gswip
++              - lantiq,xrx300-gswip
++              - lantiq,xrx330-gswip
++    then:
++      properties:
++        reg:
++          minItems: 3
++          maxItems: 3
++        mdio:
++          required:
++            - compatible
++    else:
++      properties:
++        reg:
++          maxItems: 1
++        reg-names: false
++        gphy-fw: false
++
+ unevaluatedProperties: false
+ 
+ examples:
+@@ -230,3 +261,90 @@ examples:
+                     };
+             };
+     };
++
++  - |
++    #include <dt-bindings/leds/common.h>
++
++    mdio {
++        #address-cells = <1>;
++        #size-cells = <0>;
++
++        switch@1f {
++            compatible = "maxlinear,gsw125";
++            reg = <0x1f>;
++
++            ports {
++                #address-cells = <1>;
++                #size-cells = <0>;
++
++                port@0 {
++                    reg = <0>;
++                    label = "lan0";
++                    phy-handle = <&switchphy0>;
++                    phy-mode = "internal";
++                };
++
++                port@1 {
++                    reg = <1>;
++                    label = "lan1";
++                    phy-handle = <&switchphy1>;
++                    phy-mode = "internal";
++                };
++
++                port@4 {
++                    reg = <4>;
++                    label = "wan";
++                    phy-mode = "1000base-x";
++                    managed = "in-band-status";
++                };
++
++                port@5 {
++                    reg = <5>;
++                    phy-mode = "rgmii-id";
++                    tx-internal-delay-ps = <2000>;
++                    rx-internal-delay-ps = <2000>;
++                    ethernet = <&eth0>;
++
++                    fixed-link {
++                        speed = <1000>;
++                        full-duplex;
++                    };
++                };
++            };
++
++            mdio {
++                #address-cells = <1>;
++                #size-cells = <0>;
++
++                switchphy0: switchphy@0 {
++                    reg = <0>;
++
++                    leds {
++                        #address-cells = <1>;
++                        #size-cells = <0>;
++
++                        led@0 {
++                            reg = <0>;
++                            color = <LED_COLOR_ID_GREEN>;
++                            function = LED_FUNCTION_LAN;
++                        };
++                    };
++                };
++
++                switchphy1: switchphy@1 {
++                    reg = <1>;
++
++                    leds {
++                        #address-cells = <1>;
++                        #size-cells = <0>;
++
++                        led@0 {
++                            reg = <0>;
++                            color = <LED_COLOR_ID_GREEN>;
++                            function = LED_FUNCTION_LAN;
++                        };
++                    };
++                };
++            };
++        };
++    };

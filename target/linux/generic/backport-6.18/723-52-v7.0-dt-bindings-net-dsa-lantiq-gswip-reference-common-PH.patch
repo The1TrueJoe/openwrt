@@ -1,0 +1,45 @@
+From 431b777762d7373dd5bb2874b806eae4e0ff1f6d Mon Sep 17 00:00:00 2001
+From: Daniel Golle <daniel@makrotopia.org>
+Date: Sun, 1 Feb 2026 03:41:53 +0000
+Subject: [PATCH] dt-bindings: net: dsa: lantiq,gswip: reference common PHY
+ properties
+
+Reference the common PHY properties so RX and TX SerDes lane polarity
+of the SGMII/1000Base-X/2500Base-X port can be configured.
+
+Signed-off-by: Daniel Golle <daniel@makrotopia.org>
+Acked-by: Rob Herring (Arm) <robh@kernel.org>
+Link: https://patch.msgid.link/f556ef8be75e37a2f864b9d905a78962bbe76d18.1769916962.git.daniel@makrotopia.org
+Reviewed-by: Vladimir Oltean <olteanv@gmail.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+---
+ Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+--- a/Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml
++++ b/Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml
+@@ -105,6 +105,8 @@ patternProperties:
+     patternProperties:
+       "^(ethernet-)?port@[0-6]$":
+         $ref: dsa-port.yaml#
++        allOf:
++          - $ref: /schemas/phy/phy-common-props.yaml#
+         unevaluatedProperties: false
+ 
+         properties:
+@@ -288,6 +290,7 @@ examples:
+ 
+   - |
+     #include <dt-bindings/leds/common.h>
++    #include <dt-bindings/phy/phy.h>
+ 
+     mdio {
+         #address-cells = <1>;
+@@ -320,6 +323,7 @@ examples:
+                     label = "wan";
+                     phy-mode = "1000base-x";
+                     managed = "in-band-status";
++                    tx-polarity = <PHY_POL_INVERT>;
+                 };
+ 
+                 port@5 {

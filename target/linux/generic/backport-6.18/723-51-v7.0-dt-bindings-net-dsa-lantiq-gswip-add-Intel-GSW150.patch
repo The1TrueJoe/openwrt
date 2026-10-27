@@ -1,0 +1,28 @@
+From e7e354aa496b1ba33cf72e93ff10bf585705d15a Mon Sep 17 00:00:00 2001
+From: Daniel Golle <daniel@makrotopia.org>
+Date: Thu, 22 Jan 2026 16:38:53 +0000
+Subject: [PATCH] dt-bindings: net: dsa: lantiq,gswip: add Intel GSW150
+
+Add compatible strings for the Intel GSW150 which is apparently
+identical or at least compatible with the Lantiq PEB7084 Ethernet
+switch IC.
+
+Signed-off-by: Daniel Golle <daniel@makrotopia.org>
+Reviewed-by: Rob Herring (Arm) <robh@kernel.org>
+Link: https://patch.msgid.link/1dc62de5263e8536d5960b837bc5dad7b8f42fad.1769099517.git.daniel@makrotopia.org
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+---
+ Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml | 2 ++
+ 1 file changed, 2 insertions(+)
+
+--- a/Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml
++++ b/Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml
+@@ -19,6 +19,8 @@ maintainers:
+ properties:
+   compatible:
+     enum:
++      - intel,gsw150
++      - lantiq,peb7084
+       - lantiq,xrx200-gswip
+       - lantiq,xrx300-gswip
+       - lantiq,xrx330-gswip
