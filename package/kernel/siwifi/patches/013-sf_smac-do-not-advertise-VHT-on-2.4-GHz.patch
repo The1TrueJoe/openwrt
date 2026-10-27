@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Mon, 2 Nov 2026 17:51:37 -0500
+Subject: [PATCH] sf_smac: do not advertise VHT on 2.4 GHz
+
+siwifi_set_vht_capa() sets vht_supported on every band of the wiphy,
+2.4 GHz included. The 2.4 GHz radio of the SF19A2890 is an 802.11n
+radio. VHT there is only the non-standard "256-QAM on 2.4 GHz"
+extension, which hostapd runs as vendor_vht. OpenWrt's wifi-scripts
+then configure the 2.4 GHz radio as VHT20 instead of HT20/HT40.
+
+Advertise VHT on 5 GHz only. The 2.4 GHz radio then reports plain HT,
+and the firmware's ME configuration gets vht_supp = 0 for it.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/siwifi_mod_params.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+--- a/sf_smac/src/bb_src/umac/siwifi_mod_params.c
++++ b/sf_smac/src/bb_src/umac/siwifi_mod_params.c
+@@ -310,6 +310,9 @@ void siwifi_set_vht_capa(struct siwifi_h
+         return;
+     for (band = NL80211_BAND_2GHZ; band <= NL80211_BAND_5GHZ; band++) {
+         struct ieee80211_sta_vht_cap *vht_cap = NULL;
++        /* VHT is a 5 GHz PHY; the 2.4 GHz radio is 802.11n */
++        if (band == NL80211_BAND_2GHZ)
++            continue;
+         if(wiphy->bands[band] != NULL) {
+             vht_cap = &wiphy->bands[band]->vht_cap;
+         }

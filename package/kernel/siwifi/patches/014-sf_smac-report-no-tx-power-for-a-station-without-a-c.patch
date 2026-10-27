@@ -1,0 +1,124 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Mon, 2 Nov 2026 17:53:07 -0500
+Subject: [PATCH] sf_smac: report no tx power for a station without a channel
+
+The firmware confirms MM_SET_POWER_REQ with power 0x7f for an interface
+that has no channel yet, such as a station that is not connected,
+whatever limit was sent. The driver stores that as the interface's tx
+power, so "iw dev" shows 127.00 dBm. Nothing sends the limit again
+when the station connects, so after association a station keeps
+reporting 127 dBm, and whether the firmware then applies the user's
+limit depends on what it kept from the earlier request.
+
+Treat 0x7f as "no power known": start every interface with it, and
+return -ENODATA from get_tx_power while it is set, so cfg80211 leaves
+the attribute out instead of reporting a wrong value. When a station
+connects, send the user's limit again from a wiphy work, because the
+connect indication arrives in the message handler, which cannot wait
+for the confirmation. The work walks the interface list under the
+wiphy mutex, so it needs no reference to an interface that might be
+deleted, and wiphy_unregister() deals with it at unload.
+
+A side effect: the firmware restart path, which sends every interface's
+stored power again, now sends "no limit" for an interface that never
+had one, instead of 0 dBm.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h |  7 ++++++-
+ sf_smac/src/bb_src/umac/fullmac/siwifi_main.c | 19 +++++++++++++++++++
+ sf_smac/src/bb_src/umac/siwifi_msg_rx.c       |  3 +++
+ 3 files changed, 28 insertions(+), 1 deletion(-)
+
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h
+@@ -180,6 +180,8 @@ struct siwifi_vif {
+     u8 txpower_idx;
+     /* limit set through cfg80211, SIWIFI_TXPOWER_AUTO if none */
+     s8 user_txpower;
++    /* send user_txpower again from siwifi_hw->txpower_work */
++    bool txpower_resend;
+     union
+     {
+         struct
+@@ -671,7 +673,9 @@ void report_sf_notify_event(const sf_not
+ #ifdef CONFIG_SIWIFI_SORT_SCAN
+ #define MAX_SCAN_BSS_CNT 64
+ #endif
+-/* MM_SET_POWER_REQ value for no limit other than the channel's */
++/* MM_SET_POWER_REQ value for no limit other than the channel's. The
++ * firmware also confirms it as the power of an interface that has no
++ * channel yet. */
+ #define SIWIFI_TXPOWER_AUTO 0x7f
+ 
+ struct siwifi_hw {
+@@ -790,6 +794,7 @@ struct siwifi_hw {
+     u8 vif_started;
+     /* limit set for the whole wiphy, inherited by new interfaces */
+     s8 user_txpower;
++    struct wiphy_work txpower_work;
+     bool adding_sta;
+     struct phy_cfg_tag phy_config;
+     struct siwifi_radar radar;
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+@@ -718,6 +718,20 @@ static int siwifi_send_user_txpower(stru
+     }
+     return res;
+ }
++/* A station only gets a channel when it connects; until then the
++ * firmware confirms SIWIFI_TXPOWER_AUTO, so ask again. */
++static void siwifi_txpower_work(struct wiphy *wiphy, struct wiphy_work *work)
++{
++    struct siwifi_hw *siwifi_hw = container_of(work, struct siwifi_hw, txpower_work);
++    struct siwifi_vif *vif;
++    list_for_each_entry(vif, &siwifi_hw->vifs, list) {
++        if (!vif->txpower_resend)
++            continue;
++        vif->txpower_resend = false;
++        if (vif->up)
++            siwifi_send_user_txpower(siwifi_hw, vif);
++    }
++}
+ static int siwifi_open(struct net_device *dev)
+ {
+     struct siwifi_vif *siwifi_vif = netdev_priv(dev);
+@@ -989,6 +1003,7 @@ static struct wireless_dev *siwifi_inter
+  vif->up = false;
+  vif->ch_index = SIWIFI_CH_NOT_SET;
+  vif->user_txpower = siwifi_hw->user_txpower;
++ vif->txpower = SIWIFI_TXPOWER_AUTO;
+  memset(&vif->net_stats, 0, sizeof(vif->net_stats));
+  switch (type) {
+  case NL80211_IFTYPE_STATION:
+@@ -2289,6 +2304,9 @@ static int siwifi_cfg80211_get_tx_power(
+   if (!vif)
+    return -ENODATA;
+  }
++ /* no channel, so no power to report */
++ if (vif->txpower == SIWIFI_TXPOWER_AUTO)
++  return -ENODATA;
+  *dbm = vif->txpower;
+     return 0;
+ }
+@@ -4000,6 +4018,7 @@ int siwifi_cfg80211_init(struct siwifi_p
+     siwifi_hw->sec_phy_chan.center_freq2 = 0;
+     siwifi_hw->vif_started = 0;
+     siwifi_hw->user_txpower = SIWIFI_TXPOWER_AUTO;
++    wiphy_work_init(&siwifi_hw->txpower_work, siwifi_txpower_work);
+     siwifi_hw->monitor_vif = SIWIFI_INVALID_VIF;
+     siwifi_hw->adding_sta = false;
+     siwifi_hw->scan_ie.addr = NULL;
+--- a/sf_smac/src/bb_src/umac/siwifi_msg_rx.c
++++ b/sf_smac/src/bb_src/umac/siwifi_msg_rx.c
+@@ -825,6 +825,9 @@ static inline int siwifi_rx_sm_connect_i
+             } while (0);
+         }
+ #endif
++        /* the station has a channel now */
++        siwifi_vif->txpower_resend = true;
++        wiphy_work_queue(siwifi_hw->wiphy, &siwifi_hw->txpower_work);
+     }
+     if(SIWIFI_VIF_TYPE(siwifi_vif) == NL80211_IFTYPE_STATION){
+         siwifi_vif->wds_success = 1;
