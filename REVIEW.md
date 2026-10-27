@@ -37,15 +37,15 @@ OpenWrt image has run on it yet.
 | 16 | PL022 plus GPIO chip select drives the NAND | Hans Ulli Kroll's dmesg, from another unit; stock uses a vendor SPI driver | no |
 | 17 | GSW150 DSA driver brings up all three ports with this binding | Hans Ulli Kroll's report: another unit, initramfs, his DTS | no |
 | 18 | TX FIFO ≥ 2 KiB, so `tx-fifo-depth = <2048>` is a safe lower bound; `rx-fifo-depth = <2048>` keeps hardware flow control off as stock does | stock sends 1522-byte VLAN-tagged frames (CPU port `5t`, eth0.1/eth0.2 at MTU 1500) with TX store-and-forward set (vendor sf_gmac, `DMA_OPERATION_TSF`); vendor never sets `DMA_OPERATION_EFC`; 6.18 `dwmac1000_configure_fc()` enables EFC only at ≥ 4096. The real FIFO sizes are not documented and the 3.73a does not report them | config yes; sizes inferred |
-| 19 | Kernel uImage fits 3 MiB | CI run 40442652041: 3349991 bytes at -O2 (204263 over), 2918871 at -Os (226857 under); the series defaults the subtarget to -Os | yes (build) |
+| 19 | Kernel uImage fits 3 MiB | CI run 40448141508: 2918848 bytes at -Os, 226880 under (3349991 at -O2; reserve options measured: no kallsyms 2638704, stmmac+DSA as modules 2820708) | yes (build) |
 | 20 | ET6326 LED controller at I2C 0x30 | U-Boot `i2c mw 0x30 ...` strings, stock DTB | yes (read); out of this series |
-| 21 | All series patches and refreshed patches apply to 6.18.55 + main with no fuzz | `patch -F0` on the build host | yes (host); compile pending CI |
+| 21 | Series applies with no fuzz and is refresh-clean | `patch -F0` on the build host; `make target/linux/refresh` in CI run 40448141508 leaves an empty diff (generic + siflower) | yes (CI) |
 | 22 | GMAC fix and the newest backports are checkpatch clean | `checkpatch.pl --strict` from 6.18.55 | yes (host) |
 
 ## Tests
 
 They live in `.github/gl-sft1200/` and run from `.github/workflows/gl-sft1200.yml`.
-None has run in CI yet.
+All passed in CI run 40448141508 (series 52f3163837).
 
 | Test | Expected | Where |
 |---|---|---|
@@ -59,7 +59,7 @@ None has run in CI yet.
 | fwtool metadata: good image lists `glinet,gl-sft1200`; EVB image does not | as stated | test-sysupgrade.sh |
 | Rebuild with `KERNEL_SIZE=1024k`: "is too big", and no factory or sysupgrade image produced | no images | workflow |
 | `make target/linux/refresh` leaves no diff | empty diff | workflow |
-| dt-validate against Linux v7.3 bindings | Siflower nodes lack schemas (expected); switch, partitions and keys must validate | workflow, informational |
+| dt-validate against Linux v7.3 bindings | switch, partitions and nvmem layout: clean. Board findings: gpio-keys node names (`reset`, `mode` should be `key-reset`, `switch-mode`; to fix). SoC-level: `rgmii-delay` nvmem cell is not in the dwmac binding (shared with the EVB); siflower clock/reset vendor properties and cpu nodes have no schema | workflow, informational |
 
 The platform_check cases ran on macOS against synthetic images, with the real
 `common.sh`, `nand.sh` and `platform.sh`. The good, factory, oversized-kernel,
@@ -133,6 +133,9 @@ Not testable without the unit:
 16. **"The target is source-only."** Unchanged here; a call for the maintainers.
 
 ## Open risks
+
+- gpio-keys node names fail dt-validate (cosmetic; fix with the first-boot changes).
+- The all-target `Build Kernel` check (OpenWrt's kernel.yml, which refreshes every target's patches) has not finished on the series yet.
 
 - -Os is a subtarget-wide default in config/Config-kernel.in. Precedent exists (`default y if TARGET_...`), but reviewers may prefer another way.
 - No boot on hardware: SPI NAND through PL022, switch bring-up, the delay
