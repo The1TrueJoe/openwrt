@@ -1,0 +1,76 @@
+name: Linux net-next check, mxl-gsw1xx reset-gpios
+
+# Applies the two unsent Linux patches to the current net-next tree and
+# checks them. Nothing is mailed or submitted from here.
+
+on:
+  push:
+    branches:
+      - linux-gsw1xx-reset-check
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: net-next ${{ matrix.arch }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            cross: ""
+          - arch: arm64
+            cross: aarch64-linux-gnu-
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libelf-dev libssl-dev \
+            sparse gcc-aarch64-linux-gnu python3-pip yamllint
+          pip install --user dtschema
+
+      - name: Clone net-next
+        run: |
+          git clone --depth 1 --branch main \
+            https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git net-next
+          git -C net-next log --oneline -1
+
+      - name: Apply the patches
+        run: |
+          cd net-next
+          git -c user.name=ci -c user.email=ci@example.invalid am ../.github/linux-gsw1xx-reset/000*.patch
+          git log --oneline -3
+
+      - name: checkpatch --strict
+        run: |
+          cd net-next
+          ./scripts/checkpatch.pl --strict -g HEAD~2..HEAD
+
+      - name: Build mxl-gsw1xx with W=1 and sparse
+        run: |
+          cd net-next
+          export ARCH=${{ matrix.arch }} CROSS_COMPILE=${{ matrix.cross }}
+          make defconfig
+          ./scripts/config -e NET_DSA -e GPIOLIB -m NET_DSA_MXL_GSW1XX -m NET_DSA_LANTIQ_GSWIP \
+            -e OF_GPIO
+          make olddefconfig
+          grep -E 'CONFIG_(NET_DSA|NET_DSA_MXL_GSW1XX|NET_DSA_LANTIQ_COMMON|GPIOLIB|OF)=' .config
+          make -j$(nproc) prepare
+          make -j$(nproc) W=1 C=1 drivers/net/dsa/lantiq/ 2>&1 | tee build.log
+          ! grep -E 'warning:|error:' build.log
+
+      - name: dt_binding_check
+        if: matrix.arch == 'x86_64'
+        run: |
+          cd net-next
+          make dt_binding_check DT_SCHEMA_FILES=net/dsa/lantiq,gswip.yaml 2>&1 | tee binding.log
+          test ${PIPESTATUS[0]} -eq 0
+          ! grep -E 'warning|error' binding.log
