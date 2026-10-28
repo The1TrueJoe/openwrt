@@ -101,6 +101,13 @@ jobs:
           dtb=$(ls build_dir/target-*/linux-siflower_sf19a2890/image-sf19a2890_glinet_gl-sft1200.dtb)
           dt-validate -s processed-schema.json "$dtb" 2>&1 | tee dt-validate.txt
 
+      - name: Check the DTB against the tree's own binding (make target/linux/dtbs_check)
+        if: always() && steps.build.outcome == 'success'
+        run: |
+          # lantiq,gswip.yaml as patched by 723-46..52 and pending 761-01
+          make target/linux/dtbs_check DT_SCHEMA_FILES=lantiq,gswip.yaml V=s 2>&1 | tee dtbs-check.txt
+          test ${PIPESTATUS[0]} -eq 0
+
       - name: Upload images
         if: always()
         uses: actions/upload-artifact@v4
@@ -110,6 +117,7 @@ jobs:
             bin/targets/siflower/sf19a2890/
             verify.txt
             dt-validate.txt
+            dtbs-check.txt
           if-no-files-found: warn
 
       - name: Negative test, a kernel over the limit must not give images
