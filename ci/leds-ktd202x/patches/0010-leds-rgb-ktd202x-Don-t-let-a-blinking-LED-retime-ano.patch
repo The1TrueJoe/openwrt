@@ -1,4 +1,4 @@
-From 8a87a2953f5fa1cacd713f0ec2d27050bc52e0e1 Mon Sep 17 00:00:00 2001
+From f546fc39607f163ff3880caf447d098c832d39df Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:33:42 -0400
 Subject: [PATCH 10/11] leds: rgb: ktd202x: Don't let a blinking LED retime
@@ -23,17 +23,23 @@ write the timer registers when they change, so that a LED joining the
 timer does not restart the blink of the others. Also never program an
 on time of zero for a hardware pattern.
 
+The match is on the programmed values. The timer trigger writes delay_on
+and delay_off one at a time, and each write is rounded against the other's
+rounded value, so two LEDs set to the same delays can get on times a few
+steps apart. The second one then blinks in software, at the timing it
+asked for. The documentation says how to make them share.
+
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- Documentation/leds/leds-ktd202x.rst |   7 +-
+ Documentation/leds/leds-ktd202x.rst |  13 +-
  drivers/leds/rgb/leds-ktd202x.c     | 218 +++++++++++++++++-----------
- 2 files changed, 140 insertions(+), 85 deletions(-)
+ 2 files changed, 146 insertions(+), 85 deletions(-)
 
 diff --git a/Documentation/leds/leds-ktd202x.rst b/Documentation/leds/leds-ktd202x.rst
-index 2ee537f..248035a 100644
+index 2ee537f..32ea9d6 100644
 --- a/Documentation/leds/leds-ktd202x.rst
 +++ b/Documentation/leds/leds-ktd202x.rst
-@@ -31,9 +31,10 @@ equal and not 0. ``repeat`` must be -1, its default.
+@@ -31,9 +31,16 @@ equal and not 0. ``repeat`` must be -1, its default.
  The sum of the four times is the flash period. The driver rounds it up to the
  next step of 128 ms, between 256 ms (128 ms on the ET6326) and 16384 ms.
  
@@ -44,6 +50,12 @@ index 2ee537f..248035a 100644
 +use it at once only with the same period, on time and ramps. A LED that asks
 +for different ones while another LED is on the timer gets -EBUSY: blinking
 +then falls back to the software timer, and ``hw_pattern`` returns the error.
++
++The match is on the values programmed into the chip. The timer trigger sets
++``delay_on`` and ``delay_off`` one at a time and the driver rounds each pair,
++so two LEDs given the same delays can end up with slightly different on times,
++and then the second one blinks in software. To share the timer, give the
++second LED the delays that the first one reads back.
  
  For example, to breathe with a period of 4 seconds::
  

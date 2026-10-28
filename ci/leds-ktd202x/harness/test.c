@@ -180,6 +180,19 @@ int main(void)
 	CHECK(ret == 0 && CH(0) == 2 && hw[5] == 0xff, "repeat 0: ret %d mode %d Reg5 0x%02x", ret, CH(0), hw[5]);
 	leds[0]->pattern_clear(leds[0]);
 
+	printf("the timer trigger writes delay_on, then delay_off (B2)\n");
+	unsigned long bon, boff;
+	blink(0, 500, 500, &bon, &boff);		/* the trigger's default */
+	blink(0, 500, boff, &bon, &boff);	/* echo 500 > delay_on */
+	ret = blink(0, bon, 500, &bon, &boff);	/* echo 500 > delay_off */
+	CHECK(ret == 0 && bon == 434 && boff == 462 && hw[2] == 124, "blue 500/500 reads back %lu/%lu, Reg2 %u", bon, boff, hw[2]);
+	ret = blink(1, 500, 500, &on, &off);
+	CHECK(ret == -EBUSY, "white 500/500 (on time 128, not 124): ret %d, software", ret);
+	ret = blink(1, bon, boff, &on, &off);
+	CHECK(ret == 0 && CH(1) == 2 && hw[2] == 124, "white with blue's read-back delays shares the timer: ret %d mode %d", ret, CH(1));
+	leds[0]->brightness_set_blocking(leds[0], 0);
+	leds[1]->brightness_set_blocking(leds[1], 0);
+
 	printf("KTD2026 keeps its own period encoding\n");
 	ret = probe(&ktd2026_info, 3, 0);
 	CHECK(ret == 0 && leds[2]->max_brightness == 192, "probe, max %u", leds[2]->max_brightness);
