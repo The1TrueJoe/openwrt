@@ -2,18 +2,22 @@
 
 For the `siflower-gl-sft1200` series. This file and `.github/gl-sft1200/` live
 only on the `siflower-gl-sft1200-ci` branch and are never sent upstream.
-Nothing has been submitted or pushed.
+Both branches are pushed to The1TrueJoe/openwrt. Nothing has been submitted
+upstream: no openwrt/openwrt PR, no patch mail.
 
-Series, on openwrt/openwrt `main` 7d0bf92bee:
+Series, on openwrt/openwrt `main` 7cd9ef1f22:
 
 1. `kernel: 6.18: backport MaxLinear GSW1xx DSA switch support`
 2. `siflower: sf19a2890: terminate the RGMII delay string before parsing`
 3. `siflower: sf19a2890: enable SPI NAND and UBI`
-4. `siflower: sf19a2890: add support for GL.iNet GL-SFT1200 (Opal)`
+4. `kernel: build siflower sf19a2890 kernels for size`
+5. `kernel: 6.18: mxl-gsw1xx: reset the switch through reset-gpios`
+6. `siflower: sf19a2890: add support for GL.iNet GL-SFT1200 (Opal)`
 
 "Unit" below means the harvested GL-SFT1200, label MAC 94:83:c4:9a:ea:d1, read
-on GL firmware 4.8.3 (`device-dumps/glinet-sft1200/94-83-c4-9a-ea-d1`). No
-OpenWrt image has run on it yet.
+on GL firmware 4.8.3 (`device-dumps/glinet-sft1200/94-83-c4-9a-ea-d1`).
+OpenWrt images from this series have run on it since row 23, installed with
+GL's sysupgrade; the U-Boot web recovery has not been run with factory.img yet.
 
 ## Verification matrix
 
@@ -26,7 +30,7 @@ OpenWrt image has run on it yet.
 | 5 | U-Boot reads 0x300000 bytes of kernel | bootcmd string in the unit's U-Boot | yes (binary), not executed |
 | 6 | Failsafe takes any upload named `*.img` of at least 10 KB, writes it raw at 0xc0000, and erases 0xc0000 to the end of flash (`log` included); the image is a raw uImage, padding to 4 MiB, then UBI | disassembly of the unit's U-Boot (0xa002ad0c, 0xa003bc2c); GL's own stock image sft1200-4.8.3 (SHA-256 matches GL's published value) has exactly that layout, and its kernel is byte-identical to the unit's mtd5 | layout yes (GL's image); write path inferred from code, not yet exercised |
 | 7 | bootm allows 64 MiB uncompressed | disassembly (unc_len 0x4000000) | inferred from code |
-| 8 | U-Boot reads an env from 0x80000 and falls back to defaults on a bad CRC | env code present, the partition is all zeros, the stock unit boots | inferred |
+| 8 | U-Boot reads an env from 0x80000 and falls back to defaults on a bad CRC; it has `saveenv`, but nothing has saved there | env code and `saveenv` present in GL's U-Boot 2016.07, the partition is all zeros, the stock unit boots. With no saved env and its size unknown, fw_printenv only prints "Failed to find NVMEM device" on every boot (preinit → board_detect → 05_fw_defaults), so the GL image leaves out uboot-envtools | env read inferred; the boot message seen on the unit |
 | 9 | Base MAC at factory 0x0 = label MAC; LAN = base + 1 | factory hexdump, stock `mtd-mac-address-increment`, stock interface MACs | yes (read) |
 | 10 | RGMII delay string `110a` at factory 0xb2 | factory hexdump, stock dmesg `get gmac delay: 110a` | yes (read) |
 | 11 | Switch is an Intel GSW150 at SMI address 31 (0x1f) | measured on the unit by bit-banging MDIO on GPIO 28/29: only SMI 31 answers; MANU_ID (0xfa10) = 0x1713 (FIX1 1, MANID 0x389), PNUM_ID (0xfa11) = 0x3003, so part 0x31 v1.3; MII_CFG5 (0xf100) = 0x4044 as stock. The vendor's `gsw_mdio_addr` table is {0, 0x1f}; the first image used 0 and failed | yes (unit) |
@@ -37,9 +41,9 @@ OpenWrt image has run on it yet.
 | 16 | PL022 plus GPIO chip select drives the NAND | Hans Ulli Kroll's dmesg, from another unit; stock uses a vendor SPI driver | no |
 | 17 | GSW150 DSA driver brings up all three ports with this binding | Hans Ulli Kroll's report: another unit, initramfs, his DTS | no |
 | 18 | TX FIFO ≥ 2 KiB, so `tx-fifo-depth = <2048>` is a safe lower bound; `rx-fifo-depth = <2048>` keeps hardware flow control off as stock does | stock sends 1522-byte VLAN-tagged frames (CPU port `5t`, eth0.1/eth0.2 at MTU 1500) with TX store-and-forward set (vendor sf_gmac, `DMA_OPERATION_TSF`); vendor never sets `DMA_OPERATION_EFC`; 6.18 `dwmac1000_configure_fc()` enables EFC only at ≥ 4096. The real FIFO sizes are not documented and the 3.73a does not report them | config yes; sizes inferred |
-| 19 | Kernel uImage fits 3 MiB | CI run 40448141508: 2918848 bytes at -Os, 226880 under; on the 25.12.6 toolchain (ParkezeOS build, run 40453704327) 3000258 bytes, 145470 under (3349991 at -O2 on main; reserve options measured: no kallsyms 2638704, stmmac+DSA as modules 2820708) | yes (build) |
+| 19 | Kernel uImage fits 3 MiB | CI run 40644462900 (main 7cd9ef1f22): 2929268 bytes at -Os, 216460 under, and 3367284 at -O2; earlier, run 40448141508: 2918848 bytes, 226880 under; on the 25.12.6 toolchain (ParkezeOS build, run 40453704327) 3000258 bytes, 145470 under (3349991 at -O2 on main; reserve options measured: no kallsyms 2638704, stmmac+DSA as modules 2820708) | yes (build) |
 | 20 | ET6326 LED controller at I2C 0x30 | U-Boot `i2c mw 0x30 ...` strings, stock DTB | yes (read); out of this series |
-| 21 | Series applies with no fuzz and is refresh-clean | `patch -F0` on the build host; `make target/linux/refresh` in CI run 40448141508 leaves an empty diff (generic + siflower); OpenWrt's kernel.yml on all 98 subtargets (run 40486566465): every kernel builds; 25 patches in 8 other targets needed hunk-header-only refreshes (MAINTAINERS and DSA context moved by the backport), now folded into the backport commit | yes (CI) |
+| 21 | Series applies with no fuzz and is refresh-clean | `patch -F0` on the build host; `make target/linux/refresh` in CI run 40644462900 leaves an empty diff (generic + siflower; before that run, pending 761-01 still carried a git version trailer, now removed); OpenWrt's kernel.yml on all 98 subtargets (run 40486566465): every kernel builds; 25 patches in 8 other targets needed hunk-header-only refreshes (MAINTAINERS and DSA context moved by the backport), now folded into the backport commit | yes (CI) |
 | 22 | GMAC fix and the newest backports are checkpatch clean | `checkpatch.pl --strict` from 6.18.55 | yes (host) |
 | 23 | First boot on hardware (52f3163837, via GL sysupgrade) | serial log: SPL, U-Boot, kernel, SPI NAND GD5F1GQ5 (c8:51), UBI attach, ubiblock root, overlay, procd, login shell; GMAC probes with the factory MAC. The switch did not probe: at SMI 0 nothing answers, so the chip-ID read sees 0xffff (-ENODEV). Fixed: `switch@1f` | yes (unit) |
 | 24 | GSW150 reset is GPIO 0, active low | stock DT `esw-rst-gpio = <0>`; stock sgmac.ko `sf_trigger_eswitch_hwReset`: output high, low for 2 ms, high, then 100 ms. A 1 s pulse with nothing bound resets the switch (RST_REQ and MDC_CFG0 back to defaults) | yes (unit) |
@@ -48,11 +52,15 @@ OpenWrt image has run on it yet.
 | 27 | wan needs a hardware reset of the switch | without one, GL U-Boot's state leaves the GPHYs at internal MDIO 1-4 (port 0 has no PHY, and each port's address answers with its neighbour's GPHY); after a GPIO 0 pulse they are at 0-3, and the unmodified driver brings wan up at 1 Gbit/s. The MDIO core ignores reset-gpios on non-PHY devices, hence pending patch 761 | yes (unit): patched driver (pending 761) verified on a warm reboot and a cold power-on, no manual pulse; wan mii:00, lan2 mii:01, lan1 mii:02 |
 | 28 | RST_REQ (82e2c7db0830) and GPIO_ALTSEL are not the cause | rst_override sweep and a clean reset + unmodified driver | yes (unit) |
 | 29 | Jack map: WAN = port 0, end LAN jack = port 2 (lan1), LAN beside WAN = port 1 (lan2) | one cable moved between jacks with the GPHYs at 0-2, link only on the expected port, 1 Gbit/s each | yes (unit) |
+| 30 | The DTS validates against the tree's own binding | `make target/linux/dtbs_check DT_SCHEMA_FILES=lantiq,gswip.yaml` with the binding as backported by 723-46..52 plus pending 761-01: silent (pass), run 40644462900 | yes (CI) |
+| 31 | The two Linux patches are ready for net-next | `linux-gsw1xx-reset-check` run 40630875170 on net-next: both apply; checkpatch --strict 0/0/0; `W=1 C=1` (sparse from git) clean on x86_64 and arm64 for drivers/net/dsa/lantiq; `dt_binding_check DT_SCHEMA_FILES=lantiq,gswip.yaml` passes | yes (CI) |
+| 32 | The GL image leaves out uboot-envtools and the EVB's switch packages | rootfs listing of the sysupgrade image in CI; needs `CONFIG_TARGET_PER_DEVICE_ROOTFS=y` in a multi-profile build, as on the buildbots (run 40644462900 had a shared rootfs, so it still carried fw_printenv and rtl8367b) | yes (CI, after run 40644462900) |
 
 ## Tests
 
 They live in `.github/gl-sft1200/` and run from `.github/workflows/gl-sft1200.yml`.
-All passed in CI run 40448141508 (series 52f3163837).
+All passed in CI run 40644462900 (CI 44e8833f10, the same series tree as
+2a2b4ddcb2), except the rootfs package check, which was added after it.
 
 | Test | Expected | Where |
 |---|---|---|
@@ -66,6 +74,8 @@ All passed in CI run 40448141508 (series 52f3163837).
 | fwtool metadata: good image lists `glinet,gl-sft1200`; EVB image does not | as stated | test-sysupgrade.sh |
 | Rebuild with `KERNEL_SIZE=1024k`: "is too big", and no factory or sysupgrade image produced | no images | workflow |
 | `make target/linux/refresh` leaves no diff | empty diff | workflow |
+| `make target/linux/dtbs_check DT_SCHEMA_FILES=lantiq,gswip.yaml` | silent | workflow |
+| GL rootfs (per-device): mxl-gsw1xx.ko present; no fw_printenv/fw_setenv, rtl8367b.ko or swconfig | pass | workflow |
 | dt-validate against Linux v7.3 bindings | switch, partitions and nvmem layout: clean. Board findings: none since the gpio-keys nodes were renamed `key-reset` and `switch-mode`. SoC-level: `rgmii-delay` nvmem cell is not in the dwmac binding (shared with the EVB); siflower clock/reset vendor properties and cpu nodes have no schema | workflow, informational |
 
 The platform_check cases ran on macOS against synthetic images, with the real
@@ -83,7 +93,8 @@ Not testable without the unit:
 
 ## Objections a maintainer would raise, with answers
 
-1. **"45 backport patches for one board?"** mxl-gsw1xx sits on the lantiq_gswip
+1. **"52 backport patches for one board?"** 45 are the driver; 723-46..52
+   are the matching `lantiq,gswip.yaml` binding commits, so dtbs_check works. mxl-gsw1xx sits on the lantiq_gswip
    regmap conversion and the common/MMIO split, so a shorter set means
    rewriting code. Every patch is an upstream commit with its id. The only
    edit is the `dsa.h` context in 723-27, because 6.18 has no YT921X.
@@ -132,7 +143,8 @@ Not testable without the unit:
 14. **"LAN labels."** They follow GL's firmware (port 2 = lan1), verified on
     the unit jack by jack (row 29).
 15. **"Why -Os for the whole subtarget?"** At -O2 the kernel is 204 KB over
-    the 3 MiB U-Boot loads. -Os puts it 227 KB under and removes no feature.
+    the 3 MiB U-Boot loads (222 KB over on main 7cd9ef1f22). -Os puts it
+    216 KB under and removes no feature.
     The alternatives cost something: kallsyms is needed to read oopses on a
     new port, and namespaces and seccomp are used by procd-ujail and sshd. The
     interAptiv has 16 KiB L1 I-caches, where -Os rarely loses speed. Moving
@@ -146,7 +158,12 @@ Not testable without the unit:
     (2 ms asserted, 100 ms after, the vendor's timing). OpenWrt carries the
     driver half as pending-6.18 761. Targeted at net-next, not net: it adds
     DT ABI and no in-tree board is affected, so a Fixes: tag would be hard
-    to justify.
+    to justify. Both are checked against net-next (row 31).
+    Alexander Sverdlin's 82e2c7db0830 ("force internal PHYs into a known reset
+    state", net-next for v7.4, backported here as 723-45) only programs the
+    RST_REQ PHY bits; on the unit it does not undo U-Boot's address shift
+    (row 28), so it complements the reset-gpios patches rather than replacing
+    them.
 18. **"Why not reset the switch in the bootloader or with a GPIO hog?"** A hog
     can only hold a level, not pulse it, and the bootloader is GL's; the
     switch driver owning its reset matches mt7530 and other MDIO switches.
@@ -155,10 +172,11 @@ Not testable without the unit:
 
 - The reset timing is the vendor's, not a measured minimum or a datasheet value.
 - The all-target `Build Kernel` check passed on the build but needed 25 hunk-header refreshes in other targets (folded in). Re-run it on every rebase: the backport moves MAINTAINERS and DSA context that many target patches share.
-- Kernel margin on 25.12 is 145 KB, against 227 KB on main.
+- Kernel margin on 25.12 is 145 KB, against 216 KB on main.
 - -Os is a subtarget-wide default in config/Config-kernel.in. Precedent exists (`default y if TARGET_...`), but reviewers may prefer another way.
-- The failsafe behaviour (row 6) comes from disassembly. opal-harvest can
-  confirm the `log` wipe: write a marker on stock, recover, read it back.
+- The failsafe behaviour (row 6) comes from disassembly. opal-harvest is to
+  run the web recovery with factory.img from run 40644462900, capture the IP
+  U-Boot serves it on, and read mtd0-3 and `log` back against the backup.
 - Lantiq xrx200 module split: compile only.
 - Generated patches were made with git, not GNU diff/quilt; the CI refresh
   step shows any header differences.
