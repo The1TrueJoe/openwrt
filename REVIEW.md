@@ -45,8 +45,9 @@ OpenWrt image has run on it yet.
 | 24 | GSW150 reset is GPIO 0, active low | stock DT `esw-rst-gpio = <0>`; stock sgmac.ko `sf_trigger_eswitch_hwReset`: output high, low for 2 ms, high, then 100 ms. A 1 s pulse with nothing bound resets the switch (RST_REQ and MDC_CFG0 back to defaults) | yes (unit) |
 | 25 | All-target kernel check on a1710648ff | kernel.yml run 40542009664: 383/383 jobs green | yes (CI) |
 | 26 | 7debf930a7 on hardware: DSA, sysupgrade, RGMII | `switch@1f` probes (part 0x31 v1.3, GSWIP 23); `nand_do_upgrade` from our own image works and leaves mtd0-3 and log unchanged; DHCP on LAN; 5.8 MB scp intact, 0 RGMII errors; eth0 MTU 1508 | yes (unit) |
-| 27 | wan needs a hardware reset of the switch | without one, GL U-Boot's state leaves the GPHYs at internal MDIO 1-4 (port 0 has no PHY, and each port's address answers with its neighbour's GPHY); after a GPIO 0 pulse they are at 0-3, and the unmodified driver brings wan up at 1 Gbit/s. The MDIO core ignores reset-gpios on non-PHY devices, hence pending patch 761 | yes (unit, manual pulse); patched driver not yet booted |
+| 27 | wan needs a hardware reset of the switch | without one, GL U-Boot's state leaves the GPHYs at internal MDIO 1-4 (port 0 has no PHY, and each port's address answers with its neighbour's GPHY); after a GPIO 0 pulse they are at 0-3, and the unmodified driver brings wan up at 1 Gbit/s. The MDIO core ignores reset-gpios on non-PHY devices, hence pending patch 761 | yes (unit): patched driver (pending 761) verified on a warm reboot and a cold power-on, no manual pulse; wan mii:00, lan2 mii:01, lan1 mii:02 |
 | 28 | RST_REQ (82e2c7db0830) and GPIO_ALTSEL are not the cause | rst_override sweep and a clean reset + unmodified driver | yes (unit) |
+| 29 | Jack map: WAN = port 0, end LAN jack = port 2 (lan1), LAN beside WAN = port 1 (lan2) | one cable moved between jacks with the GPHYs at 0-2, link only on the expected port, 1 Gbit/s each | yes (unit) |
 
 ## Tests
 
@@ -128,8 +129,8 @@ Not testable without the unit:
     Required for bisectability: each tree must build after every commit.
 13. **"UBIFS without zlib/zstd."** Size: the 3 MiB kernel limit. LZO is
     OpenWrt's default UBIFS compressor anyway.
-14. **"LAN labels."** They follow GL's firmware (port 2 = lan1), not the case
-    print. Check on the unit before submitting.
+14. **"LAN labels."** They follow GL's firmware (port 2 = lan1), verified on
+    the unit jack by jack (row 29).
 15. **"Why -Os for the whole subtarget?"** At -O2 the kernel is 204 KB over
     the 3 MiB U-Boot loads. -Os puts it 227 KB under and removes no feature.
     The alternatives cost something: kallsyms is needed to read oopses on a
@@ -152,7 +153,6 @@ Not testable without the unit:
 
 ## Open risks
 
-- The pending reset patch (row 27) is not yet booted; the jack map for lan1/lan2 must be rechecked once the GPHY addresses are right (wan = WAN jack is confirmed).
 - The reset timing is the vendor's, not a measured minimum or a datasheet value.
 - The all-target `Build Kernel` check passed on the build but needed 25 hunk-header refreshes in other targets (folded in). Re-run it on every rebase: the backport moves MAINTAINERS and DSA context that many target patches share.
 - Kernel margin on 25.12 is 145 KB, against 227 KB on main.
