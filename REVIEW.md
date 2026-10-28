@@ -17,7 +17,7 @@ Series, on openwrt/openwrt `main` 7cd9ef1f22:
 "Unit" below means the harvested GL-SFT1200, label MAC 94:83:c4:9a:ea:d1, read
 on GL firmware 4.8.3 (`device-dumps/glinet-sft1200/94-83-c4-9a-ea-d1`).
 OpenWrt images from this series have run on it since row 23, installed with
-GL's sysupgrade; the U-Boot web recovery has not been run with factory.img yet.
+GL's sysupgrade, and since row 33 through U-Boot's web recovery.
 
 ## Verification matrix
 
@@ -28,7 +28,7 @@ GL's sysupgrade; the U-Boot web recovery has not been run with factory.img yet.
 | 3 | Flash map: spl 0x0, u-boot 0x20000, env 0x80000, factory 0xa0000, kernel 0xc0000 (4 MiB), ubi 0x4c0000, log 0x7e00000 | `/proc/mtd`, stock DTB | yes (read) |
 | 4 | Stock also marks spl, u-boot, u-boot-env and factory read-only | stock DTB | yes (read) |
 | 5 | U-Boot reads 0x300000 bytes of kernel | bootcmd string in the unit's U-Boot | yes (binary), not executed |
-| 6 | Failsafe takes any upload named `*.img` of at least 10 KB, writes it raw at 0xc0000, and erases 0xc0000 to the end of flash (`log` included); the image is a raw uImage, padding to 4 MiB, then UBI | disassembly of the unit's U-Boot (0xa002ad0c, 0xa003bc2c); GL's own stock image sft1200-4.8.3 (SHA-256 matches GL's published value) has exactly that layout, and its kernel is byte-identical to the unit's mtd5 | layout yes (GL's image); write path inferred from code, not yet exercised |
+| 6 | Failsafe takes any upload named `*.img` of at least 10 KB, writes it raw at 0xc0000, and erases 0xc0000 to the end of flash (`log` included); the image is a raw uImage, padding to 4 MiB, then UBI | disassembly of the unit's U-Boot (0xa002ad0c, 0xa003bc2c); GL's own stock image sft1200-4.8.3 (SHA-256 matches GL's published value) has exactly that layout, and its kernel is byte-identical to the unit's mtd5 | yes (unit, row 33): U-Boot ran exactly `spi_nand erase 0xc0000 +0x7f40000; spi_nand update 0x81000000 0xc0000 0x7c0000` for our factory.img |
 | 7 | bootm allows 64 MiB uncompressed | disassembly (unc_len 0x4000000) | inferred from code |
 | 8 | U-Boot reads an env from 0x80000 and falls back to defaults on a bad CRC; it has `saveenv`, but nothing has saved there | env code and `saveenv` present in GL's U-Boot 2016.07, the partition is all zeros, the stock unit boots. With no saved env and its size unknown, fw_printenv only prints "Failed to find NVMEM device" on every boot (preinit → board_detect → 05_fw_defaults), so the GL image leaves out uboot-envtools | env read inferred; the boot message seen on the unit |
 | 9 | Base MAC at factory 0x0 = label MAC; LAN = base + 1 | factory hexdump, stock `mtd-mac-address-increment`, stock interface MACs | yes (read) |
@@ -55,6 +55,7 @@ GL's sysupgrade; the U-Boot web recovery has not been run with factory.img yet.
 | 30 | The DTS validates against the tree's own binding | `make target/linux/dtbs_check DT_SCHEMA_FILES=lantiq,gswip.yaml` with the binding as backported by 723-46..52 plus pending 761-01: silent (pass), run 40644462900 | yes (CI) |
 | 31 | The two Linux patches are ready for net-next | `linux-gsw1xx-reset-check` run 40630875170 on net-next: both apply; checkpatch --strict 0/0/0; `W=1 C=1` (sparse from git) clean on x86_64 and arm64 for drivers/net/dsa/lantiq; `dt_binding_check DT_SCHEMA_FILES=lantiq,gswip.yaml` passes | yes (CI) |
 | 32 | The GL image leaves out uboot-envtools and the EVB's switch packages | rootfs listing of the sysupgrade image in CI; needs `CONFIG_TARGET_PER_DEVICE_ROOTFS=y` in a multi-profile build, as on the buildbots (run 40644462900 had a shared rootfs, so it still carried fw_printenv and rtl8367b) | yes (CI, after run 40644462900) |
+| 33 | factory.img installs through U-Boot's web recovery and boots | siwifi-wifi session, factory.img from run 40644462900 (sha256 5f2d8e46…): U-Boot's md5 matched the file, it erased 0xc0000 to the end of flash and wrote 0x7c0000 bytes, then booted OpenWrt r0-44e8833 (ubiblock root, rootfs_data resized, overlay, SSH). Afterwards spl-loader, u-boot, u-boot-env and factory match the stock backup, and `log` is all 0xff. The button route printed "HTTP server is starting at IP: 192.168.1.1" but did not answer on lan2 in its one attempt, with a loose serial RX wire (the "Abort" may be noise). The upload that worked used the same httpd, started from the U-Boot prompt, with the cable on lan1 | write path and boot yes (unit); button route on lan1 not yet tried |
 
 ## Tests
 
@@ -174,9 +175,11 @@ Not testable without the unit:
 - The all-target `Build Kernel` check passed on the build but needed 25 hunk-header refreshes in other targets (folded in). Re-run it on every rebase: the backport moves MAINTAINERS and DSA context that many target patches share.
 - Kernel margin on 25.12 is 145 KB, against 216 KB on main.
 - -Os is a subtarget-wide default in config/Config-kernel.in. Precedent exists (`default y if TARGET_...`), but reviewers may prefer another way.
-- The failsafe behaviour (row 6) comes from disassembly. opal-harvest is to
-  run the web recovery with factory.img from run 40644462900, capture the IP
-  U-Boot serves it on, and read mtd0-3 and `log` back against the backup.
+- The web recovery's write path is confirmed (row 33), but its button route
+  has not yet worked end to end: one attempt on lan2 found no host, possibly
+  because of serial noise. Which LAN jack U-Boot's httpd serves ("vlan tag is
+  2" with the button, 3 from the prompt) needs a clean button test on lan1 and
+  lan2 before the install steps can name a port.
 - Lantiq xrx200 module split: compile only.
 - Generated patches were made with git, not GNU diff/quilt; the CI refresh
   step shows any header differences.
