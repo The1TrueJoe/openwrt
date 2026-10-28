@@ -1,4 +1,4 @@
-From 120319272320d76772246149348c06f466514420 Mon Sep 17 00:00:00 2001
+From 037636d5e3e5e8ae6aafbe65eb38624c70ac6b6a Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 08/11] leds: rgb: ktd202x: Limit the LED current to
@@ -9,25 +9,21 @@ LEDs are made for, and a channel may drive several LEDs in parallel. The
 GL.iNet GL-SFT1200 firmware, for example, runs each of its two channels,
 three LEDs each, at 1.375 mA.
 
-Honor the common led-max-microamp property:
+Honor the common led-max-microamp property for single color LEDs by
+lowering max_brightness, since each brightness step adds 0.125 mA. Set
+max_brightness before the LED is registered, and blink at max_brightness
+rather than at the chip maximum.
 
-- for a single color LED, lower max_brightness, since each brightness
-  step adds 0.125 mA
-- for a multicolor LED, scale the current of each color to the limit of
-  its channel. The LED core does not bound the color intensities, so
-  clamp the color brightness first; before, a large intensity overflowed
-  the 8-bit current register.
-
-Set max_brightness before the LED is registered, and blink at
-max_brightness rather than at the chip maximum.
+Multicolor LEDs are left as they are: the LED core already bounds each
+color intensity, and the hardware this was tested on has none.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- drivers/leds/rgb/leds-ktd202x.c | 40 +++++++++++++++++++++++++++++----
- 1 file changed, 36 insertions(+), 4 deletions(-)
+ drivers/leds/rgb/leds-ktd202x.c | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index d0eb035..30ad8f1 100644
+index d0eb035..4b8786c 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -78,6 +78,7 @@
@@ -38,44 +34,7 @@ index d0eb035..30ad8f1 100644
  
  static const struct reg_default ktd202x_reg_defaults[] = {
  	{ KTD202X_REG_RESET_CONTROL, KTD202X_TIMER_SLOT_CONTROL_TSLOT1 |
-@@ -136,6 +137,8 @@ struct ktd202x {
- 	struct regmap *regmap;
- 	const struct ktd202x_info *info;
- 	bool enabled;
-+	/* Current limit of the channels of multicolor LEDs, in 0.125 mA steps */
-+	u8 channel_max[KTD202X_MAX_LEDS];
- 	unsigned long num_leds;
- 	struct ktd202x_led leds[] __counted_by(num_leds);
- };
-@@ -289,12 +292,27 @@ static int ktd202x_brightness_mc_set(struct led_classdev *cdev,
- 	struct led_classdev_mc *mc = lcdev_to_mccdev(cdev);
- 	struct ktd202x_led *led = container_of(mc, struct ktd202x_led, mcdev);
- 	int ret;
-+	int i;
- 
- 	cdev->brightness = value;
- 
- 	mutex_lock(&led->chip->mutex);
- 
- 	led_mc_calc_color_components(mc, value);
-+
-+	/*
-+	 * The intensities are not bounded by the LED core. Scale each color
-+	 * to the current limit of its channel.
-+	 */
-+	for (i = 0; i < mc->num_colors; i++) {
-+		struct mc_subled *subled = &mc->subled_info[i];
-+		unsigned int max = led->chip->channel_max[subled->channel];
-+		unsigned int brightness;
-+
-+		brightness = min_t(unsigned int, subled->brightness, KTD202X_MAX_BRIGHTNESS);
-+		subled->brightness = DIV_ROUND_UP(brightness * max, KTD202X_MAX_BRIGHTNESS);
-+	}
-+
- 	ret = ktd202x_brightness_set(led, mc->subled_info, mc->num_colors);
- 
- 	mutex_unlock(&led->chip->mutex);
-@@ -398,7 +416,7 @@ static int ktd202x_blink_single_set(struct led_classdev *cdev,
+@@ -398,7 +399,7 @@ static int ktd202x_blink_single_set(struct led_classdev *cdev,
  	int ret;
  
  	if (!cdev->brightness) {
@@ -84,16 +43,7 @@ index d0eb035..30ad8f1 100644
  		if (ret)
  			return ret;
  	}
-@@ -427,7 +445,7 @@ static int ktd202x_blink_mc_set(struct led_classdev *cdev,
- 	int ret;
- 
- 	if (!cdev->brightness) {
--		ret = ktd202x_brightness_mc_set(cdev, KTD202X_MAX_BRIGHTNESS);
-+		ret = ktd202x_brightness_mc_set(cdev, cdev->max_brightness);
- 		if (ret)
- 			return ret;
- 	}
-@@ -587,6 +605,18 @@ static int ktd202x_pattern_mc_clear(struct led_classdev *cdev)
+@@ -587,6 +588,18 @@ static int ktd202x_pattern_mc_clear(struct led_classdev *cdev)
  	return ktd202x_brightness_mc_set(cdev, LED_OFF);
  }
  
@@ -112,15 +62,7 @@ index d0eb035..30ad8f1 100644
  static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwnode,
  				 struct ktd202x_led *led, struct led_init_data *init_data)
  {
-@@ -629,6 +659,7 @@ static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwn
- 		info[i].color_index = mono_color;
- 		info[i].channel = reg;
- 		info[i].intensity = KTD202X_MAX_BRIGHTNESS;
-+		chip->channel_max[reg] = ktd202x_max_brightness(child);
- 		i++;
- 	}
- 
-@@ -636,6 +667,7 @@ static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwn
+@@ -636,6 +649,7 @@ static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwn
  	led->mcdev.num_colors = num_channels;
  
  	cdev = &led->mcdev.led_cdev;
@@ -128,7 +70,7 @@ index d0eb035..30ad8f1 100644
  	cdev->brightness_set_blocking = ktd202x_brightness_mc_set;
  	cdev->blink_set = ktd202x_blink_mc_set;
  	cdev->pattern_set = ktd202x_pattern_mc_set;
-@@ -659,6 +691,8 @@ static int ktd202x_setup_led_single(struct ktd202x *chip, struct fwnode_handle *
+@@ -659,6 +673,8 @@ static int ktd202x_setup_led_single(struct ktd202x *chip, struct fwnode_handle *
  	led->index = reg;
  
  	cdev = &led->cdev;
@@ -137,7 +79,7 @@ index d0eb035..30ad8f1 100644
  	cdev->brightness_set_blocking = ktd202x_brightness_single_set;
  	cdev->blink_set = ktd202x_blink_single_set;
  	cdev->pattern_set = ktd202x_pattern_single_set;
-@@ -698,8 +732,6 @@ static int ktd202x_add_led(struct ktd202x *chip, struct fwnode_handle *fwnode, u
+@@ -698,8 +714,6 @@ static int ktd202x_add_led(struct ktd202x *chip, struct fwnode_handle *fwnode, u
  		return ret;
  	}
  

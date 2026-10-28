@@ -1,7 +1,7 @@
-From ae5a27273b84aa88cb5573a727dc1237b7b585a5 Mon Sep 17 00:00:00 2001
+From cbb6e5e15561c724a0792bbefbb91b2bbe6f0690 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:58 -0400
-Subject: [PATCH 03/11] leds: rgb: ktd202x: Fix an out-of-bounds read with
+Subject: [PATCH 02/11] leds: rgb: ktd202x: Fix an out-of-bounds read with
  unused channels
 
 The LED array is allocated for the number of child nodes, but

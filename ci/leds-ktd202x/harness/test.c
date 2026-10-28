@@ -201,7 +201,7 @@ int main(void)
 	ret = blink(2, 1, 1, &on, &off);
 	CHECK(ret == 0 && hw[1] == 0, "1/1 (period < 256 ms): Reg1 %u", hw[1]);
 
-	printf("multicolor: led-max-microamp per color, unbounded intensities\n");
+	printf("multicolor: full range, led-max-microamp on a color is not used\n");
 	static struct fwnode_handle rgbk[3] = { { .reg = 0, .color = 1, .ua = 1375 }, { .reg = 1, .color = 2 }, { .reg = 2, .color = 3, .ua = 2500 } };
 	nleds = 0; match = &ktd2026_info; nkids = 1;
 	kids[0] = (struct fwnode_handle){ .color = LED_COLOR_ID_RGB, .kids = rgbk, .nk = 3 };
@@ -210,15 +210,16 @@ int main(void)
 	struct led_classdev_mc *mc = lcdev_to_mccdev(leds[0]);
 	CHECK(ret == 0 && nleds == 1 && leds[0]->max_brightness == 192, "probe RGB, max %u", leds[0]->max_brightness);
 	leds[0]->brightness_set_blocking(leds[0], 192);
-	CHECK(hw[6] == 10 && hw[7] == 191 && hw[8] == 19, "full: IOUT %u/%u/%u (caps 1375 uA, none, 2500 uA)", hw[6], hw[7], hw[8]);
+	CHECK(hw[6] == 191 && hw[7] == 191 && hw[8] == 191, "full: IOUT %u/%u/%u", hw[6], hw[7], hw[8]);
 	leds[0]->brightness_set_blocking(leds[0], 96);
-	CHECK(hw[6] == 5 && hw[7] == 95 && hw[8] == 9, "half: IOUT %u/%u/%u", hw[6], hw[7], hw[8]);
-	mc->subled_info[0].intensity = 100000; mc->subled_info[1].intensity = (unsigned int)-5;
-	leds[0]->brightness_set_blocking(leds[0], 192);
-	CHECK(hw[6] <= 10 && hw[7] <= 191, "intensity 100000 and -5: IOUT %u/%u stay within the caps", hw[6], hw[7]);
+	CHECK(hw[6] == 95 && hw[7] == 95 && hw[8] == 95, "half: IOUT %u/%u/%u", hw[6], hw[7], hw[8]);
+	/* The core bounds the intensities to max_brightness */
 	mc->subled_info[0].intensity = 1;
 	leds[0]->brightness_set_blocking(leds[0], 192);
 	CHECK(hw[6] == 0 && CH(0) == 1, "intensity 1 still lights (0.125 mA): IOUT %u mode %d", hw[6], CH(0));
+	ret = blink(0, 500, 500, &on, &off);
+	CHECK(ret == 0 && hw[7] == 191 && CH(1) == 2, "blink: IOUT %u, green mode %d", hw[7], CH(1));
+	leds[0]->brightness_set_blocking(leds[0], 0);
 
 	printf("absent chip\n");
 	fail_io = 1;

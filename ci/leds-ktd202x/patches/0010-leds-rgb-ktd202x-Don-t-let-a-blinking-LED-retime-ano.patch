@@ -1,4 +1,4 @@
-From f546fc39607f163ff3880caf447d098c832d39df Mon Sep 17 00:00:00 2001
+From 48f9b4b96c5160a81e3fe0bf6bc6d93f98230fc2 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:33:42 -0400
 Subject: [PATCH 10/11] leds: rgb: ktd202x: Don't let a blinking LED retime
@@ -60,7 +60,7 @@ index 2ee537f..32ea9d6 100644
  For example, to breathe with a period of 4 seconds::
  
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index c1b96db..2370388 100644
+index d0fea30..f4544ba 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -128,6 +128,8 @@ struct ktd202x_led {
@@ -72,10 +72,10 @@ index c1b96db..2370388 100644
  };
  
  struct ktd202x {
-@@ -139,6 +141,10 @@ struct ktd202x {
+@@ -137,6 +139,10 @@ struct ktd202x {
+ 	struct regmap *regmap;
+ 	const struct ktd202x_info *info;
  	bool enabled;
- 	/* Current limit of the channels of multicolor LEDs, in 0.125 mA steps */
- 	u8 channel_max[KTD202X_MAX_LEDS];
 +	/* Settings of the flash timer, valid while a LED is on it */
 +	u8 flash_period;
 +	u8 flash_on;
@@ -83,7 +83,7 @@ index c1b96db..2370388 100644
  	unsigned long num_leds;
  	struct ktd202x_led leds[] __counted_by(num_leds);
  };
-@@ -198,13 +204,20 @@ static bool ktd202x_chip_in_use(struct ktd202x *chip)
+@@ -196,13 +202,20 @@ static bool ktd202x_chip_in_use(struct ktd202x *chip)
  	return false;
  }
  
@@ -106,7 +106,7 @@ index c1b96db..2370388 100644
  	int ret;
  	int i;
  
-@@ -214,24 +227,9 @@ static int ktd202x_brightness_set(struct ktd202x_led *led,
+@@ -212,24 +225,9 @@ static int ktd202x_brightness_set(struct ktd202x_led *led,
  			return ret;
  	}
  
@@ -134,7 +134,7 @@ index c1b96db..2370388 100644
  
  	for (i = 0; i < num_channels; i++) {
  		enum led_brightness brightness;
-@@ -247,10 +245,7 @@ static int ktd202x_brightness_set(struct ktd202x_led *led,
+@@ -245,10 +243,7 @@ static int ktd202x_brightness_set(struct ktd202x_led *led,
  			if (ret)
  				return ret;
  
@@ -146,7 +146,7 @@ index c1b96db..2370388 100644
  		} else {
  			mode = KTD202X_CHANNEL_CTRL_OFF;
  		}
-@@ -337,6 +332,89 @@ static unsigned long ktd202x_flash_period_ms(const struct ktd202x_info *info,
+@@ -320,6 +315,89 @@ static unsigned long ktd202x_flash_period_ms(const struct ktd202x_info *info,
  	return num_steps * KTD202X_FLASH_PERIOD_STEP_MS + info->flash_period_min_ms;
  }
  
@@ -236,7 +236,7 @@ index c1b96db..2370388 100644
  static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
  			     unsigned long *delay_off, struct mc_subled *subleds,
  			     unsigned int num_channels)
-@@ -345,22 +423,21 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+@@ -328,22 +406,21 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
  	unsigned long delay_total_ms;
  	int ret, num_steps, on;
  	u8 ctrl_mask = 0;
@@ -267,7 +267,7 @@ index c1b96db..2370388 100644
  		ret = regmap_update_bits(led->chip->regmap, KTD202X_REG_CHANNEL_CTRL,
  					 ctrl_mask, ctrl_on);
  		goto out;
-@@ -380,28 +457,19 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+@@ -363,28 +440,19 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
  	on = mul_u64_u64_div_u64(*delay_on, KTD202X_FLASH_ON_MAX, delay_total_ms);
  	on = clamp(on, 1, KTD202X_FLASH_ON_MAX - 1);
  
@@ -305,7 +305,7 @@ index c1b96db..2370388 100644
  out:
  	mutex_unlock(&led->chip->mutex);
  	return ret;
-@@ -501,18 +569,9 @@ static int ktd202x_pattern_program(struct ktd202x_led *led,
+@@ -484,18 +552,9 @@ static int ktd202x_pattern_program(struct ktd202x_led *led,
  	unsigned int t[KTD202X_PATTERN_LEN];
  	unsigned int rise, fall, num_steps, on;
  	unsigned long period_ms, ton_ms;
@@ -324,7 +324,7 @@ index c1b96db..2370388 100644
  	for (i = 0; i < KTD202X_PATTERN_LEN; i++)
  		t[i] = min_t(u32, pattern[i].delta_t, KTD202X_PATTERN_MAX_MS);
  
-@@ -529,28 +588,15 @@ static int ktd202x_pattern_program(struct ktd202x_led *led,
+@@ -512,28 +571,15 @@ static int ktd202x_pattern_program(struct ktd202x_led *led,
  
  	/* The on time includes the rise time */
  	ton_ms = t[0] + t[1];
@@ -359,7 +359,7 @@ index c1b96db..2370388 100644
  	return ret;
  }
  
-@@ -572,7 +618,11 @@ static int ktd202x_pattern_single_set(struct led_classdev *cdev,
+@@ -555,7 +601,11 @@ static int ktd202x_pattern_single_set(struct led_classdev *cdev,
  
  	info.channel = led->index;
  
@@ -372,7 +372,7 @@ index c1b96db..2370388 100644
  }
  
  static int ktd202x_pattern_single_clear(struct led_classdev *cdev)
-@@ -596,8 +646,12 @@ static int ktd202x_pattern_mc_set(struct led_classdev *cdev,
+@@ -579,8 +629,12 @@ static int ktd202x_pattern_mc_set(struct led_classdev *cdev,
  	if (ret)
  		return ret;
  

@@ -1,7 +1,7 @@
-From d6900458480d3293883332ccb57566a8e3498b76 Mon Sep 17 00:00:00 2001
+From 9ee7c9eb71c0bdee3825f21c60099d5a83682a0f Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Tue, 27 Oct 2026 00:01:02 -0400
-Subject: [PATCH 05/11] leds: rgb: ktd202x: Fix a division by zero with long
+Subject: [PATCH 04/11] leds: rgb: ktd202x: Fix a division by zero with long
  blinks
 
 blink_set() works out the on time as delay_on * 256 / (delay_on +

@@ -1,7 +1,7 @@
-From 8e491370e8100cab1ea0360ea28ee81ce1048d2b Mon Sep 17 00:00:00 2001
+From ee952e2461960cec4c8530040f980a7e7f496980 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:31 -0400
-Subject: [PATCH 02/11] leds: rgb: ktd202x: Fix the flash period of short
+Subject: [PATCH 01/11] leds: rgb: ktd202x: Fix the flash period of short
  blinks on 32 bit
 
 When delay_on + delay_off is below 256 ms, the unsigned subtraction of
