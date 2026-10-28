@@ -42,8 +42,11 @@ OpenWrt image has run on it yet.
 | 21 | Series applies with no fuzz and is refresh-clean | `patch -F0` on the build host; `make target/linux/refresh` in CI run 40448141508 leaves an empty diff (generic + siflower); OpenWrt's kernel.yml on all 98 subtargets (run 40486566465): every kernel builds; 25 patches in 8 other targets needed hunk-header-only refreshes (MAINTAINERS and DSA context moved by the backport), now folded into the backport commit | yes (CI) |
 | 22 | GMAC fix and the newest backports are checkpatch clean | `checkpatch.pl --strict` from 6.18.55 | yes (host) |
 | 23 | First boot on hardware (52f3163837, via GL sysupgrade) | serial log: SPL, U-Boot, kernel, SPI NAND GD5F1GQ5 (c8:51), UBI attach, ubiblock root, overlay, procd, login shell; GMAC probes with the factory MAC. The switch did not probe: at SMI 0 nothing answers, so the chip-ID read sees 0xffff (-ENODEV). Fixed: `switch@1f` | yes (unit) |
-| 24 | GSW150 reset is GPIO 0, active low | stock DT `esw-rst-gpio = <0>`; stock sgmac.ko `sf_trigger_eswitch_hwReset`: output high, low for 2 ms, high, then 100 ms. U-Boot leaves it high (out of reset); kept as `reset-gpios` so Linux owns the line | yes (unit: GPIO 512 out-high) |
+| 24 | GSW150 reset is GPIO 0, active low | stock DT `esw-rst-gpio = <0>`; stock sgmac.ko `sf_trigger_eswitch_hwReset`: output high, low for 2 ms, high, then 100 ms. A 1 s pulse with nothing bound resets the switch (RST_REQ and MDC_CFG0 back to defaults) | yes (unit) |
 | 25 | All-target kernel check on a1710648ff | kernel.yml run 40542009664: 383/383 jobs green | yes (CI) |
+| 26 | 7debf930a7 on hardware: DSA, sysupgrade, RGMII | `switch@1f` probes (part 0x31 v1.3, GSWIP 23); `nand_do_upgrade` from our own image works and leaves mtd0-3 and log unchanged; DHCP on LAN; 5.8 MB scp intact, 0 RGMII errors; eth0 MTU 1508 | yes (unit) |
+| 27 | wan needs a hardware reset of the switch | without one, GL U-Boot's state leaves the GPHYs at internal MDIO 1-4 (port 0 has no PHY, and each port's address answers with its neighbour's GPHY); after a GPIO 0 pulse they are at 0-3, and the unmodified driver brings wan up at 1 Gbit/s. The MDIO core ignores reset-gpios on non-PHY devices, hence pending patch 761 | yes (unit, manual pulse); patched driver not yet booted |
+| 28 | RST_REQ (82e2c7db0830) and GPIO_ALTSEL are not the cause | rst_override sweep and a clean reset + unmodified driver | yes (unit) |
 
 ## Tests
 
@@ -134,22 +137,26 @@ Not testable without the unit:
     interAptiv has 16 KiB L1 I-caches, where -Os rarely loses speed. Moving
     stmmac and DSA to modules is measured as a further option.
 16. **"The target is source-only."** Unchanged here; a call for the maintainers.
-17. **"`reset-gpios` is not in lantiq,gswip.yaml."** mdio.yaml defines it for
-    every MDIO child and the MDIO core handles it, but the switch schema has
-    `unevaluatedProperties: false`, so dt-validate flags it. Linux needs a
-    one-line binding patch allowing `reset-gpios` for the GSW1xx parts. The MDIO
-    core reads no `reset-deassert-us` for non-PHY devices; here the driver is a
-    module that probes seconds after the bus deasserts the reset, but a
-    built-in driver would need the vendor's 100 ms in the driver.
+17. **"`reset-gpios` is not in lantiq,gswip.yaml, and nothing uses it."**
+    The MDIO core handles reset-gpios only for PHY devices, so on the switch
+    node it did nothing. Two Linux patches, ready but not sent (shared notes,
+    `linux-mxl-gsw1xx-reset/`, checkpatch --strict clean): the binding allows
+    `reset-gpios` for the standalone GSW1xx, and mxl-gsw1xx pulses it at probe
+    (2 ms asserted, 100 ms after, the vendor's timing). OpenWrt carries the
+    driver half as pending-6.18 761. Targeted at net-next, not net: it adds
+    DT ABI and no in-tree board is affected, so a Fixes: tag would be hard
+    to justify.
+18. **"Why not reset the switch in the bootloader or with a GPIO hog?"** A hog
+    can only hold a level, not pulse it, and the bootloader is GL's; the
+    switch driver owning its reset matches mt7530 and other MDIO switches.
 
 ## Open risks
 
-- The switch at SMI 31 (row 11) is measured but the DSA bring-up on it is not yet booted.
+- The pending reset patch (row 27) is not yet booted; the jack map for lan1/lan2 must be rechecked once the GPHY addresses are right (wan = WAN jack is confirmed).
+- The reset timing is the vendor's, not a measured minimum or a datasheet value.
 - The all-target `Build Kernel` check passed on the build but needed 25 hunk-header refreshes in other targets (folded in). Re-run it on every rebase: the backport moves MAINTAINERS and DSA context that many target patches share.
 - Kernel margin on 25.12 is 145 KB, against 227 KB on main.
 - -Os is a subtarget-wide default in config/Config-kernel.in. Precedent exists (`default y if TARGET_...`), but reviewers may prefer another way.
-- No boot on hardware: SPI NAND through PL022, switch bring-up, the delay
-  values and the port mapping are all inferred.
 - The failsafe behaviour (row 6) comes from disassembly. opal-harvest can
   confirm the `log` wipe: write a marker on stock, recover, read it back.
 - Lantiq xrx200 module split: compile only.

@@ -95,6 +95,8 @@ jobs:
           git clone --depth 1 --branch v7.3 --filter=blob:none --sparse \
             https://github.com/torvalds/linux.git linux-bindings
           git -C linux-bindings sparse-checkout set Documentation/devicetree/bindings
+          # The binding half of the pending reset-gpios series
+          patch -p1 -d linux-bindings < .github/gl-sft1200/linux/0001-dt-bindings-net-dsa-lantiq-gswip-add-reset-gpios.patch
           dt-mk-schema -j linux-bindings/Documentation/devicetree/bindings > processed-schema.json
           dtb=$(ls build_dir/target-*/linux-siflower_sf19a2890/image-sf19a2890_glinet_gl-sft1200.dtb)
           dt-validate -s processed-schema.json "$dtb" 2>&1 | tee dt-validate.txt

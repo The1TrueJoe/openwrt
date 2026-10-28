@@ -1,0 +1,33 @@
+From 52dac3212c31f517a893ff4556f5a165d24c598b Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 22:01:01 -0400
+Subject: [PATCH net-next 0/2] net: dsa: mxl-gsw1xx: reset the switch through reset-gpios
+
+The GSW1xx driver never resets the switch, and the MDIO core does not
+handle reset-gpios for non-PHY devices, so the driver works with whatever
+the bootloader configured. On the GL.iNet GL-SFT1200 (SiFlower SF19A2890 +
+GSW150) the bootloader leaves the internal PHYs one MDIO address too high,
+and the WAN port has no PHY.
+
+Patch 1 allows reset-gpios in the binding for the standalone switches.
+Patch 2 pulses it at probe.
+
+Tested on a GL-SFT1200 [TO CONFIRM with the patched driver before sending]:
+without a reset, port 0 fails with -ENODEV after every boot; after a manual
+reset through the GPIO, the unmodified driver finds all three PHYs and port
+0 links at 1 Gbit/s.
+
+The board's device tree goes to OpenWrt; there is no in-tree user yet.
+
+Joseph Telaak (2):
+  dt-bindings: net: dsa: lantiq,gswip: add reset-gpios
+  net: dsa: mxl-gsw1xx: reset the switch through reset-gpios
+
+ .../bindings/net/dsa/lantiq,gswip.yaml           |  6 ++++++
+ drivers/net/dsa/lantiq/mxl-gsw1xx.c              | 16 ++++++++++++++++
+ drivers/net/dsa/lantiq/mxl-gsw1xx.h              |  4 ++++
+ 3 files changed, 26 insertions(+)
+
+-- 
+2.50.1 (Apple Git-155)
+
