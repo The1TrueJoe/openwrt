@@ -13,6 +13,17 @@ Series, on openwrt/openwrt `main` 7cd9ef1f22:
 4. `kernel: build siflower sf19a2890 kernels for size`
 5. `kernel: 6.18: mxl-gsw1xx: reset the switch through reset-gpios`
 6. `siflower: sf19a2890: add support for GL.iNet GL-SFT1200 (Opal)`
+7. `kernel: leds-ktd202x: fix blink timing and an out-of-bounds read`
+8. `kernel: leds-ktd202x: add Etek ET6326 support`
+9. `kernel: leds-ktd202x: add hardware breathing`
+10. `kernel: leds-ktd202x: honor led-max-microamp`
+11. `kernel: leds-ktd202x: fail the probe without a chip`
+12. `kernel: leds-ktd202x: don't let a blinking LED retime another one`
+13. `siflower: sf19a2890: add the GL.iNet GL-SFT1200 status LEDs`
+
+Commits 7-13 are the et6326-led session's (pending-6.18/881-01..10 and
+kmod-leds-ktd202x, then the board's I2C and LED nodes); its own notes hold
+their evidence. They were folded in on top of the six above unchanged.
 
 "Unit" below means the harvested GL-SFT1200, label MAC 94:83:c4:9a:ea:d1, read
 on GL firmware 4.8.3 (`device-dumps/glinet-sft1200/94-83-c4-9a-ea-d1`).
@@ -47,7 +58,7 @@ GL's sysupgrade, and since row 33 through U-Boot's web recovery.
 | 22 | GMAC fix and the newest backports are checkpatch clean | `checkpatch.pl --strict` from 6.18.55 | yes (host) |
 | 23 | First boot on hardware (52f3163837, via GL sysupgrade) | serial log: SPL, U-Boot, kernel, SPI NAND GD5F1GQ5 (c8:51), UBI attach, ubiblock root, overlay, procd, login shell; GMAC probes with the factory MAC. The switch did not probe: at SMI 0 nothing answers, so the chip-ID read sees 0xffff (-ENODEV). Fixed: `switch@1f` | yes (unit) |
 | 24 | GSW150 reset is GPIO 0, active low | stock DT `esw-rst-gpio = <0>`; stock sgmac.ko `sf_trigger_eswitch_hwReset`: output high, low for 2 ms, high, then 100 ms. A 1 s pulse with nothing bound resets the switch (RST_REQ and MDC_CFG0 back to defaults) | yes (unit) |
-| 25 | All-target kernel check on a1710648ff | kernel.yml run 40542009664: 383/383 jobs green | yes (CI) |
+| 25 | All-target kernel check | kernel.yml run 40542009664 on a1710648ff: 383/383; run 40644660860 on the six-commit series rebased onto 7cd9ef1f22 (tree 89b130c715): 383 passed, 1 skipped. Re-run on the 13-commit series | yes (CI) |
 | 26 | 7debf930a7 on hardware: DSA, sysupgrade, RGMII | `switch@1f` probes (part 0x31 v1.3, GSWIP 23); `nand_do_upgrade` from our own image works and leaves mtd0-3 and log unchanged; DHCP on LAN; 5.8 MB scp intact, 0 RGMII errors; eth0 MTU 1508 | yes (unit) |
 | 27 | wan needs a hardware reset of the switch | without one, GL U-Boot's state leaves the GPHYs at internal MDIO 1-4 (port 0 has no PHY, and each port's address answers with its neighbour's GPHY); after a GPIO 0 pulse they are at 0-3, and the unmodified driver brings wan up at 1 Gbit/s. The MDIO core ignores reset-gpios on non-PHY devices, hence pending patch 761 | yes (unit): patched driver (pending 761) verified on a warm reboot and a cold power-on, no manual pulse; wan mii:00, lan2 mii:01, lan1 mii:02 |
 | 28 | RST_REQ (82e2c7db0830) and GPIO_ALTSEL are not the cause | rst_override sweep and a clean reset + unmodified driver | yes (unit) |
@@ -56,6 +67,7 @@ GL's sysupgrade, and since row 33 through U-Boot's web recovery.
 | 31 | The two Linux patches are ready for net-next | `linux-gsw1xx-reset-check` run 40630875170 on net-next: both apply; checkpatch --strict 0/0/0; `W=1 C=1` (sparse from git) clean on x86_64 and arm64 for drivers/net/dsa/lantiq; `dt_binding_check DT_SCHEMA_FILES=lantiq,gswip.yaml` passes | yes (CI) |
 | 32 | The GL image leaves out uboot-envtools and the EVB's switch packages | rootfs listing of the sysupgrade image in CI; needs `CONFIG_TARGET_PER_DEVICE_ROOTFS=y` in a multi-profile build, as on the buildbots (run 40644462900 had a shared rootfs, so it still carried fw_printenv and rtl8367b) | yes (CI, after run 40644462900) |
 | 33 | factory.img installs through U-Boot's web recovery and boots | siwifi-wifi session, factory.img from run 40644462900 (sha256 5f2d8e46…): U-Boot's md5 matched the file, it erased 0xc0000 to the end of flash and wrote 0x7c0000 bytes, then booted OpenWrt r0-44e8833 (ubiblock root, rootfs_data resized, overlay, SSH). Afterwards spl-loader, u-boot, u-boot-env and factory match the stock backup, and `log` is all 0xff. The button route printed "HTTP server is starting at IP: 192.168.1.1" but did not answer on lan2 in its one attempt, with a loose serial RX wire (the "Abort" may be noise). The upload that worked used the same httpd, started from the U-Boot prompt, with the cable on lan1 | write path and boot yes (unit); button route on lan1 not yet tried |
+| 34 | The reset-button route brings up recovery on lan1 | opal-harvest: holding reset counts down 5..0, then "HTTP server is starting at IP: 192.168.1.1", "HTTP server is ready!", "now vlan tag is 3"; GL's "Firmware update" form answered on http://192.168.1.1 within 4 s of link-up, from a Mac at 192.168.1.2/24 (no DHCP). Earlier "no answer" results were the Mac's routing (another interface on 192.168.1.0/24). lan2: one 6 s try after moving the cable mid-session, no answer. U-Boot printed tag 2 when lan2 had link at power-on, so it may serve only the jack with link when its httpd starts | lan1 yes (unit); lan2 retest pending |
 
 ## Tests
 
@@ -135,8 +147,8 @@ Not testable without the unit:
 10. **"No vendor header on factory.img."** GL's own SDK builds the same raw
     `kernel | pad-to 4096k | ubi`, and U-Boot checks nothing but the name and
     size (row 6).
-11. **"Placeholder nodes."** Removed. The LED (`ktd202x`/ET6326) and Wi-Fi
-    nodes come as follow-up commits with their drivers.
+11. **"Placeholder nodes."** Removed. The LED nodes come with their driver
+    (commits 7-13); the Wi-Fi node comes as a follow-up with the siwifi driver.
 12. **"Commit 1 touches lantiq, ipq40xx, qualcommax, ramips and realtek."**
     Required for bisectability: each tree must build after every commit.
 13. **"UBIFS without zlib/zstd."** Size: the 3 MiB kernel limit. LZO is
@@ -175,11 +187,10 @@ Not testable without the unit:
 - The all-target `Build Kernel` check passed on the build but needed 25 hunk-header refreshes in other targets (folded in). Re-run it on every rebase: the backport moves MAINTAINERS and DSA context that many target patches share.
 - Kernel margin on 25.12 is 145 KB, against 216 KB on main.
 - -Os is a subtarget-wide default in config/Config-kernel.in. Precedent exists (`default y if TARGET_...`), but reviewers may prefer another way.
-- The web recovery's write path is confirmed (row 33), but its button route
-  has not yet worked end to end: one attempt on lan2 found no host, possibly
-  because of serial noise. Which LAN jack U-Boot's httpd serves ("vlan tag is
-  2" with the button, 3 from the prompt) needs a clean button test on lan1 and
-  lan2 before the install steps can name a port.
+- The web recovery is confirmed for the write path (row 33) and the button
+  route on lan1 (row 34). lan2 needs a proper test with the cable in place
+  before power-on. Install step 1 says "a LAN port" until then: if lan2 works
+  only when cabled first, the step says so; if it never answers, it names lan1.
 - Lantiq xrx200 module split: compile only.
 - Generated patches were made with git, not GNU diff/quilt; the CI refresh
   step shows any header differences.
