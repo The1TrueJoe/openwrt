@@ -1,0 +1,157 @@
+name: siwifi build
+
+# Test build of package/kernel/siwifi for siflower/sf19a2890 (GL-SFT1200).
+# The target is source-only, so the stock kernel and package workflows skip
+# it. Not part of any series sent upstream.
+
+on:
+  push:
+    branches:
+      - siflower-siwifi-ci
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build kmod-siwifi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force || true
+          df -h /
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex bison g++ gawk \
+            gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev \
+            python3-setuptools python3-dev rsync swig unzip zlib1g-dev file \
+            wget quilt zstd device-tree-compiler
+
+      - name: Configure
+        run: |
+          cat > .config <<'EOF'
+          CONFIG_TARGET_siflower=y
+          CONFIG_TARGET_siflower_sf19a2890=y
+          CONFIG_TARGET_siflower_sf19a2890_DEVICE_glinet_gl-sft1200=y
+          CONFIG_PACKAGE_kmod-siwifi=y
+          CONFIG_PACKAGE_siwifi-firmware=y
+          CONFIG_PACKAGE_iw=y
+          CONFIG_IMAGEOPT=y
+          CONFIG_DEVEL=y
+          CONFIG_BUILD_LOG=y
+          EOF
+          make defconfig
+          grep -E 'siwifi|KERNEL_DEBUG_FS|DEVICE_glinet' .config
+
+      - name: Download sources
+        run: make -j$(nproc) download || make -j1 download V=s
+
+      - name: Build tools and toolchain
+        run: make -j$(nproc) tools/install toolchain/install || make -j1 V=s tools/install toolchain/install
+
+      - name: Build the kernel
+        run: make -j$(nproc) target/linux/compile || make -j1 V=s target/linux/compile
+
+      - name: Build cfg80211
+        run: make -j$(nproc) package/kernel/mac80211/compile || make -j1 V=s package/kernel/mac80211/compile
+
+      - name: Compute PKG_MIRROR_HASH
+        if: always()
+        run: |
+          make package/siwifi/check FIXUP=1 V=s || true
+          git diff -- package/kernel/siwifi/Makefile | tee mirror-hash.diff
+          [ ! -s mirror-hash.diff ] || echo "::warning::PKG_MIRROR_HASH is out of date"
+
+      - name: Build siwifi
+        id: siwifi
+        # -k reaches the kernel's make through MAKEFLAGS, so one run lists
+        # every file that fails, not just the first
+        run: make -k -j1 V=s package/siwifi/compile 2>&1 | tee siwifi-build.log; exit ${PIPESTATUS[0]}
+
+      - name: Summarise the build
+        if: always()
+        run: |
+          echo "errors:   $(grep -c ' error: ' siwifi-build.log || true)"
+          echo "warnings: $(grep -c ' warning: ' siwifi-build.log || true)"
+          grep -E ' error: ' siwifi-build.log | sort | uniq | head -100 || true
+          grep -E ' warning: ' siwifi-build.log | sed -E 's/.*warning: //' | sort | uniq -c | sort -rn | head -40 || true
+          find build_dir/target-*/linux-siflower_sf19a2890/siwifi-* -name '*.ko' \
+            -exec sh -c 'echo "== $1"; ls -l "$1"; /sbin/modinfo "$1" | grep -E "^(depends|vermagic|alias|license):"' _ {} \; || true
+          ls -l bin/targets/siflower/sf19a2890/packages/ 2>/dev/null | grep -i siwifi || true
+          ls -l bin/packages/*/*/ 2>/dev/null | grep -i siwifi || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: siwifi-build
+          path: |
+            siwifi-build.log
+            mirror-hash.diff
+            logs/package/kernel/siwifi/
+            logs/package/kernel/mac80211/
+            logs/target/linux/
+          if-no-files-found: warn
+
+      # Test images for the unit. "autoload" is the image as the series
+      # builds it; "noautoload" drops the modules.d entry so the first boot
+      # comes up without the driver and it can be loaded by hand over ssh.
+      - name: Build images (autoload)
+        id: image
+        if: steps.siwifi.outcome == 'success'
+        run: make -j$(nproc) || make -j1 V=s
+
+      - name: Check the autoload image
+        if: steps.image.outcome == 'success'
+        run: |
+          root=$(ls -d build_dir/target-*/root-siflower*)
+          ls -l "$root"/lib/modules/*/ | grep -E 'startcore|sf16a18|cfg80211'
+          cat "$root"/etc/modules.d/siwifi
+          ls -l "$root"/lib/firmware/
+          ls "$root"/usr/sbin | grep -E '^(hostapd|wpad|wpa_supplicant|iw)$'
+          find build_dir/target-*/linux-siflower_sf19a2890 -maxdepth 1 \
+            -name '*gl-sft1200*kernel*' -printf '%s bytes\t%f\n'
+          echo "limit for the flash kernel: $((3 * 1024 * 1024)) bytes"
+          mkdir -p images/autoload
+          cp bin/targets/siflower/sf19a2890/*glinet_gl-sft1200* images/autoload/
+          ls -l images/autoload
+
+      - name: Build images (noautoload)
+        id: image2
+        if: steps.image.outcome == 'success'
+        run: |
+          sed -i '/AUTOLOAD:=/d' package/kernel/siwifi/Makefile
+          make package/siwifi/clean
+          make -j$(nproc) || make -j1 V=s
+          root=$(ls -d build_dir/target-*/root-siflower*)
+          if [ -e "$root"/etc/modules.d/siwifi ]; then
+            echo "::error::modules.d/siwifi still present"; exit 1
+          fi
+          ls -l "$root"/lib/modules/*/ | grep -E 'startcore|sf16a18'
+          mkdir -p images/noautoload
+          cp bin/targets/siflower/sf19a2890/*glinet_gl-sft1200* images/noautoload/
+          git checkout package/kernel/siwifi/Makefile
+
+      - name: Checksums
+        if: steps.image.outcome == 'success'
+        run: |
+          cd images && find . -type f ! -name sha256sums -exec sha256sum {} + | sort -k2 | tee sha256sums
+
+      - name: Upload images
+        if: steps.image.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: glinet_gl-sft1200-wifi-images
+          path: images/
+          if-no-files-found: error
