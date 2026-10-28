@@ -132,3 +132,33 @@ src = src.replace(info, info + r'''
 
 open(path, "w").write(src)
 print("patched (second experiment)", path)
+
+# Third experiment: a vendor-style hardware reset at probe time.
+src = open(path).read()
+probe = "static int gsw1xx_probe(struct mdio_device *mdiodev)\n{\n"
+assert src.count(probe) == 1
+src = src.replace(probe, r'''static bool hw_reset;
+module_param(hw_reset, bool, 0444);
+MODULE_PARM_DESC(hw_reset, "DEBUG: pulse reset-gpios for 2 ms at probe, as the vendor driver does");
+
+static int probe_delay_ms;
+module_param(probe_delay_ms, int, 0444);
+MODULE_PARM_DESC(probe_delay_ms, "DEBUG: wait this long at probe start, after any hw_reset");
+
+''' + probe)
+alloc = "\tpriv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);\n"
+assert src.count(alloc) == 1
+src = src.replace(alloc, r'''	dev_info(dev, "DEBUG probe: reset_gpio %s, reset_state %d, hw_reset %d, probe_delay_ms %d\n",
+		 mdiodev->reset_gpio ? "present" : "none", mdiodev->reset_state,
+		 hw_reset, probe_delay_ms);
+	if (hw_reset) {
+		mdio_device_reset(mdiodev, 1);
+		usleep_range(2000, 3000);
+		mdio_device_reset(mdiodev, 0);
+	}
+	if (probe_delay_ms)
+		msleep(probe_delay_ms);
+
+''' + alloc, 1)
+open(path, "w").write(src)
+print("patched (third experiment)", path)
