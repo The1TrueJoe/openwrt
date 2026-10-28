@@ -58,7 +58,7 @@ jobs:
           CONFIG_PACKAGE_kmod-nls-iso8859-1=y
           EOF
           make defconfig
-          grep -E 'DEVICE_glinet|ROOTFS_(INITRAMFS|SQUASHFS)|kmod-dsa' .config
+          grep -E 'DEVICE_glinet|ROOTFS_(INITRAMFS|SQUASHFS)|kmod-dsa|ktd202x|i2c-designware' .config
 
       - name: Download sources
         run: make -j$(nproc) download || make -j1 download V=s
@@ -97,11 +97,13 @@ jobs:
           tar -xf bin/targets/siflower/sf19a2890/*-glinet_gl-sft1200-squashfs-sysupgrade.bin -C "$t"
           unsquashfs -l -d r "$t"/sysupgrade-glinet_gl-sft1200/root > rootfs.txt
           grep -q '^r/lib/modules/.*/mxl-gsw1xx\.ko$' rootfs.txt
+          grep -q '^r/lib/modules/.*/leds-ktd202x\.ko$' rootfs.txt
+          grep -q '^r/lib/modules/.*/i2c-designware-platform\.ko$' rootfs.txt
           if grep -E '/fw_(printenv|setenv)$|/rtl8367b\.ko$|^r/sbin/swconfig$' rootfs.txt; then
             echo "::error::the GL image carries packages it should not"
             exit 1
           fi
-          echo "GL rootfs: mxl-gsw1xx present; no uboot-envtools, rtl8367b or swconfig" | tee -a verify.txt
+          echo "GL rootfs: mxl-gsw1xx, leds-ktd202x and i2c-designware-platform present; no uboot-envtools, rtl8367b or swconfig" | tee -a verify.txt
 
       - name: Validate the DTB against Linux v7.3 bindings
         if: always() && steps.build.outcome == 'success'
@@ -113,6 +115,8 @@ jobs:
           git -C linux-bindings sparse-checkout set Documentation/devicetree/bindings
           # The binding half of the pending reset-gpios series
           patch -p1 -d linux-bindings < .github/gl-sft1200/linux/0001-dt-bindings-net-dsa-lantiq-gswip-add-reset-gpios.patch
+          # and the ET6326 compatible
+          patch -p1 -d linux-bindings < target/linux/generic/pending-6.18/881-05-dt-bindings-leds-kinetic-ktd202x-add-etek-et6326.patch
           dt-mk-schema -j linux-bindings/Documentation/devicetree/bindings > processed-schema.json
           dtb=$(ls build_dir/target-*/linux-siflower_sf19a2890/image-sf19a2890_glinet_gl-sft1200.dtb)
           dt-validate -s processed-schema.json "$dtb" 2>&1 | tee dt-validate.txt
@@ -120,8 +124,9 @@ jobs:
       - name: Check the DTB against the tree's own binding (make target/linux/dtbs_check)
         if: always() && steps.build.outcome == 'success'
         run: |
-          # lantiq,gswip.yaml as patched by 723-46..52 and pending 761-01
-          make target/linux/dtbs_check DT_SCHEMA_FILES=lantiq,gswip.yaml V=s 2>&1 | tee dtbs-check.txt
+          # lantiq,gswip.yaml as patched by 723-46..52 and pending 761-01,
+          # kinetic,ktd202x.yaml as patched by pending 881-05
+          make target/linux/dtbs_check DT_SCHEMA_FILES=lantiq,gswip.yaml:kinetic,ktd202x.yaml V=s 2>&1 | tee dtbs-check.txt
           test ${PIPESTATUS[0]} -eq 0
 
       - name: Upload images
