@@ -67,7 +67,7 @@ GL's sysupgrade, and since row 33 through U-Boot's web recovery.
 | 31 | The two Linux patches are ready for net-next | `linux-gsw1xx-reset-check` run 40630875170 on net-next: both apply; checkpatch --strict 0/0/0; `W=1 C=1` (sparse from git) clean on x86_64 and arm64 for drivers/net/dsa/lantiq; `dt_binding_check DT_SCHEMA_FILES=lantiq,gswip.yaml` passes | yes (CI) |
 | 32 | The GL image leaves out uboot-envtools and the EVB's switch packages | rootfs listing of the sysupgrade image in CI; needs `CONFIG_TARGET_PER_DEVICE_ROOTFS=y` in a multi-profile build, as on the buildbots (run 40644462900 had a shared rootfs, so it still carried fw_printenv and rtl8367b) | yes (CI, after run 40644462900) |
 | 33 | factory.img installs through U-Boot's web recovery and boots | siwifi-wifi session, factory.img from run 40644462900 (sha256 5f2d8e46…): U-Boot's md5 matched the file, it erased 0xc0000 to the end of flash and wrote 0x7c0000 bytes, then booted OpenWrt r0-44e8833 (ubiblock root, rootfs_data resized, overlay, SSH). Afterwards spl-loader, u-boot, u-boot-env and factory match the stock backup, and `log` is all 0xff. The button route printed "HTTP server is starting at IP: 192.168.1.1" but did not answer on lan2 in its one attempt, with a loose serial RX wire (the "Abort" may be noise). The upload that worked used the same httpd, started from the U-Boot prompt, with the cable on lan1 | write path and boot yes (unit); button route on lan1 not yet tried |
-| 34 | The reset-button route brings up recovery on lan1 | opal-harvest: holding reset counts down 5..0, then "HTTP server is starting at IP: 192.168.1.1", "HTTP server is ready!", "now vlan tag is 3"; GL's "Firmware update" form answered on http://192.168.1.1 within 4 s of link-up, from a Mac at 192.168.1.2/24 (no DHCP). Earlier "no answer" results were the Mac's routing (another interface on 192.168.1.0/24). lan2: one 6 s try after moving the cable mid-session, no answer. U-Boot printed tag 2 when lan2 had link at power-on, so it may serve only the jack with link when its httpd starts | lan1 yes (unit); lan2 retest pending |
+| 34 | The reset-button route brings up recovery on either LAN jack, the one with link at power-on | opal-harvest: holding reset counts down 5..0, then "HTTP server is starting at IP: 192.168.1.1", "HTTP server is ready!", "now vlan tag is 3"; GL's "Firmware update" form answered on http://192.168.1.1 within 4 s of link-up, from a Mac at 192.168.1.2/24 (no DHCP). Earlier "no answer" results were the Mac's routing (another interface on 192.168.1.0/24). lan2 cabled before a reset-held power-on: "now vlan tag is 2", and http://192.168.1.1/ answered 200 within 12 s of link-up (full exchange captured, U-Boot MAC 56:2b:3f:41:8b:d7). In each session, moving the cable to the other jack got no ARP reply for 35 s or more. So U-Boot serves only the jack that had link at power-on (tag 3 = lan1, tag 2 = lan2), and install step 1 says to connect the cable before powering on | yes (unit), both jacks |
 
 ## Tests
 
@@ -188,9 +188,8 @@ Not testable without the unit:
 - Kernel margin on 25.12 is 145 KB, against 216 KB on main.
 - -Os is a subtarget-wide default in config/Config-kernel.in. Precedent exists (`default y if TARGET_...`), but reviewers may prefer another way.
 - The web recovery is confirmed for the write path (row 33) and the button
-  route on lan1 (row 34). lan2 needs a proper test with the cable in place
-  before power-on. Install step 1 says "a LAN port" until then: if lan2 works
-  only when cabled first, the step says so; if it never answers, it names lan1.
+  route on both LAN jacks, each only when cabled before power-on (row 34). The
+  LED pattern in install step 2 is GL's wording; serial shows a 5 s countdown.
 - Lantiq xrx200 module split: compile only.
 - Generated patches were made with git, not GNU diff/quilt; the CI refresh
   step shows any header differences.
