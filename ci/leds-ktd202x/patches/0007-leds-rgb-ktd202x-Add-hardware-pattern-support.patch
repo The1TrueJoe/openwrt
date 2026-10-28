@@ -1,4 +1,4 @@
-From f814f0a65559c7d0b8fbfccafdcbf7659e99daa0 Mon Sep 17 00:00:00 2001
+From 3eba284dbf42398a8ae6e679dccb21ea27d662d3 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 07/11] leds: rgb: ktd202x: Add hardware pattern support
@@ -19,9 +19,9 @@ sharp.
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  Documentation/leds/index.rst        |   1 +
- Documentation/leds/leds-ktd202x.rst |  41 +++++++
- drivers/leds/rgb/leds-ktd202x.c     | 181 ++++++++++++++++++++++++++--
- 3 files changed, 216 insertions(+), 7 deletions(-)
+ Documentation/leds/leds-ktd202x.rst |  41 ++++++
+ drivers/leds/rgb/leds-ktd202x.c     | 185 ++++++++++++++++++++++++++--
+ 3 files changed, 220 insertions(+), 7 deletions(-)
  create mode 100644 Documentation/leds/leds-ktd202x.rst
 
 diff --git a/Documentation/leds/index.rst b/Documentation/leds/index.rst
@@ -38,7 +38,7 @@ index 23fa9ff..54d1c73 100644
     leds-lp5521
 diff --git a/Documentation/leds/leds-ktd202x.rst b/Documentation/leds/leds-ktd202x.rst
 new file mode 100644
-index 0000000..cbf4044
+index 0000000..2ee537f
 --- /dev/null
 +++ b/Documentation/leds/leds-ktd202x.rst
 @@ -0,0 +1,41 @@
@@ -70,7 +70,7 @@ index 0000000..cbf4044
 +    Time spent off in ms.
 +
 +The first and the last brightness must be 0, and the two in the middle must be
-+equal and not 0. ``repeat`` must be -1.
++equal and not 0. ``repeat`` must be -1, its default.
 +
 +The sum of the four times is the flash period. The driver rounds it up to the
 +next step of 128 ms, between 256 ms (128 ms on the ET6326) and 16384 ms.
@@ -84,7 +84,7 @@ index 0000000..cbf4044
 +    echo pattern > /sys/class/leds/blue:status/trigger
 +    echo "0 1000 192 1000 192 1000 0 1000" > /sys/class/leds/blue:status/hw_pattern
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 67e65c1..7766243 100644
+index 67e65c1..d0eb035 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -62,12 +62,20 @@
@@ -168,7 +168,7 @@ index 67e65c1..7766243 100644
  	ret = regmap_update_bits(led->chip->regmap, KTD202X_REG_CHANNEL_CTRL,
  				 ctrl_mask, ctrl_pwm1);
  out:
-@@ -420,6 +446,143 @@ static int ktd202x_blink_mc_set(struct led_classdev *cdev,
+@@ -420,6 +446,147 @@ static int ktd202x_blink_mc_set(struct led_classdev *cdev,
  				 mc->num_colors);
  }
  
@@ -184,7 +184,11 @@ index 67e65c1..7766243 100644
 +				 struct led_pattern *pattern, u32 len,
 +				 int repeat)
 +{
-+	if (len != KTD202X_PATTERN_LEN || repeat != -1)
++	/*
++	 * Only forever: the pattern trigger passes -1, or 0 when repeat
++	 * has not been written since the trigger was set.
++	 */
++	if (len != KTD202X_PATTERN_LEN || repeat > 0)
 +		return -EINVAL;
 +
 +	if (pattern[0].brightness || pattern[3].brightness ||
@@ -312,7 +316,7 @@ index 67e65c1..7766243 100644
  static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwnode,
  				 struct ktd202x_led *led, struct led_init_data *init_data)
  {
-@@ -471,6 +634,8 @@ static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwn
+@@ -471,6 +638,8 @@ static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwn
  	cdev = &led->mcdev.led_cdev;
  	cdev->brightness_set_blocking = ktd202x_brightness_mc_set;
  	cdev->blink_set = ktd202x_blink_mc_set;
@@ -321,7 +325,7 @@ index 67e65c1..7766243 100644
  
  	return devm_led_classdev_multicolor_register_ext(chip->dev, &led->mcdev, init_data);
  }
-@@ -492,6 +657,8 @@ static int ktd202x_setup_led_single(struct ktd202x *chip, struct fwnode_handle *
+@@ -492,6 +661,8 @@ static int ktd202x_setup_led_single(struct ktd202x *chip, struct fwnode_handle *
  	cdev = &led->cdev;
  	cdev->brightness_set_blocking = ktd202x_brightness_single_set;
  	cdev->blink_set = ktd202x_blink_single_set;

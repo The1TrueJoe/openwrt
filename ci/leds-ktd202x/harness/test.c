@@ -175,6 +175,11 @@ int main(void)
 	struct led_pattern hot[4] = { { 100, 0 }, { 100, 12 }, { 100, 12 }, { 100, 0 } };
 	CHECK(leds[0]->pattern_set(leds[0], hot, 4, -1) == -EINVAL, "brightness 12 > max 11");
 
+	printf("the pattern trigger passes repeat 0 until repeat is written\n");
+	ret = leds[0]->pattern_set(leds[0], p, 4, 0);
+	CHECK(ret == 0 && CH(0) == 2 && hw[5] == 0xff, "repeat 0: ret %d mode %d Reg5 0x%02x", ret, CH(0), hw[5]);
+	leds[0]->pattern_clear(leds[0]);
+
 	printf("KTD2026 keeps its own period encoding\n");
 	ret = probe(&ktd2026_info, 3, 0);
 	CHECK(ret == 0 && leds[2]->max_brightness == 192, "probe, max %u", leds[2]->max_brightness);
