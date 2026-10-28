@@ -12,6 +12,12 @@ and the WAN port has no PHY.
 Patch 1 allows reset-gpios in the binding for the standalone switches.
 Patch 2 pulses it at probe.
 
+This is separate from commit 82e2c7db0830 ("net: dsa: mxl-gsw1xx: force
+internal PHYs into a known reset state"), which only programs the PHY
+bits of RST_REQ. On this board that commit is applied, and the PHYs still
+sit at the shifted addresses; only a hardware reset of the switch moves
+them back.
+
 Tested on a GL.iNet GL-SFT1200 (Intel GSW150 / PEB7084 at SMI address
 0x1f, reset on an active-low SoC GPIO), on the 6.18 backport that OpenWrt
 carries: after a warm reboot and after a cold power-on, all three ports
