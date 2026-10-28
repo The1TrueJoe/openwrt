@@ -34,8 +34,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential bc bison flex libelf-dev libssl-dev \
-            sparse gcc-aarch64-linux-gnu python3-pip yamllint
+            gcc-aarch64-linux-gnu python3-pip yamllint llvm-dev
           pip install --user dtschema
+
+      - name: Build sparse from git (the distro one is too old for net-next)
+        run: |
+          git clone --depth 1 https://git.kernel.org/pub/scm/devel/sparse/sparse.git
+          make -C sparse -j$(nproc) PREFIX=$HOME/.local install
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          $HOME/.local/bin/sparse --version
 
       - name: Clone net-next
         run: |
@@ -65,7 +72,8 @@ jobs:
           grep -E 'CONFIG_(NET_DSA|NET_DSA_MXL_GSW1XX|NET_DSA_LANTIQ_COMMON|GPIOLIB|OF)=' .config
           make -j$(nproc) prepare
           make -j$(nproc) W=1 C=1 drivers/net/dsa/lantiq/ 2>&1 | tee build.log
-          ! grep -E 'warning:|error:' build.log
+          ! grep -E 'warning:|error:|sparse is not available' build.log
+          grep -E 'CHECK +drivers/net/dsa/lantiq/mxl-gsw1xx.c' build.log
 
       - name: dt_binding_check
         if: matrix.arch == 'x86_64'
