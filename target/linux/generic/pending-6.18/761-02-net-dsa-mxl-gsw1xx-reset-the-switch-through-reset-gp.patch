@@ -1,0 +1,90 @@
+From 77db35a524be8ddbaa1a57dfd3dae3beb54b2c7f Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Tue, 27 Oct 2026 22:01:01 -0400
+Subject: [PATCH] net: dsa: mxl-gsw1xx: reset the switch through reset-gpios
+
+The switch keeps the configuration the bootloader left in it, and the
+driver never resets it. The MDIO core asserts and releases reset-gpios
+only for PHY devices, so a reset line described on the switch node has
+no effect either.
+
+On the GL.iNet GL-SFT1200 the bootloader leaves each internal PHY of
+the GSW150 one MDIO address above its port. Port 0 then fails with
+"failed to connect to PHY: -ENODEV", and the PHY that answers at a
+port's address belongs to the neighbouring port. After a hardware reset
+every PHY is back at its port's address and all ports work.
+
+Get the reset through the reset controller API and pulse it before the
+first register access. The reset core hands a reset-gpios property to
+the reset-gpio driver, so a board that wires the reset this way needs
+CONFIG_RESET_GPIO; without it the reset is skipped. The timing follows
+the vendor driver: asserted for 2 ms, then 100 ms before the switch is
+accessed.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ drivers/net/dsa/lantiq/mxl-gsw1xx.c | 25 +++++++++++++++++++++++++
+ drivers/net/dsa/lantiq/mxl-gsw1xx.h |  4 ++++
+ 2 files changed, 29 insertions(+)
+
+--- a/drivers/net/dsa/lantiq/mxl-gsw1xx.c
++++ b/drivers/net/dsa/lantiq/mxl-gsw1xx.c
+@@ -18,6 +18,7 @@
+ #include <linux/phy/phy-common-props.h>
+ #include <linux/property.h>
+ #include <linux/regmap.h>
++#include <linux/reset.h>
+ #include <linux/workqueue.h>
+ #include <net/dsa.h>
+ 
+@@ -719,6 +720,7 @@ static int gsw1xx_serdes_pcs_init(struct
+ static int gsw1xx_probe(struct mdio_device *mdiodev)
+ {
+ 	struct device *dev = &mdiodev->dev;
++	struct reset_control *reset;
+ 	struct gsw1xx_priv *priv;
+ 	u32 version, val;
+ 	u8 shellver;
+@@ -737,6 +739,29 @@ static int gsw1xx_probe(struct mdio_devi
+ 	if (!priv->gswip.hw_info)
+ 		return -EINVAL;
+ 
++	/* The MDIO core handles reset-gpios only for PHYs. Reset the switch
++	 * here, so it does not run with whatever the bootloader configured.
++	 */
++	reset = devm_reset_control_get_optional_exclusive(dev, NULL);
++	if (IS_ERR(reset))
++		return dev_err_probe(dev, PTR_ERR(reset),
++				     "failed to get reset control\n");
++
++	if (reset) {
++		ret = reset_control_assert(reset);
++		if (ret)
++			return dev_err_probe(dev, ret, "failed to assert reset\n");
++
++		fsleep(GSW1XX_RESET_ASSERT_US);
++
++		ret = reset_control_deassert(reset);
++		if (ret)
++			return dev_err_probe(dev, ret,
++					     "failed to deassert reset\n");
++
++		fsleep(GSW1XX_RESET_DEASSERT_US);
++	}
++
+ 	priv->gswip.gswip = gsw1xx_regmap_init(priv, "switch",
+ 					       GSW1XX_SWITCH_BASE, 0xfff);
+ 	if (IS_ERR(priv->gswip.gswip))
+--- a/drivers/net/dsa/lantiq/mxl-gsw1xx.h
++++ b/drivers/net/dsa/lantiq/mxl-gsw1xx.h
+@@ -19,6 +19,10 @@
+ 
+ #define GSW1XX_SYS_CLK_FREQ			340000000
+ 
++/* Hardware reset timing, as the vendor driver for the GSW150 does it */
++#define GSW1XX_RESET_ASSERT_US			2000
++#define GSW1XX_RESET_DEASSERT_US		100000
++
+ /* SMDIO switch register base address */
+ #define GSW1XX_SMDIO_BADR			0x1f
+ #define  GSW1XX_SMDIO_BADR_UNKNOWN		-1
