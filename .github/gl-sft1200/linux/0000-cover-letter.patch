@@ -12,10 +12,11 @@ and the WAN port has no PHY.
 Patch 1 allows reset-gpios in the binding for the standalone switches.
 Patch 2 pulses it at probe.
 
-Tested on a GL-SFT1200 [TO CONFIRM with the patched driver before sending]:
-without a reset, port 0 fails with -ENODEV after every boot; after a manual
-reset through the GPIO, the unmodified driver finds all three PHYs and port
-0 links at 1 Gbit/s.
+Tested on a GL.iNet GL-SFT1200 (Intel GSW150 / PEB7084 at SMI address
+0x1f, reset on an active-low SoC GPIO), on the 6.18 backport that OpenWrt
+carries: after a warm reboot and after a cold power-on, all three ports
+find their PHYs at addresses 0 to 2 and link at 1 Gbit/s. Without the
+patch, port 0 fails with -ENODEV after every boot.
 
 The board's device tree goes to OpenWrt; there is no in-tree user yet.
 
