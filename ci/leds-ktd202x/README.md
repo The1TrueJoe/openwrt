@@ -1,7 +1,7 @@
 # leds-ktd202x upstream checks
 
 This branch only exists for CI. `patches/` holds the ET6326/KTD202x LED
-series as it would be mailed to linux-leds (based on next-20261026).
+series as it would be mailed to linux-leds (based on v7.4-rc1; it applies unchanged to next-20261026 and for-leds-next).
 `.github/workflows/leds-ktd202x.yml` builds and checks it the way the
 kernel test robot and the maintainers would:
 
