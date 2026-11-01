@@ -5,7 +5,7 @@ only on the `siflower-gl-sft1200-ci` branch and are never sent upstream.
 Both branches are pushed to The1TrueJoe/openwrt. Nothing has been submitted
 upstream: no openwrt/openwrt PR, no patch mail.
 
-Series, on openwrt/openwrt `main` 7cd9ef1f22:
+Series, on openwrt/openwrt `main` 554f401d6b (Linux 6.18.60):
 
 1. `kernel: 6.18: backport MaxLinear GSW1xx DSA switch support`
 2. `siflower: sf19a2890: terminate the RGMII delay string before parsing`
@@ -20,6 +20,10 @@ Series, on openwrt/openwrt `main` 7cd9ef1f22:
 11. `kernel: leds-ktd202x: fail the probe without a chip`
 12. `kernel: leds-ktd202x: don't let a blinking LED retime another one`
 13. `siflower: sf19a2890: add the GL.iNet GL-SFT1200 status LEDs`
+
+Rebased from 7cd9ef1f22 (6.18.55) onto 554f401d6b on 2026-11-01 with no
+conflicts. Only ipq40xx 701 was changed by both main (the 6.18.57 hunk
+headers) and commit 1 (tag ids and context), and git merged the two.
 
 Commits 7-13 are the et6326-led session's (pending-6.18/881-01..10 and
 kmod-leds-ktd202x, then the board's I2C and LED nodes); its own notes hold
