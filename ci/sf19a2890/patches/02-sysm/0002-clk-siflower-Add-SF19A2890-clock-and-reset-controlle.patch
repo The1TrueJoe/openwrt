@@ -1,4 +1,4 @@
-From 5c7b7ab40da47b342ef8c51429074fea266aafa5 Mon Sep 17 00:00:00 2001
+From d18055521858e262ceb54994028ec6c142c92645 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:55:00 -0500
 Subject: [PATCH 2/2] clk: siflower: Add SF19A2890 clock and reset controller
@@ -25,8 +25,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  drivers/clk/Makefile                 |   1 +
  drivers/clk/siflower/Kconfig         |  12 +
  drivers/clk/siflower/Makefile        |   2 +
- drivers/clk/siflower/clk-sf19a2890.c | 671 +++++++++++++++++++++++++++
- 6 files changed, 688 insertions(+)
+ drivers/clk/siflower/clk-sf19a2890.c | 674 +++++++++++++++++++++++++++
+ 6 files changed, 691 insertions(+)
  create mode 100644 drivers/clk/siflower/Kconfig
  create mode 100644 drivers/clk/siflower/Makefile
  create mode 100644 drivers/clk/siflower/clk-sf19a2890.c
@@ -95,10 +95,10 @@ index 000000000..6958bcd56
 +obj-$(CONFIG_CLK_SF19A2890)	+= clk-sf19a2890.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890.c b/drivers/clk/siflower/clk-sf19a2890.c
 new file mode 100644
-index 000000000..c494db0d2
+index 000000000..9f87fd559
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890.c
-@@ -0,0 +1,671 @@
+@@ -0,0 +1,674 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Siflower SF19A2890 system manager: clocks and resets
@@ -627,7 +627,8 @@ index 000000000..c494db0d2
 +	.status = sf19a2890_reset_status,
 +};
 +
-+static int __init sf19a2890_register_gates(struct sf19a2890_sysm *sysm)
++static int __init sf19a2890_register_gates(struct device_node *np,
++					   struct sf19a2890_sysm *sysm)
 +{
 +	struct clk_hw **hws = sysm->clk_data.hws;
 +	int i, ret;
@@ -652,7 +653,7 @@ index 000000000..c494db0d2
 +		clk->bit = g->bit;
 +		clk->hw.init = &init;
 +
-+		ret = clk_hw_register(NULL, &clk->hw);
++		ret = of_clk_hw_register(np, &clk->hw);
 +		if (ret) {
 +			kfree(clk);
 +			return ret;
@@ -664,14 +665,16 @@ index 000000000..c494db0d2
 +	return 0;
 +}
 +
-+static int __init sf19a2890_register_clk(struct sf19a2890_sysm *sysm,
++static int __init sf19a2890_register_clk(struct device_node *np,
++					 struct sf19a2890_sysm *sysm,
 +					 struct sf19a2890_clk *clk,
 +					 unsigned int id)
 +{
 +	clk->sysm = sysm;
 +	sysm->clk_data.hws[id] = &clk->hw;
 +
-+	return clk_hw_register(NULL, &clk->hw);
++	/* With the node, so that the oscillators are found by name */
++	return of_clk_hw_register(np, &clk->hw);
 +}
 +
 +/*
@@ -699,20 +702,20 @@ index 000000000..c494db0d2
 +	sysm->clk_data.num = SF19A2890_NR_CLKS;
 +
 +	for (i = 0; i < ARRAY_SIZE(sf19a2890_plls); i++) {
-+		ret = sf19a2890_register_clk(sysm, &sf19a2890_plls[i],
++		ret = sf19a2890_register_clk(np, sysm, &sf19a2890_plls[i],
 +					     CLK_PLL_CPU + i);
 +		if (ret)
 +			goto err;
 +	}
 +
 +	for (i = 0; i < ARRAY_SIZE(sf19a2890_muxdivs); i++) {
-+		ret = sf19a2890_register_clk(sysm, &sf19a2890_muxdivs[i],
++		ret = sf19a2890_register_clk(np, sysm, &sf19a2890_muxdivs[i],
 +					     CLK_MUXDIV_BUS1 + i);
 +		if (ret)
 +			goto err;
 +	}
 +
-+	ret = sf19a2890_register_gates(sysm);
++	ret = sf19a2890_register_gates(np, sysm);
 +	if (ret)
 +		goto err;
 +
