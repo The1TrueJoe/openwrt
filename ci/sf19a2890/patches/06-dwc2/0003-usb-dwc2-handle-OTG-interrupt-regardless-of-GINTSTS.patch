@@ -1,4 +1,4 @@
-From ca5820b798f6be9dc15950289cb9867cf1b1fdd6 Mon Sep 17 00:00:00 2001
+From c792d3b405ac8b39ac8754bdf2b5c569bc86fd36 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Tue, 10 Sep 2024 09:10:27 +0800
 Subject: [PATCH 3/3] usb: dwc2: handle OTG interrupt regardless of GINTSTS

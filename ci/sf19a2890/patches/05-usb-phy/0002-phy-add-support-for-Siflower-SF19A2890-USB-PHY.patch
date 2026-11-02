@@ -1,4 +1,4 @@
-From d9c401ccf0f9a434b5845dfa004fbb7fc29f964f Mon Sep 17 00:00:00 2001
+From d9888368276bf356f066c7668262bb597c88e95b Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 9 Sep 2024 10:18:33 +0800
 Subject: [PATCH 2/2] phy: add support for Siflower SF19A2890 USB PHY

@@ -1,4 +1,4 @@
-From 40c82e1aadc10d7c9e12a66aa5186201560d6139 Mon Sep 17 00:00:00 2001
+From 97d0372efff16d8c877518b1e6f2a5a3be87c9e8 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:00:02 -0500
 Subject: [PATCH 1/2] dt-bindings: gpio: Add Siflower SF19A2890 GPIO controller

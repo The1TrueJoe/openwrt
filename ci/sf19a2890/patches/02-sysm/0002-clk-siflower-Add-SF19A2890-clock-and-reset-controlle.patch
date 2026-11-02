@@ -1,4 +1,4 @@
-From 2eb96732cb7ae52f1e1e41b05c60336126801278 Mon Sep 17 00:00:00 2001
+From 5c7b7ab40da47b342ef8c51429074fea266aafa5 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:55:00 -0500
 Subject: [PATCH 2/2] clk: siflower: Add SF19A2890 clock and reset controller

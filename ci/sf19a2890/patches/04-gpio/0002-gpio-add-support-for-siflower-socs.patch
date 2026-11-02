@@ -1,4 +1,4 @@
-From 98b51bdefb3abe7ad40cbfd264a9e25fd652965d Mon Sep 17 00:00:00 2001
+From 1d29b90b68ce229e1b323569fe25603aaa1282e7 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
 Subject: [PATCH 2/2] gpio: add support for siflower socs

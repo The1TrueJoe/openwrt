@@ -1,4 +1,4 @@
-From a0667eef1c853469c146c0bcbbb9031e43eba70d Mon Sep 17 00:00:00 2001
+From ae526c7ca5051f530783c4068d8d692666aed8ff Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 20 Jan 2025 09:52:52 +0800
 Subject: [PATCH 2/4] MIPS: Add support for Siflower MIPS SoCs

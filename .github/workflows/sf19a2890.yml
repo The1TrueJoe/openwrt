@@ -291,6 +291,12 @@ jobs:
           # Full stack: mainline + every series + ET6326 + GSW1xx reset
           bench_cfg; image full
 
+          # The same without the dwc2 OTG interrupt patch, to show it is needed
+          c=$(git log --format=%H -1 --grep='handle OTG interrupt regardless of GINTSTS')
+          git revert -q --no-edit "$c"
+          bench_cfg; image full-no-otg-quirk
+          git reset -q --hard HEAD~1
+
           # Series 1 alone, and the three kernels for the memory comparison
           git checkout -q s1
           bench_cfg; image s1-siflower
