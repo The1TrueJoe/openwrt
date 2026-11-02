@@ -12,9 +12,10 @@ Send from ONE Mac only. Nothing has been sent from the other one.
        git clone --depth 1 --branch for-leds-next https://git.kernel.org/pub/scm/linux/kernel/git/lee/leds.git linux-leds
        cd linux-leds
 
-2. Load the series from the bundle (adjust the path to where you saved it):
+2. Download the bundle from the fork and load the series from it:
 
-       git fetch ~/Downloads/ktd202x-et6326.bundle b4/ktd202x-et6326:b4/ktd202x-et6326
+       curl -fLO https://github.com/The1TrueJoe/openwrt/raw/leds-ktd202x-send/ktd202x-et6326.bundle
+       git fetch ./ktd202x-et6326.bundle b4/ktd202x-et6326:b4/ktd202x-et6326
        git checkout b4/ktd202x-et6326
 
 3. Identity and relay:
