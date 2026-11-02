@@ -141,11 +141,15 @@ jobs:
       - name: checkpatch --strict with the tree
         working-directory: linux
         run: |
+          # Use the checkpatch of lee/leds for-leds-next, the tree the series
+          # is for: it knows the Assisted-by tag, which v7.4-rc1's does not.
+          curl -fsSL -o scripts/checkpatch.pl \
+            'https://git.kernel.org/pub/scm/linux/kernel/git/lee/leds.git/plain/scripts/checkpatch.pl?h=for-leds-next'
           # The Fixes: commit predates this shallow clone; it was checked
           # by hand: 0ebdb7210943 ("leds: Add ktd202x driver"). The
           # MAINTAINERS reminder on the new doc file is answered by the
           # last patch of the series.
-          scripts/checkpatch.pl --strict --ignore UNKNOWN_COMMIT_ID,FILE_PATH_CHANGES \
+          perl scripts/checkpatch.pl --strict --ignore UNKNOWN_COMMIT_ID,FILE_PATH_CHANGES \
             --summary-file --show-types ../ci-src/ci/leds-ktd202x/patches/*.patch
 
       - name: dt_binding_check

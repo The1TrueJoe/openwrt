@@ -1,4 +1,4 @@
-From 9a3bdcb4b4993c0cfdb02e198ec9127a3a025121 Mon Sep 17 00:00:00 2001
+From eb1f90ea3cd89aa438338a878c471cab5179f33f Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:31 -0400
 Subject: [PATCH 01/11] leds: rgb: ktd202x: Fix the flash period of short

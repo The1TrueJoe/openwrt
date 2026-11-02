@@ -1,4 +1,4 @@
-From 23ffe17268c1f7209ab6fa3965b2f463a3581896 Mon Sep 17 00:00:00 2001
+From aca65b3ad39f4ab1dab1ea06d28ad7cdf6ad4596 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 08/11] leds: rgb: ktd202x: Add hardware pattern support
@@ -85,7 +85,7 @@ index 000000000..2ee537f57
 +    echo pattern > /sys/class/leds/blue:status/trigger
 +    echo "0 1000 192 1000 192 1000 0 1000" > /sys/class/leds/blue:status/hw_pattern
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 8a0497ab4..699b82cf2 100644
+index 2650573b6..daa04f8ec 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -62,12 +62,20 @@
@@ -153,10 +153,10 @@ index 8a0497ab4..699b82cf2 100644
  	/* Actually used delay_{on,off} values */
 -	delay_total_ms = num_steps * KTD202X_FLASH_PERIOD_STEP_MS + info->flash_period_min_ms;
 +	delay_total_ms = ktd202x_flash_period_ms(info, num_steps);
- 	/* 1/256 of the 128 ms ET6326 period would round down to 0 ms */
- 	*delay_on = max(delay_total_ms * on / KTD202X_FLASH_ON_MAX, 1UL);
- 	*delay_off = delay_total_ms - *delay_on;
-@@ -361,6 +381,12 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+ 	/*
+ 	 * Rounded to the nearest ms, so that the delays give the same on time
+ 	 * when written back. Rounded down, 1/256 of the 128 ms ET6326 period
+@@ -366,6 +386,12 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
  	if (ret)
  		goto out;
  
@@ -169,7 +169,7 @@ index 8a0497ab4..699b82cf2 100644
  	ret = regmap_update_bits(led->chip->regmap, KTD202X_REG_CHANNEL_CTRL,
  				 ctrl_mask, ctrl_pwm1);
  out:
-@@ -426,6 +452,153 @@ static int ktd202x_blink_mc_set(struct led_classdev *cdev,
+@@ -431,6 +457,153 @@ static int ktd202x_blink_mc_set(struct led_classdev *cdev,
  				 mc->num_colors);
  }
  
@@ -323,7 +323,7 @@ index 8a0497ab4..699b82cf2 100644
  static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwnode,
  				 struct ktd202x_led *led, struct led_init_data *init_data)
  {
-@@ -477,6 +650,8 @@ static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwn
+@@ -482,6 +655,8 @@ static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwn
  	cdev = &led->mcdev.led_cdev;
  	cdev->brightness_set_blocking = ktd202x_brightness_mc_set;
  	cdev->blink_set = ktd202x_blink_mc_set;
@@ -332,7 +332,7 @@ index 8a0497ab4..699b82cf2 100644
  
  	return devm_led_classdev_multicolor_register_ext(chip->dev, &led->mcdev, init_data);
  }
-@@ -498,6 +673,8 @@ static int ktd202x_setup_led_single(struct ktd202x *chip, struct fwnode_handle *
+@@ -503,6 +678,8 @@ static int ktd202x_setup_led_single(struct ktd202x *chip, struct fwnode_handle *
  	cdev = &led->cdev;
  	cdev->brightness_set_blocking = ktd202x_brightness_single_set;
  	cdev->blink_set = ktd202x_blink_single_set;

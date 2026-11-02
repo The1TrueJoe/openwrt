@@ -1,4 +1,4 @@
-From 8dea8a096bcd6dec8ae5ecae4f3520e7aa3a0948 Mon Sep 17 00:00:00 2001
+From 9fffb2ab672622a777df56e04517ea0be679373e Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:31 -0400
 Subject: [PATCH 06/11] dt-bindings: leds: kinetic,ktd202x: Add Etek ET6326

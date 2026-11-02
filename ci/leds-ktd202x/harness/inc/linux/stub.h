@@ -46,7 +46,7 @@ void fwnode_handle_put(struct fwnode_handle *);
 enum led_brightness { LED_OFF = 0, LED_FULL = 255 };
 #define LED_COLOR_ID_RGB 9
 struct led_pattern { u32 delta_t; int brightness; };
-struct led_classdev { const char *name; unsigned int brightness; unsigned int max_brightness;
+struct led_classdev { const char *name; unsigned int brightness; unsigned int max_brightness; unsigned int blink_brightness;
 	int (*brightness_set_blocking)(struct led_classdev *, enum led_brightness);
 	int (*blink_set)(struct led_classdev *, unsigned long *, unsigned long *);
 	int (*pattern_set)(struct led_classdev *, struct led_pattern *, u32, int);

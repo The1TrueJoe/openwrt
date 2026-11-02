@@ -7,10 +7,13 @@
 
 struct fwnode_handle { u32 reg; int color; u32 ua; struct fwnode_handle *kids; int nk; };
 #define ENXIO 6
+#ifndef EIO
+#define EIO 5
+#endif
 
 static u8 hw[16], cache[16];
 static int writes[16];
-static int fail_io, nak_reset;
+static int fail_io, nak_reset, power_loss, fail_reg = -1;
 static const void *match;
 static struct fwnode_handle kids[4];
 static int nkids;
@@ -21,7 +24,15 @@ void mutex_lock(struct mutex *m) { }
 void mutex_unlock(struct mutex *m) { }
 int devm_mutex_init(struct device *d, struct mutex *m) { return 0; }
 int regulator_bulk_enable(int n, struct regulator_bulk_data *r) { return 0; }
-int regulator_bulk_disable(int n, struct regulator_bulk_data *r) { return 0; }
+static const struct regmap_config *rcfg;
+int regulator_bulk_disable(int n, struct regulator_bulk_data *r)
+{
+	/* Without power the chip forgets its registers, the cache does not */
+	if (power_loss && rcfg)
+		for (unsigned int i = 0; i < rcfg->num_reg_defaults; i++)
+			hw[rcfg->reg_defaults[i].reg] = rcfg->reg_defaults[i].def;
+	return 0;
+}
 int devm_regulator_bulk_get(struct device *d, int n, struct regulator_bulk_data *r) { return 0; }
 void dev_err(struct device *d, const char *f, ...) { va_list a; va_start(a, f); printf("    dev_err: "); vprintf(f, a); va_end(a); }
 int dev_err_probe(struct device *d, int e, const char *f, ...) { va_list a; va_start(a, f); printf("    dev_err_probe(%d): ", e); vprintf(f, a); va_end(a); return e; }
@@ -55,7 +66,6 @@ const void *i2c_get_match_data(const struct i2c_client *c) { return match; }
 static void *clientdata;
 void i2c_set_clientdata(struct i2c_client *c, void *p) { clientdata = p; }
 void *i2c_get_clientdata(const struct i2c_client *c) { return clientdata; }
-static const struct regmap_config *rcfg;
 struct regmap *devm_regmap_init_i2c(struct i2c_client *c, const struct regmap_config *cfg)
 {
 	rcfg = cfg;
@@ -68,6 +78,7 @@ struct regmap *devm_regmap_init_i2c(struct i2c_client *c, const struct regmap_co
 int regmap_write(struct regmap *m, unsigned int r, unsigned int v)
 {
 	if (fail_io) return -ENXIO;
+	if ((int)r == fail_reg) return -EIO;
 	if (r > rcfg->max_register) { printf("    BAD REG %u\n", r); abort(); }
 	if (v > 0xff) { printf("    VALUE OVERFLOW reg %u = %u\n", r, v); abort(); }
 	hw[r] = cache[r] = v; writes[r]++;
@@ -142,7 +153,7 @@ int main(void)
 	printf("O13: pattern needs ramps the blinking LED does not use -> -EBUSY\n");
 	struct led_pattern p[4] = { { 1920, 0 }, { 384, 11 }, { 1920, 11 }, { 0, 0 } };
 	ret = leds[1]->pattern_set(leds[1], p, 4, -1);
-	CHECK(ret == -EBUSY && CH(1) == 0, "white breathe: ret %d, white off (mode %d)", ret, CH(1));
+	CHECK(ret == -EBUSY && CH(1) == 2 && hw[5] == 0, "white breathe: ret %d, white left blinking with blue (mode %d), ramps 0x%02x", ret, CH(1), hw[5]);
 
 	printf("turning blue off frees its timer\n");
 	leds[0]->brightness_set_blocking(leds[0], 0);
@@ -213,6 +224,63 @@ int main(void)
 	CHECK(ret == 0 && hw[1] == 5 && on + off == 896, "500/500: Reg1 %u period %lu", hw[1], on + off);
 	ret = blink(2, 1, 1, &on, &off);
 	CHECK(ret == 0 && hw[1] == 0, "1/1 (period < 256 ms): Reg1 %u", hw[1]);
+
+	printf("Sashiko: read-back delays give the same on time (odd period and on steps)\n");
+	ret = probe(&ktd2026_info, 3, 0);
+	ret = blink(0, 452, 444, &on, &off);
+	CHECK(ret == 0 && hw[1] == 5 && hw[2] == 129 && on == 452 && off == 444,
+	      "452/444: Reg1 %u Reg2 %u, reads back %lu/%lu", hw[1], hw[2], on, off);
+	ret = blink(1, on, off, &on, &off);
+	CHECK(ret == 0 && CH(1) == 2 && hw[2] == 129, "a second LED given them shares the timer: ret %d mode %d", ret, CH(1));
+	leds[0]->brightness_set_blocking(leds[0], 0);
+	leds[1]->brightness_set_blocking(leds[1], 0);
+
+	printf("Sashiko: a failed timer write does not keep the timer\n");
+	fail_reg = KTD202X_REG_FLASH_PERIOD;
+	ret = blink(0, 500, 500, &on, &off);
+	fail_reg = -1;
+	CHECK(ret == -EIO, "blink, the Reg1 write fails: ret %d", ret);
+	ret = blink(1, 100, 900, &on, &off);
+	CHECK(ret == 0 && CH(1) == 2 && hw[2] == 25, "another LED then gets the timer: ret %d mode %d Reg2 %u", ret, CH(1), hw[2]);
+	leds[0]->brightness_set_blocking(leds[0], 0);
+	leds[1]->brightness_set_blocking(leds[1], 0);
+
+	printf("Sashiko: the timer is written again after the chip lost power\n");
+	power_loss = 1;
+	ret = blink(0, 500, 500, &on, &off);
+	leds[0]->brightness_set_blocking(leds[0], 0);
+	CHECK(hw[1] == 0 && hw[2] == 1, "all off, power lost: Reg1 %u Reg2 %u (defaults)", hw[1], hw[2]);
+	ret = blink(0, 500, 500, &on, &off);
+	CHECK(ret == 0 && hw[1] == 5 && hw[2] == 128 && CH(0) == 2, "same blink again: Reg1 %u Reg2 %u mode %d", hw[1], hw[2], CH(0));
+	power_loss = 0;
+
+	printf("Sashiko: a LED turned off leaves the timer, whatever cdev->brightness says\n");
+	struct ktd202x_led *kl = container_of(leds[0], struct ktd202x_led, cdev);
+	struct mc_subled dark = { .brightness = 0, .channel = 0 };
+	leds[0]->brightness = 7;	/* set by the LED core meanwhile */
+	ret = ktd202x_brightness_set(kl, &dark, 1);
+	CHECK(ret == 0 && !kl->on_timer && CH(0) == 0, "off: ret %d, on_timer %d, mode %d", ret, kl->on_timer, CH(0));
+	leds[0]->brightness_set_blocking(leds[0], 0);
+	ret = blink(1, 100, 900, &on, &off);
+	CHECK(ret == 0 && CH(1) == 2, "another LED gets the timer: ret %d mode %d", ret, CH(1));
+	leds[1]->brightness_set_blocking(leds[1], 0);
+
+	printf("Sashiko: a hardware blink from a software blink's off phase keeps its brightness\n");
+	leds[0]->blink_brightness = 20;
+	ret = blink(0, 500, 500, &on, &off);
+	CHECK(ret == 0 && hw[6] == 19 && CH(0) == 2, "blink_brightness 20: IOUT %u mode %d", hw[6], CH(0));
+	leds[0]->blink_brightness = 0;
+
+	printf("Sashiko: a pattern that can't get the timer leaves the LED alone\n");
+	leds[1]->brightness_set_blocking(leds[1], 50);
+	int w7 = writes[7], w8 = writes[8];
+	struct led_pattern kp[4] = { { 1000, 0 }, { 1000, 100 }, { 1000, 100 }, { 1000, 0 } };
+	ret = leds[1]->pattern_set(leds[1], kp, 4, -1);
+	CHECK(ret == -EBUSY && CH(1) == 1 && hw[7] == 49 && writes[7] == w7, "lit LED: ret %d, still steady (mode %d) at IOUT %u, not rewritten", ret, CH(1), hw[7]);
+	ret = leds[2]->pattern_set(leds[2], kp, 4, -1);
+	CHECK(ret == -EBUSY && CH(2) == 0 && writes[8] == w8, "unlit LED: ret %d, still off (mode %d), IOUT not written", ret, CH(2));
+	leds[0]->brightness_set_blocking(leds[0], 0);
+	leds[1]->brightness_set_blocking(leds[1], 0);
 
 	printf("multicolor: full range, led-max-microamp on a color is not used\n");
 	static struct fwnode_handle rgbk[3] = { { .reg = 0, .color = 1, .ua = 1375 }, { .reg = 1, .color = 2 }, { .reg = 2, .color = 3, .ua = 2500 } };
