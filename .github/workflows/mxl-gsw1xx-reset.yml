@@ -1,0 +1,151 @@
+name: mxl-gsw1xx-reset upstream checks
+
+# Builds and checks the mxl-gsw1xx reset-gpios series in
+# ci/mxl-gsw1xx-reset/patches on top of net-next main, the way the netdev
+# patchwork checks and the DT maintainers would look at it.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/mxl-gsw1xx-reset.yml'
+      - 'ci/mxl-gsw1xx-reset/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NEXT_BRANCH: main
+  NEXT_URL: https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git
+  OBJ: drivers/net/dsa/lantiq/mxl-gsw1xx.o
+  NPATCHES: 2
+
+jobs:
+  build:
+    name: build ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The SF19A2890 on the GL-SFT1200 is a MIPS32 SoC
+          - name: mips 32 bit gcc W=1
+            arch: mips
+            cross: mips-linux-gnu-
+            defconfig: malta_defconfig
+            make: W=1
+            pkgs: gcc-mips-linux-gnu
+          - name: x86_64 gcc W=1 sparse
+            arch: x86_64
+            make: W=1 C=1
+            pkgs: sparse
+          - name: x86_64 clang W=1
+            arch: x86_64
+            make: W=1 LLVM=1
+            pkgs: clang lld llvm
+          - name: arm64 gcc W=1
+            arch: arm64
+            cross: aarch64-linux-gnu-
+            make: W=1
+            pkgs: gcc-aarch64-linux-gnu
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ci-src
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bc bison flex libssl-dev libelf-dev \
+            ${{ matrix.pkgs }}
+
+      - name: Fetch net-next and apply the series
+        run: |
+          git clone -q --depth 1 --branch "$NEXT_BRANCH" "$NEXT_URL" linux
+          cd linux
+          git config user.name ci
+          git config user.email ci@example.invalid
+          git am -q ../ci-src/ci/mxl-gsw1xx-reset/patches/*.patch
+          git log --oneline -3
+
+      - name: Configure
+        working-directory: linux
+        run: |
+          m="ARCH=${{ matrix.arch }} ${{ matrix.cross && format('CROSS_COMPILE={0}', matrix.cross) || '' }} ${{ matrix.make }}"
+          echo "MAKEARGS=$m" >> "$GITHUB_ENV"
+          make $m ${{ matrix.defconfig || 'defconfig' }} >/dev/null
+          scripts/config -e NET -e NETDEVICES -e PHYLIB -e GPIOLIB -e OF \
+            -e NET_DSA -m NET_DSA_MXL_GSW1XX
+          make $m olddefconfig >/dev/null
+          grep -E 'CONFIG_(NET_DSA|NET_DSA_MXL_GSW1XX|GPIOLIB|OF)=' .config || true
+          grep -q '^CONFIG_NET_DSA_MXL_GSW1XX=m' .config
+          make $m -j"$(nproc)" prepare >/dev/null
+
+      - name: Build every commit (bisectability, warnings)
+        working-directory: linux
+        run: |
+          fail=0
+          for c in $(git rev-list --reverse HEAD~$NPATCHES..HEAD); do
+            git checkout -q "$c"
+            subj=$(git log -1 --format=%s)
+            rm -f "$OBJ"
+            if ! make $MAKEARGS -j"$(nproc)" "$OBJ" > build.log 2>&1; then
+              echo "::error::build failed at: $subj"; cat build.log; fail=1; continue
+            fi
+            if grep -E 'mxl-gsw1xx\.[ch].*(warning|error)' build.log; then
+              echo "::error::warnings at: $subj"; fail=1
+            else
+              echo "ok: $subj"
+            fi
+          done
+          git checkout -q -
+          exit $fail
+
+  checks:
+    name: checkpatch, dt_binding_check, kernel-doc
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ci-src
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-venv yamllint swig libyaml-dev
+          python3 -m venv ~/venv
+          ~/venv/bin/pip install -q dtschema yamllint
+          echo "$HOME/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch net-next and apply the series
+        run: |
+          git clone -q --depth 1 --branch "$NEXT_BRANCH" "$NEXT_URL" linux
+          cd linux
+          git config user.name ci
+          git config user.email ci@example.invalid
+          git am -q ../ci-src/ci/mxl-gsw1xx-reset/patches/*.patch
+
+      - name: checkpatch, plain and --strict, from net-next
+        working-directory: linux
+        run: |
+          p=../ci-src/ci/mxl-gsw1xx-reset/patches/*.patch
+          perl scripts/checkpatch.pl --summary-file --show-types $p
+          perl scripts/checkpatch.pl --strict --summary-file --show-types $p
+
+      - name: dt_binding_check
+        working-directory: linux
+        run: |
+          make dt_binding_check DT_SCHEMA_FILES=net/dsa/lantiq,gswip.yaml 2>&1 | tee dt.log
+          if grep -E 'lantiq,gswip.*(error|warning)' dt.log; then exit 1; fi
+
+      - name: kernel-doc
+        working-directory: linux
+        run: |
+          # Only new warnings count; compare with net-next before the series
+          f="drivers/net/dsa/lantiq/mxl-gsw1xx.c drivers/net/dsa/lantiq/mxl-gsw1xx.h"
+          git checkout -q HEAD~$NPATCHES
+          scripts/kernel-doc -none -Wall $f 2>&1 | sed 's/:[0-9]*:/:/' | sort > before.log
+          git checkout -q -
+          scripts/kernel-doc -none -Wall $f 2>&1 | sed 's/:[0-9]*:/:/' | sort > after.log
+          cat after.log
+          if comm -13 before.log after.log | grep .; then exit 1; fi
