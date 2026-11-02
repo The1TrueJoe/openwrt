@@ -1,4 +1,4 @@
-From 9fffb2ab672622a777df56e04517ea0be679373e Mon Sep 17 00:00:00 2001
+From 5dfb606584a54681edd448c32d77e627677628af Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:31 -0400
 Subject: [PATCH 06/11] dt-bindings: leds: kinetic,ktd202x: Add Etek ET6326
@@ -11,7 +11,7 @@ off. Document it with the KTD2026 as fallback.
 
 The ET6326 drives the status LED of the GL.iNet GL-SFT1200 (Opal).
 
-Assisted-by: Claude:claude-opus-5-5
+Acked-by: Krzysztof Kozlowski <krzysztof.kozlowski@oss.qualcomm.com>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../devicetree/bindings/leds/kinetic,ktd202x.yaml | 15 ++++++++++++---

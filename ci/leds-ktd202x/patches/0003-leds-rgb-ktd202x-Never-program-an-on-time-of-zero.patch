@@ -1,4 +1,4 @@
-From 47727d9f5cc47dae68023f268840c8a7194f1b3e Mon Sep 17 00:00:00 2001
+From 5881b9382d36a1a1273e07529739d6fcc50aefaf Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:25:12 -0400
 Subject: [PATCH 03/11] leds: rgb: ktd202x: Never program an on time of zero
@@ -12,7 +12,7 @@ Use the shortest on time the hardware has, 1/256 of the period, and
 report it back.
 
 Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
-Assisted-by: Claude:claude-opus-5-5
+Assisted-by: LLM
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/leds/rgb/leds-ktd202x.c | 6 +++++-

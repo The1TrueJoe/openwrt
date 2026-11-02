@@ -1,4 +1,4 @@
-From 6f19df4e192fd0abe2e63c06b0b9f12dbf9b0f79 Mon Sep 17 00:00:00 2001
+From 3a2fd68ef04f57708c7cd5c2c97553449c7e5695 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Sun, 1 Nov 2026 21:38:31 -0500
 Subject: [PATCH 05/11] leds: rgb: ktd202x: Keep the unlit colors of a blinking
@@ -15,7 +15,7 @@ brightness_set() does. A single color LED now passes its brightness too.
 
 Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
 Cc: stable@vger.kernel.org
-Assisted-by: Claude:claude-opus-5-5
+Assisted-by: LLM
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/leds/rgb/leds-ktd202x.c | 5 +++++

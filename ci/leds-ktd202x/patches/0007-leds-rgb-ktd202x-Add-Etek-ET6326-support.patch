@@ -1,4 +1,4 @@
-From 159a2090db4f4ad2e98234bb8f2e9ba1e8a3184a Mon Sep 17 00:00:00 2001
+From c6d86bb695bb86c69457c6bf4b4f1703739bd9f3 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 07/11] leds: rgb: ktd202x: Add Etek ET6326 support
@@ -19,7 +19,7 @@ read back also give the same on time when they are written again.
 
 Link: https://www.etekmicro.com/wp-content/uploads/datasheets/ET6326_datasheet.pdf
 
-Assisted-by: Claude:claude-opus-5-5
+Assisted-by: LLM
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/leds/rgb/Kconfig        |  3 +-

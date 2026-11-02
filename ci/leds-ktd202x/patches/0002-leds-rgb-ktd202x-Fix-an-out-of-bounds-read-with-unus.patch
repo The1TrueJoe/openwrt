@@ -1,4 +1,4 @@
-From d788c0a990baf3f173d4044db9e082126a546d05 Mon Sep 17 00:00:00 2001
+From ec99d28c6b98a0e402b7231653d3109289cf60e8 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:58 -0400
 Subject: [PATCH 02/11] leds: rgb: ktd202x: Fix an out-of-bounds read with
@@ -14,7 +14,7 @@ Allocate one entry per channel.
 
 Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
 Cc: stable@vger.kernel.org
-Assisted-by: Claude:claude-opus-5-5
+Assisted-by: LLM
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/leds/rgb/leds-ktd202x.c | 8 +++++---
