@@ -1,0 +1,14 @@
+#!/bin/sh
+# Bridge the three switch ports and give the bridge an address, so that
+# any jack reaches the bench Mac. Usage: net-up [address/prefix]
+addr=${1:-192.168.1.10/24}
+ip link set eth0 up
+ip link add br0 type bridge 2>/dev/null
+for p in wan lan1 lan2; do
+	ip link set "$p" master br0
+	ip link set "$p" up
+done
+ip link set br0 up
+ip addr add "$addr" dev br0
+ip -br link
+ip -br addr show br0

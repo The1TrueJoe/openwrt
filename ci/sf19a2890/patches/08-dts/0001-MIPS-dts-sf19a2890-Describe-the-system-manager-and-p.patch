@@ -1,0 +1,379 @@
+From a9958981c01f23896566774ace86bc56fef6d479 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Mon, 2 Nov 2026 18:05:42 -0500
+Subject: [PATCH 1/3] MIPS: dts: sf19a2890: Describe the system manager and
+ peripherals
+
+Replace the fixed clocks that stood in for the system manager with the
+system manager itself, which provides the SoC's clocks and resets, and
+add the peripherals that have drivers: the pin and GPIO controllers,
+the GMAC, the USB controller and its PHY, the I2C and SPI controllers,
+the other two UARTs and the watchdog. The system manager also holds
+the reboot register.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ arch/mips/boot/dts/siflower/sf19a2890.dtsi | 286 +++++++++++++++++++--
+ 1 file changed, 270 insertions(+), 16 deletions(-)
+
+diff --git a/arch/mips/boot/dts/siflower/sf19a2890.dtsi b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
+index 3a4b39971..e8f6c7d86 100644
+--- a/arch/mips/boot/dts/siflower/sf19a2890.dtsi
++++ b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
+@@ -1,7 +1,9 @@
+ // SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+ 
++#include <dt-bindings/clock/siflower,sf19a2890-sysm.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/mips-gic.h>
++#include <dt-bindings/reset/siflower,sf19a2890-sysm.h>
+ 
+ / {
+ 	compatible = "siflower,sf19a2890";
+@@ -16,51 +18,57 @@ cpu@0 {
+ 			device_type = "cpu";
+ 			compatible = "mti,interaptiv";
+ 			reg = <0>;
+-			clocks = <&cpu_clk>;
++			clocks = <&sysm CLK_MUXDIV_CPU>;
+ 		};
+ 
+ 		cpu@1 {
+ 			device_type = "cpu";
+ 			compatible = "mti,interaptiv";
+ 			reg = <1>;
+-			clocks = <&cpu_clk>;
++			clocks = <&sysm CLK_MUXDIV_CPU>;
+ 		};
+ 
+ 		cpu@2 {
+ 			device_type = "cpu";
+ 			compatible = "mti,interaptiv";
+ 			reg = <2>;
+-			clocks = <&cpu_clk>;
++			clocks = <&sysm CLK_MUXDIV_CPU>;
+ 		};
+ 
+ 		cpu@3 {
+ 			device_type = "cpu";
+ 			compatible = "mti,interaptiv";
+ 			reg = <3>;
+-			clocks = <&cpu_clk>;
++			clocks = <&sysm CLK_MUXDIV_CPU>;
+ 		};
+ 	};
+ 
+-	/*
+-	 * The bootloader sets up these clocks. They stand in for the system
+-	 * clock controller until it has a driver.
+-	 */
+-	cpu_clk: clock-800000000 {
++	osc12m: clock-12000000 {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-		clock-frequency = <800000000>;
++		clock-frequency = <12000000>;
+ 	};
+ 
+-	pbus_clk: clock-100000000 {
++	osc32k: clock-32768 {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-		clock-frequency = <100000000>;
++		clock-frequency = <32768>;
+ 	};
+ 
+-	uart_clk: clock-125000000 {
++	osc40m: clock-40000000 {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-		clock-frequency = <125000000>;
++		clock-frequency = <40000000>;
++	};
++
++	usb_phy: usb-phy {
++		compatible = "siflower,sf19a2890-usb-phy";
++		clocks = <&sysm CLK_USBPHY_REF>;
++		resets = <&sysm RST_USB_PHY_POR>, <&sysm RST_USB_PHY>;
++		reset-names = "por", "phy";
++		siflower,sysm = <&sysm>;
++		#phy-cells = <0>;
++		status = "disabled";
+ 	};
+ 
+ 	soc {
+@@ -70,15 +78,261 @@ soc {
+ 		ranges;
+ 		interrupt-parent = <&gic>;
+ 
++		gmac: ethernet@10800000 {
++			compatible = "siflower,sf19a2890-gmac", "snps,dwmac";
++			reg = <0x10800000 0x200000>;
++			interrupts = <GIC_SHARED 32 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SHARED 34 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SHARED 33 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "macirq", "eth_wake_irq", "eth_lpi";
++			clocks = <&sysm CLK_GMAC>, <&sysm CLK_GMAC_PCLK>,
++				 <&sysm CLK_GMAC_ETH_TSU>, <&sysm CLK_GMAC_BYP_REF>;
++			clock-names = "stmmaceth", "pclk", "ptp_ref", "byp_ref";
++			resets = <&sysm RST_GMAC>;
++			reset-names = "stmmaceth";
++			siflower,sysm = <&sysm>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&rgmii_pins>, <&mdio_pins>;
++			status = "disabled";
++
++			mdio: mdio {
++				compatible = "snps,dwmac-mdio";
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++		};
++
++		usb: usb@17000000 {
++			compatible = "siflower,sf19a2890-usb";
++			reg = <0x17000000 0x40000>;
++			interrupts = <GIC_SHARED 128 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sysm CLK_USB>;
++			clock-names = "otg";
++			resets = <&sysm RST_USB>;
++			reset-names = "dwc2";
++			phys = <&usb_phy>;
++			phy-names = "usb2-phy";
++			g-np-tx-fifo-size = <768>;
++			status = "disabled";
++		};
++
++		i2c0: i2c@18100000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x18100000 0x1000>;
++			interrupts = <GIC_SHARED 217 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sysm CLK_I2C0>;
++			resets = <&sysm RST_I2C0>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		spi: spi@18202000 {
++			compatible = "arm,pl022", "arm,primecell";
++			reg = <0x18202000 0x1000>;
++			interrupts = <GIC_SHARED 225 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sysm CLK_SPI_SSP>, <&sysm CLK_SPI_APB>;
++			clock-names = "sspclk", "apb_pclk";
++			resets = <&sysm RST_SPI>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&spi_pins>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		uart0: serial@18300000 {
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0x18300000 0x1000>;
+ 			interrupts = <GIC_SHARED 226 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&uart_clk>, <&pbus_clk>;
++			clocks = <&sysm CLK_UART0>, <&sysm CLK_UART0_APB>;
++			clock-names = "uartclk", "apb_pclk";
++			resets = <&sysm RST_UART0>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins>;
++			status = "disabled";
++		};
++
++		uart1: serial@18301000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x18301000 0x1000>;
++			interrupts = <GIC_SHARED 227 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sysm CLK_UART1>, <&sysm CLK_UART1_APB>;
++			clock-names = "uartclk", "apb_pclk";
++			resets = <&sysm RST_UART1>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart1_pins>;
++			status = "disabled";
++		};
++
++		uart2: serial@18302000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x18302000 0x1000>;
++			interrupts = <GIC_SHARED 228 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sysm CLK_UART2>, <&sysm CLK_UART2_APB>;
+ 			clock-names = "uartclk", "apb_pclk";
++			resets = <&sysm RST_UART2>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart2_pins>;
+ 			status = "disabled";
+ 		};
+ 
++		watchdog: watchdog@18700000 {
++			compatible = "snps,dw-wdt";
++			reg = <0x18700000 0x1000>;
++			interrupts = <GIC_SHARED 238 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sysm CLK_WDT>;
++			resets = <&sysm RST_WDT>;
++		};
++
++		gpio: gpio@19d00000 {
++			compatible = "siflower,sf19a2890-gpio";
++			reg = <0x19d00000 0x100000>;
++			interrupts = <GIC_SHARED 246 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SHARED 247 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SHARED 248 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SHARED 249 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sysm CLK_GPIO>;
++			resets = <&sysm RST_GPIO>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			ngpios = <49>;
++			gpio-ranges = <&pinctrl 0 0 49>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		sysm: clock-controller@19e00000 {
++			compatible = "siflower,sf19a2890-sysm", "syscon";
++			reg = <0x19e00000 0x30000>;
++			clocks = <&osc12m>, <&osc40m>, <&osc32k>;
++			clock-names = "osc12m", "osc40m", "osc32k";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++
++			reboot {
++				compatible = "syscon-reboot";
++				offset = <0x2030>;
++				value = <0x1>;
++			};
++		};
++
++		pinctrl: pinctrl@19e3fc00 {
++			compatible = "siflower,sf19a2890-pinctrl";
++			reg = <0x19e3fc00 0x400>;
++
++			i2c0_pins: i2c0-pins {
++				pins {
++					pins = "I2C_DAT", "I2C_CLK";
++					function = "i2c0";
++					input-enable;
++					bias-pull-up;
++				};
++			};
++
++			mdio_pins: mdio-pins {
++				pins {
++					pins = "RGMII_MDC", "RGMII_MDIO";
++					function = "mdio";
++					input-enable;
++					bias-pull-up;
++				};
++			};
++
++			rgmii_pins: rgmii-pins {
++				pins-tx {
++					pins = "RGMII_TXCLK", "RGMII_TXD0",
++					       "RGMII_TXD1", "RGMII_TXD2",
++					       "RGMII_TXD3", "RGMII_TXCTL";
++					function = "rgmii";
++					bias-disable;
++				};
++
++				pins-rx {
++					pins = "RGMII_RXCLK", "RGMII_RXD0",
++					       "RGMII_RXD1", "RGMII_RXD2",
++					       "RGMII_RXD3", "RGMII_RXCTL";
++					function = "rgmii";
++					input-enable;
++					bias-disable;
++				};
++			};
++
++			spi_pins: spi-pins {
++				pins-clk {
++					pins = "SPI_CLK";
++					function = "spi";
++					bias-disable;
++				};
++
++				pins-mosi {
++					pins = "SPI_TXD";
++					function = "spi";
++					bias-pull-down;
++				};
++
++				pins-miso {
++					pins = "SPI_RXD";
++					function = "spi";
++					input-enable;
++					bias-pull-down;
++				};
++
++				/* Driven as a GPIO through cs-gpios */
++				pins-cs {
++					pins = "SPI_CSN";
++					bias-pull-up;
++				};
++			};
++
++			uart0_pins: uart0-pins {
++				pins-tx {
++					pins = "UART_TX";
++					function = "uart0";
++					bias-pull-up;
++				};
++
++				pins-rx {
++					pins = "UART_RX";
++					function = "uart0";
++					input-enable;
++					bias-pull-up;
++				};
++			};
++
++			uart1_pins: uart1-pins {
++				pins-tx {
++					pins = "JTAG_TDO";
++					function = "uart1";
++					bias-pull-up;
++				};
++
++				pins-rx {
++					pins = "JTAG_TDI";
++					function = "uart1";
++					input-enable;
++					bias-pull-up;
++				};
++			};
++
++			uart2_pins: uart2-pins {
++				pins-tx {
++					pins = "I2C_DAT";
++					function = "uart2";
++					bias-pull-up;
++				};
++
++				pins-rx {
++					pins = "I2C_CLK";
++					function = "uart2";
++					input-enable;
++					bias-pull-up;
++				};
++			};
++		};
++
+ 		gic: interrupt-controller@1bdc0000 {
+ 			compatible = "mti,gic";
+ 			reg = <0x1bdc0000 0x20000>;
+@@ -89,7 +343,7 @@ gic: interrupt-controller@1bdc0000 {
+ 			timer {
+ 				compatible = "mti,gic-timer";
+ 				interrupts = <GIC_LOCAL 1 IRQ_TYPE_NONE>;
+-				clocks = <&cpu_clk>;
++				clocks = <&sysm CLK_MUXDIV_CPU>;
+ 			};
+ 		};
+ 	};
+-- 
+2.50.1 (Apple Git-155)
+

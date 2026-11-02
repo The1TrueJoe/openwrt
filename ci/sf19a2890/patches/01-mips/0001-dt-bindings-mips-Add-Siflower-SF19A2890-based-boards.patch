@@ -1,0 +1,68 @@
+From a16579f37bf4be8ace17d694e91c0f8029e9be47 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Mon, 2 Nov 2026 17:49:40 -0500
+Subject: [PATCH 1/4] dt-bindings: mips: Add Siflower SF19A2890 based boards
+
+The SF19A2890 is a MIPS interAptiv SoC from Siflower (two cores, two
+VPEs each) for home routers. Document its compatible and the first
+board using it, the GL.iNet GL-SFT1200 ("Opal") travel router.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ .../devicetree/bindings/mips/siflower.yaml    | 26 +++++++++++++++++++
+ MAINTAINERS                                   |  6 +++++
+ 2 files changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mips/siflower.yaml
+
+diff --git a/Documentation/devicetree/bindings/mips/siflower.yaml b/Documentation/devicetree/bindings/mips/siflower.yaml
+new file mode 100644
+index 000000000..33110f742
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mips/siflower.yaml
+@@ -0,0 +1,26 @@
++# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/mips/siflower.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: Siflower MIPS SoCs
++
++maintainers:
++  - Joseph Telaak <joseph@telaak.dev>
++
++properties:
++  $nodename:
++    const: '/'
++
++  compatible:
++    oneOf:
++      - description: Boards with the Siflower SF19A2890 SoC
++        items:
++          - enum:
++              - glinet,gl-sft1200
++          - const: siflower,sf19a2890
++
++additionalProperties: true
++
++...
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 93abbb315..b95874a96 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25698,6 +25698,12 @@ N:	sifive
+ K:	fu[57]40
+ K:	[^@]sifive
+ 
++SIFLOWER SF19A2890 MIPS PLATFORM
++M:	Joseph Telaak <joseph@telaak.dev>
++L:	linux-mips@vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/mips/siflower.yaml
++
+ SILEAD TOUCHSCREEN DRIVER
+ M:	Hans de Goede <hansg@kernel.org>
+ L:	linux-input@vger.kernel.org
+-- 
+2.50.1 (Apple Git-155)
+

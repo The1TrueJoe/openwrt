@@ -1,0 +1,111 @@
+From ca5820b798f6be9dc15950289cb9867cf1b1fdd6 Mon Sep 17 00:00:00 2001
+From: Chuanhong Guo <gch981213@gmail.com>
+Date: Tue, 10 Sep 2024 09:10:27 +0800
+Subject: [PATCH 3/3] usb: dwc2: handle OTG interrupt regardless of GINTSTS
+
+The DWC OTG 3.30a found on Siflower SF19A2890 has battery charger
+support enabled. It triggers MultVallpChng interrupt (bit 20 of
+GOTGINT) but doesn't set OTGInt in GINTSTS. As a result, this
+interrupt is never handled, and linux disables USB interrupt
+because "nobody cares".
+
+Handle OTG interrupt in IRQ handler regardless of whether the
+OTGInt bit in GINTSTS is set or not.
+
+Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
+[jt: only on cores with the new otg_int_unflagged parameter, which
+ SF19A2890 sets; the others still handle OTG interrupts only when
+ GINTSTS flags them]
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ drivers/usb/dwc2/core.h      |  6 ++++++
+ drivers/usb/dwc2/core_intr.c | 15 ++++++++++++++-
+ drivers/usb/dwc2/params.c    |  1 +
+ 3 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
+index 015a5fb78..288baaaf4 100644
+--- a/drivers/usb/dwc2/core.h
++++ b/drivers/usb/dwc2/core.h
+@@ -367,6 +367,11 @@ enum dwc2_ep0_state {
+  * @no_clock_gating:	Specifies whether to avoid clock gating feature.
+  *			0 - No (use clock gating)
+  *			1 - Yes (avoid it)
++ * @otg_int_unflagged:	Specifies whether the core raises OTG interrupts
++ *			without setting OTGINT in GINTSTS, so that GOTGINT
++ *			has to be checked on every interrupt.
++ *			0 - No
++ *			1 - Yes
+  * @lpm:		Enable LPM support.
+  *			0 - No
+  *			1 - Yes
+@@ -466,6 +471,7 @@ struct dwc2_core_params {
+ #define DWC2_POWER_DOWN_PARAM_PARTIAL		1
+ #define DWC2_POWER_DOWN_PARAM_HIBERNATION	2
+ 	bool no_clock_gating;
++	bool otg_int_unflagged;
+ 
+ 	bool lpm;
+ 	bool lpm_clock_gating;
+diff --git a/drivers/usb/dwc2/core_intr.c b/drivers/usb/dwc2/core_intr.c
+index 9565e6a52..e919c0cfe 100644
+--- a/drivers/usb/dwc2/core_intr.c
++++ b/drivers/usb/dwc2/core_intr.c
+@@ -79,7 +79,7 @@ static void dwc2_handle_mode_mismatch_intr(struct dwc2_hsotg *hsotg)
+  *
+  * @hsotg: Programming view of DWC_otg controller
+  */
+-static void dwc2_handle_otg_intr(struct dwc2_hsotg *hsotg)
++static irqreturn_t dwc2_handle_otg_intr(struct dwc2_hsotg *hsotg)
+ {
+ 	u32 gotgint;
+ 	u32 gotgctl;
+@@ -88,6 +88,10 @@ static void dwc2_handle_otg_intr(struct dwc2_hsotg *hsotg)
+ 
+ 	gotgint = dwc2_readl(hsotg, GOTGINT);
+ 	gotgctl = dwc2_readl(hsotg, GOTGCTL);
++
++	if (!gotgint)
++		return IRQ_NONE;
++
+ 	dev_dbg(hsotg->dev, "++OTG Interrupt gotgint=%0x [%s]\n", gotgint,
+ 		dwc2_op_state_str(hsotg));
+ 
+@@ -244,6 +248,8 @@ static void dwc2_handle_otg_intr(struct dwc2_hsotg *hsotg)
+ 
+ 	/* Clear GOTGINT */
+ 	dwc2_writel(hsotg, gotgint, GOTGINT);
++
++	return IRQ_HANDLED;
+ }
+ 
+ /**
+@@ -861,6 +867,13 @@ irqreturn_t dwc2_handle_common_intr(int irq, void *dev)
+ 		hsotg->frame_number = (dwc2_readl(hsotg, HFNUM)
+ 				       & HFNUM_FRNUM_MASK) >> HFNUM_FRNUM_SHIFT;
+ 
++	/*
++	 * Some cores raise OTG interrupts without setting OTGINT in GINTSTS,
++	 * so look at GOTGINT itself.
++	 */
++	if (hsotg->params.otg_int_unflagged)
++		retval = dwc2_handle_otg_intr(hsotg);
++
+ 	gintsts = dwc2_read_common_intr(hsotg);
+ 	if (gintsts & ~GINTSTS_PRTINT)
+ 		retval = IRQ_HANDLED;
+diff --git a/drivers/usb/dwc2/params.c b/drivers/usb/dwc2/params.c
+index f6379e616..22ab9ce13 100644
+--- a/drivers/usb/dwc2/params.c
++++ b/drivers/usb/dwc2/params.c
+@@ -243,6 +243,7 @@ static void dwc2_set_sf19a2890_params(struct dwc2_hsotg *hsotg)
+ 
+ 	p->max_transfer_size = 65535;
+ 	p->ahbcfg = GAHBCFG_HBSTLEN_INCR4 << GAHBCFG_HBSTLEN_SHIFT;
++	p->otg_int_unflagged = true;
+ }
+ 
+ static void dwc2_set_stm32f4x9_fsotg_params(struct dwc2_hsotg *hsotg)
+-- 
+2.50.1 (Apple Git-155)
+

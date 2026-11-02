@@ -1,0 +1,111 @@
+From a0667eef1c853469c146c0bcbbb9031e43eba70d Mon Sep 17 00:00:00 2001
+From: Chuanhong Guo <gch981213@gmail.com>
+Date: Mon, 20 Jan 2025 09:52:52 +0800
+Subject: [PATCH 2/4] MIPS: Add support for Siflower MIPS SoCs
+
+Siflower MIPS SoCs like SF19A2890 uses dual-core MIPS InterAptiv
+processor, built-in GMAC, USB, dual-band WiFi and various other
+peripherals.
+Notably, it uses some ARM PLxxx peripherals, and ARM_AMBA is
+selected for the drivers.
+Most devices on the market with this chip come with 64M or less
+DRAM. A kmalloc.h with malloc alignment override is added to
+conserve memory, and a MACH_SIFLOWER_MIPS is created with reduced
+features instead of using the generic kernel.
+
+Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
+[jt: rebased on v7.4-rc1, "MIPS:" prefix, longer Kconfig help, MAINTAINERS entry]
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ MAINTAINERS                                   |  1 +
+ arch/mips/Kconfig                             | 32 +++++++++++++++++++
+ arch/mips/generic/Platform                    |  1 +
+ arch/mips/include/asm/mach-siflower/kmalloc.h |  9 ++++++
+ 4 files changed, 43 insertions(+)
+ create mode 100644 arch/mips/include/asm/mach-siflower/kmalloc.h
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b95874a96..1885b562a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
+ L:	linux-mips@vger.kernel.org
+ S:	Maintained
+ F:	Documentation/devicetree/bindings/mips/siflower.yaml
++F:	arch/mips/include/asm/mach-siflower/
+ 
+ SILEAD TOUCHSCREEN DRIVER
+ M:	Hans de Goede <hansg@kernel.org>
+diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+index ed17c9b16..e10145ede 100644
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -937,6 +937,38 @@ config SIBYTE_BIGSUR
+ 	select ZONE_DMA32 if 64BIT
+ 	select SWIOTLB if ARCH_DMA_ADDR_T_64BIT && PCI
+ 
++config MACH_SIFLOWER_MIPS
++	bool "Siflower MIPS SoCs"
++	select MIPS_GENERIC
++	select MACH_GENERIC_CORE
++	select ARM_AMBA
++	select BOOT_RAW
++	select CEVT_R4K
++	select CLKSRC_MIPS_GIC
++	select COMMON_CLK
++	select CPU_MIPSR2_IRQ_EI
++	select CPU_MIPSR2_IRQ_VI
++	select CSRC_R4K
++	select DMA_NONCOHERENT
++	select IRQ_MIPS_CPU
++	select MIPS_CPU_SCACHE
++	select MIPS_GIC
++	select MIPS_L1_CACHE_SHIFT_5
++	select NO_EXCEPT_FILL
++	select SMP_UP if SMP
++	select SYS_HAS_CPU_MIPS32_R2
++	select SYS_SUPPORTS_32BIT_KERNEL
++	select SYS_SUPPORTS_LITTLE_ENDIAN
++	select SYS_SUPPORTS_MIPS16
++	select SYS_SUPPORTS_MIPS_CPS
++	select SYS_SUPPORTS_MULTITHREADING
++	select USE_OF
++	help
++	  Select this to build a kernel which supports SoCs from Siflower
++	  with MIPS InterAptiv cores, like Siflower SF19A2890. These have
++	  ARM PrimeCell peripherals, so ARM_AMBA is selected, and 32-byte
++	  cache lines, which allows a smaller kmalloc alignment.
++
+ config SNI_RM
+ 	bool "SNI RM200/300/400"
+ 	select ARC_MEMORY
+diff --git a/arch/mips/generic/Platform b/arch/mips/generic/Platform
+index 0c03623f3..c09a8484d 100644
+--- a/arch/mips/generic/Platform
++++ b/arch/mips/generic/Platform
+@@ -10,6 +10,7 @@
+ 
+ # Note: order matters, keep the asm/mach-generic include last.
+ cflags-$(CONFIG_MACH_INGENIC_SOC)	+= -I$(srctree)/arch/mips/include/asm/mach-ingenic
++cflags-$(CONFIG_MACH_SIFLOWER_MIPS)	+= -I$(srctree)/arch/mips/include/asm/mach-siflower
+ cflags-$(CONFIG_MIPS_GENERIC)	+= -I$(srctree)/arch/mips/include/asm/mach-generic
+ 
+ load-$(CONFIG_MIPS_GENERIC)	+= 0xffffffff80100000
+diff --git a/arch/mips/include/asm/mach-siflower/kmalloc.h b/arch/mips/include/asm/mach-siflower/kmalloc.h
+new file mode 100644
+index 000000000..d0b270e2e
+--- /dev/null
++++ b/arch/mips/include/asm/mach-siflower/kmalloc.h
+@@ -0,0 +1,9 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef __ASM_MACH_SIFLOWER_KMALLOC_H
++#define __ASM_MACH_SIFLOWER_KMALLOC_H
++
++#ifdef CONFIG_DMA_NONCOHERENT
++#define ARCH_DMA_MINALIGN	32
++#endif
++
++#endif /* __ASM_MACH_SIFLOWER_KMALLOC_H */
+-- 
+2.50.1 (Apple Git-155)
+

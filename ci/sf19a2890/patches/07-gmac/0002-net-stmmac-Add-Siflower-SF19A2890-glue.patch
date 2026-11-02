@@ -1,0 +1,241 @@
+From 068f0090b2673641763dcc721ebd8c3211e40570 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Mon, 2 Nov 2026 18:03:34 -0500
+Subject: [PATCH 2/2] net: stmmac: Add Siflower SF19A2890 glue
+
+Add the glue for the DesignWare GMAC of the Siflower SF19A2890. The
+interface type is set in the SoC's system manager through the
+set_phy_intf_sel hook, and so are the RGMII clock delays, which the
+MAC adds only where rx-internal-delay-ps or tx-internal-delay-ps is
+present.
+
+Based on the OpenWrt driver by Chuanhong Guo, which read the delays
+from a factory flash cell in the delay line's own units.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ MAINTAINERS                                   |   1 +
+ drivers/net/ethernet/stmicro/stmmac/Kconfig   |  12 ++
+ drivers/net/ethernet/stmicro/stmmac/Makefile  |   1 +
+ .../ethernet/stmicro/stmmac/dwmac-sf19a2890.c | 162 ++++++++++++++++++
+ 4 files changed, 176 insertions(+)
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 8ce21e37f..5d408f342 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25659,6 +25659,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
+ L:	netdev@vger.kernel.org
+ S:	Maintained
+ F:	Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
++F:	drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
+ 
+ SILEAD TOUCHSCREEN DRIVER
+ M:	Hans de Goede <hansg@kernel.org>
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+index c6559e749..e09e61497 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
++++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+@@ -201,6 +201,18 @@ config DWMAC_S32
+ 	  SOCs GMAC ethernet controller, ie. S32G2xx, S32G3xx and
+ 	  S32R45.
+ 
++config DWMAC_SF19A2890
++	tristate "Siflower SF19A2890 GMAC support"
++	default MACH_SIFLOWER_MIPS
++	depends on OF && (MACH_SIFLOWER_MIPS || COMPILE_TEST)
++	select MFD_SYSCON
++	help
++	  Support for the Ethernet controller of the Siflower SF19A2890 SoC.
++
++	  This selects the SF19A2890 glue layer support for the stmmac
++	  device driver. It sets the interface type and the RGMII clock
++	  delays in the SoC's system manager.
++
+ config DWMAC_SOCFPGA
+ 	tristate "SOCFPGA dwmac support"
+ 	default ARCH_INTEL_SOCFPGA
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
+index b16a456b7..9330de094 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Makefile
++++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
+@@ -26,6 +26,7 @@ obj-$(CONFIG_DWMAC_RENESAS_GBETH) += dwmac-renesas-gbeth.o
+ obj-$(CONFIG_DWMAC_ROCKCHIP)	+= dwmac-rk.o
+ obj-$(CONFIG_DWMAC_RZN1)	+= dwmac-rzn1.o
+ obj-$(CONFIG_DWMAC_S32)		+= dwmac-s32.o
++obj-$(CONFIG_DWMAC_SF19A2890)	+= dwmac-sf19a2890.o
+ obj-$(CONFIG_DWMAC_SOCFPGA)	+= dwmac-altr-socfpga.o
+ obj-$(CONFIG_DWMAC_SOPHGO)	+= dwmac-sophgo.o
+ obj-$(CONFIG_DWMAC_SPACEMIT)	+= dwmac-spacemit.o
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
+new file mode 100644
+index 000000000..6a5da964e
+--- /dev/null
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
+@@ -0,0 +1,162 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Siflower SF19A2890 GMAC glue
++ *
++ * The SF19A2890 has a DWMAC 3.73a. Its interface type and RGMII clock
++ * delays are set in the SoC's system manager.
++ *
++ * Based on the OpenWrt driver by Chuanhong Guo <gch981213@gmail.com>.
++ */
++
++#include <linux/bitfield.h>
++#include <linux/clk.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/stmmac.h>
++
++#include "stmmac_platform.h"
++
++/* GMAC configuration in the system manager */
++#define SF19A2890_GMAC_MISC		0x4440
++#define  SF19A2890_PHY_INTF_SEL		GENMASK(2, 0)
++#define SF19A2890_GMAC_TX_DELAY		0x4444
++#define SF19A2890_GMAC_RX_DELAY		0x4448
++#define SF19A2890_GMAC_RX_DELAY_EN	0x444c
++#define  SF19A2890_DELAY_MAX		0xff
++
++/*
++ * PLACEHOLDER: the delay line step is not known yet. It is to be measured
++ * on hardware (or taken from Siflower) before this driver is posted.
++ */
++#define SF19A2890_DELAY_STEP_PS		100
++
++struct sf19a2890_gmac {
++	struct device *dev;
++	struct regmap *sysm;
++};
++
++static int sf19a2890_gmac_set_phy_intf_sel(void *bsp_priv, u8 phy_intf_sel)
++{
++	struct sf19a2890_gmac *gmac = bsp_priv;
++
++	if (phy_intf_sel != PHY_INTF_SEL_GMII_MII &&
++	    phy_intf_sel != PHY_INTF_SEL_RGMII &&
++	    phy_intf_sel != PHY_INTF_SEL_RMII)
++		return -EINVAL;
++
++	return regmap_update_bits(gmac->sysm, SF19A2890_GMAC_MISC,
++				  SF19A2890_PHY_INTF_SEL,
++				  FIELD_PREP(SF19A2890_PHY_INTF_SEL,
++					     phy_intf_sel));
++}
++
++static int sf19a2890_gmac_get_delay(struct sf19a2890_gmac *gmac,
++				    const char *prop, u32 *steps)
++{
++	u32 ps;
++
++	*steps = 0;
++	if (of_property_read_u32(gmac->dev->of_node, prop, &ps))
++		return 0;
++
++	if (ps % SF19A2890_DELAY_STEP_PS ||
++	    ps / SF19A2890_DELAY_STEP_PS > SF19A2890_DELAY_MAX)
++		return dev_err_probe(gmac->dev, -EINVAL,
++				     "invalid %s: %u\n", prop, ps);
++
++	*steps = ps / SF19A2890_DELAY_STEP_PS;
++
++	return 0;
++}
++
++/* The MAC adds an RGMII delay only where the device tree asks for one */
++static int sf19a2890_gmac_set_delays(struct sf19a2890_gmac *gmac)
++{
++	u32 tx, rx;
++	int ret;
++
++	ret = sf19a2890_gmac_get_delay(gmac, "tx-internal-delay-ps", &tx);
++	if (ret)
++		return ret;
++
++	ret = sf19a2890_gmac_get_delay(gmac, "rx-internal-delay-ps", &rx);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(gmac->sysm, SF19A2890_GMAC_TX_DELAY, tx);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(gmac->sysm, SF19A2890_GMAC_RX_DELAY, rx);
++	if (ret)
++		return ret;
++
++	return regmap_write(gmac->sysm, SF19A2890_GMAC_RX_DELAY_EN, !!rx);
++}
++
++static int sf19a2890_gmac_probe(struct platform_device *pdev)
++{
++	struct plat_stmmacenet_data *plat_dat;
++	struct stmmac_resources stmmac_res;
++	struct device *dev = &pdev->dev;
++	struct sf19a2890_gmac *gmac;
++	struct clk *clk;
++	int ret;
++
++	gmac = devm_kzalloc(dev, sizeof(*gmac), GFP_KERNEL);
++	if (!gmac)
++		return -ENOMEM;
++
++	gmac->dev = dev;
++
++	gmac->sysm = syscon_regmap_lookup_by_phandle(dev->of_node,
++						     "siflower,sysm");
++	if (IS_ERR(gmac->sysm))
++		return dev_err_probe(dev, PTR_ERR(gmac->sysm),
++				     "failed to get the system manager\n");
++
++	clk = devm_clk_get_enabled(dev, "byp_ref");
++	if (IS_ERR(clk))
++		return dev_err_probe(dev, PTR_ERR(clk),
++				     "failed to enable the byp_ref clock\n");
++
++	ret = sf19a2890_gmac_set_delays(gmac);
++	if (ret)
++		return ret;
++
++	ret = stmmac_get_platform_resources(pdev, &stmmac_res);
++	if (ret)
++		return ret;
++
++	plat_dat = devm_stmmac_probe_config_dt(pdev, stmmac_res.mac);
++	if (IS_ERR(plat_dat))
++		return PTR_ERR(plat_dat);
++
++	plat_dat->bsp_priv = gmac;
++	plat_dat->set_phy_intf_sel = sf19a2890_gmac_set_phy_intf_sel;
++
++	return stmmac_dvr_probe(dev, plat_dat, &stmmac_res);
++}
++
++static const struct of_device_id sf19a2890_gmac_match[] = {
++	{ .compatible = "siflower,sf19a2890-gmac" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, sf19a2890_gmac_match);
++
++static struct platform_driver sf19a2890_gmac_driver = {
++	.probe = sf19a2890_gmac_probe,
++	.remove = stmmac_pltfr_remove,
++	.driver = {
++		.name = "sf19a2890-gmac",
++		.pm = &stmmac_pltfr_pm_ops,
++		.of_match_table = sf19a2890_gmac_match,
++	},
++};
++module_platform_driver(sf19a2890_gmac_driver);
++
++MODULE_DESCRIPTION("Siflower SF19A2890 GMAC glue");
++MODULE_LICENSE("GPL");
+-- 
+2.50.1 (Apple Git-155)
+

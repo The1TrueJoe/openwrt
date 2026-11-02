@@ -1,0 +1,14 @@
+#!/bin/sh
+# Init of the SF19A2890 bench initramfs. Nothing here writes to flash.
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mount -t debugfs debugfs /sys/kernel/debug
+mount -t tmpfs tmpfs /tmp
+mkdir -p /dev/pts && mount -t devpts devpts /dev/pts
+echo
+echo "== SF19A2890 bench image: $(cat /etc/bench-id)"
+echo "== $(uname -r), $(grep -c ^processor /proc/cpuinfo) CPUs"
+echo "== helpers: mem-report, net-up, rgmii-sweep, evdump"
+echo
+exec setsid cttyhack /bin/sh -l

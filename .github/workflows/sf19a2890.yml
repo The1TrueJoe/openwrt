@@ -1,0 +1,318 @@
+name: SF19A2890 upstream checks
+
+# Checks every SF19A2890 series in ci/sf19a2890/patches on its own tree,
+# the way the subsystem maintainers would see it, then applies all of them
+# (and the ET6326 LED and GSW1xx reset series they need) to mainline for
+# dtbs_check and the bench images for the GL.iNet GL-SFT1200.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/sf19a2890.yml'
+      - 'ci/sf19a2890/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  KORG: https://git.kernel.org/pub/scm/linux/kernel/git
+
+jobs:
+  series:
+    name: ${{ matrix.series }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - series: 01-mips
+            tree: mips/linux.git
+            branch: mips-next
+            bindings: mips/siflower.yaml
+            mips_defconfig: sf19a2890_defconfig
+          - series: 02-sysm
+            tree: clk/linux.git
+            branch: clk-next
+            bindings: clock/siflower,sf19a2890-sysm.yaml
+            syms: COMMON_CLK CLK_SF19A2890
+            objs: drivers/clk/siflower/clk-sf19a2890.o
+          - series: 03-pinctrl
+            tree: linusw/linux-pinctrl.git
+            branch: devel
+            bindings: pinctrl/siflower,sf19a2890-pinctrl.yaml
+            syms: PINCTRL PINCTRL_SF19A2890
+            objs: drivers/pinctrl/pinctrl-sf19a2890.o
+          - series: 04-gpio
+            tree: brgl/linux.git
+            branch: gpio/for-next
+            bindings: gpio/siflower,sf19a2890-gpio.yaml
+            syms: GPIOLIB PINCTRL GPIO_SIFLOWER
+            objs: drivers/gpio/gpio-siflower.o
+          - series: 05-usb-phy
+            tree: phy/linux-phy.git
+            branch: next
+            bindings: phy/siflower,sf19a2890-usb-phy.yaml
+            syms: PHY_SF19A2890_USB
+            objs: drivers/phy/siflower/phy-sf19a2890-usb.o
+          - series: 06-dwc2
+            tree: gregkh/usb.git
+            branch: usb-next
+            bindings: usb/dwc2.yaml
+            syms: USB USB_DWC2 USB_DWC2_HOST
+            objs: drivers/usb/dwc2/core_intr.o drivers/usb/dwc2/params.o
+          - series: 07-gmac
+            tree: netdev/net-next.git
+            branch: main
+            bindings: net/siflower,sf19a2890-gmac.yaml net/snps,dwmac.yaml
+            syms: NETDEVICES STMMAC_ETH STMMAC_PLATFORM DWMAC_SF19A2890
+            objs: drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.o
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ci-src
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bc bison flex libssl-dev libelf-dev \
+            gcc-mipsel-linux-gnu clang lld llvm sparse u-boot-tools \
+            python3-venv swig libyaml-dev
+          python3 -m venv ~/venv
+          ~/venv/bin/pip install -q dtschema yamllint
+          echo "$HOME/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch the tree and apply the series
+        run: |
+          git clone -q --depth 1 --branch "${{ matrix.branch }}" "$KORG/${{ matrix.tree }}" linux
+          cd linux
+          echo "base: ${{ matrix.tree }} ${{ matrix.branch }} $(git rev-parse --short=12 HEAD) $(git log -1 --format=%s)"
+          git config user.name ci
+          git config user.email ci@example.invalid
+          git am -q ../ci-src/ci/sf19a2890/patches/${{ matrix.series }}/*.patch
+          git log --oneline -12
+          echo "NPATCHES=$(ls ../ci-src/ci/sf19a2890/patches/${{ matrix.series }}/*.patch | wc -l)" >> "$GITHUB_ENV"
+
+      - name: checkpatch --strict
+        working-directory: linux
+        run: |
+          perl scripts/checkpatch.pl --strict --summary-file --show-types \
+            ../ci-src/ci/sf19a2890/patches/${{ matrix.series }}/*.patch | tee checkpatch.log
+          # The only accepted finding is ENOTSUPP, which the pinconf core
+          # requires from pin_config_get/set for unsupported parameters.
+          if grep -E '^(ERROR|WARNING|CHECK):' checkpatch.log | grep -v 'WARNING:ENOTSUPP:'; then exit 1; fi
+
+      - name: dt_binding_check (full)
+        working-directory: linux
+        run: |
+          make -j"$(nproc)" dt_binding_check > dt.log 2>&1 || { tail -50 dt.log; exit 1; }
+          f=""
+          for b in ${{ matrix.bindings }}; do f="$f|$b"; done
+          grep -iE "(warning|error)" dt.log | grep -E "${f#|}" && exit 1
+          echo "full dt_binding_check: $(grep -ciE 'warning|error' dt.log) warnings or errors in the whole tree, none in this series' bindings"
+
+      - name: MIPS W=1, every commit
+        if: matrix.mips_defconfig
+        working-directory: linux
+        run: |
+          m="ARCH=mips CROSS_COMPILE=mipsel-linux-gnu- W=1"
+          fail=0
+          # Every commit is built with the series' final defconfig
+          cp arch/mips/configs/${{ matrix.mips_defconfig }} ../final_defconfig
+          for c in $(git rev-list --reverse HEAD~$NPATCHES..HEAD); do
+            git checkout -q "$c"
+            subj=$(git log -1 --format=%s)
+            cp ../final_defconfig arch/mips/configs/ci_defconfig
+            make $m ci_defconfig >/dev/null
+            rm arch/mips/configs/ci_defconfig
+            if ! make $m -j"$(nproc)" vmlinux dtbs > build.log 2>&1; then
+              echo "::error::build failed at: $subj"; tail -40 build.log; fail=1; continue
+            fi
+            if grep -E '(warning|error):' build.log | grep -E 'siflower|sf19a2890'; then
+              echo "::error::warnings at: $subj"; fail=1
+            else
+              echo "ok: $subj"
+            fi
+          done
+          git checkout -q -
+          make $m sf19a2890_defconfig >/dev/null
+          make $m savedefconfig >/dev/null
+          diff -u arch/mips/configs/sf19a2890_defconfig defconfig && echo "savedefconfig: no change"
+          exit $fail
+
+      - name: COMPILE_TEST W=1, every commit (mipsel gcc, x86_64 clang, x86_64 gcc + sparse)
+        if: matrix.objs
+        working-directory: linux
+        run: |
+          fail=0
+          for cfg in "mips:ARCH=mips CROSS_COMPILE=mipsel-linux-gnu- W=1:malta_defconfig" \
+                     "x86-clang:ARCH=x86_64 LLVM=1 W=1:defconfig" \
+                     "x86-sparse:ARCH=x86_64 W=1 C=1:defconfig"; do
+            name=${cfg%%:*}; rest=${cfg#*:}; m=${rest%%:*}; dc=${rest#*:}
+            out=../out-$name
+            make $m O=$out $dc >/dev/null
+            ./scripts/config --file $out/.config -e COMPILE_TEST -e OF -e RESET_CONTROLLER -e MFD_SYSCON -e NET -e INET
+            for s in ${{ matrix.syms }}; do ./scripts/config --file $out/.config -e $s; done
+            make $m O=$out olddefconfig >/dev/null
+            for s in ${{ matrix.syms }}; do
+              grep -qE "^CONFIG_$s=[ym]" $out/.config || { echo "::error::$name: CONFIG_$s not set"; fail=1; }
+            done
+            make $m O=$out -j"$(nproc)" prepare >/dev/null 2>&1
+            for c in $(git rev-list --reverse HEAD~$NPATCHES..HEAD); do
+              git checkout -q "$c"
+              subj=$(git log -1 --format=%s)
+              objs=""
+              for o in ${{ matrix.objs }}; do [ -f "${o%.o}.c" ] && objs="$objs $o"; done
+              [ -n "$objs" ] || { echo "$name skip (no source yet): $subj"; continue; }
+              rm -f $(for o in $objs; do echo $out/$o; done)
+              if ! make $m O=$out -j"$(nproc)" $objs > $out/build.log 2>&1; then
+                echo "::error::$name build failed at: $subj"; tail -40 $out/build.log; fail=1; continue
+              fi
+              if grep -E 'warning|error' $out/build.log; then
+                echo "::error::$name warnings at: $subj"; fail=1
+              else
+                echo "$name ok: $subj"
+              fi
+            done
+            git checkout -q -
+          done
+          exit $fail
+
+  combined:
+    name: mainline + all series, dtbs_check and bench images
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ci-src
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bc bison flex libssl-dev libelf-dev \
+            gcc-mipsel-linux-gnu libc6-dev-mipsel-cross u-boot-tools \
+            python3-venv swig libyaml-dev xz-utils cpio
+          python3 -m venv ~/venv
+          ~/venv/bin/pip install -q dtschema yamllint
+          echo "$HOME/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch mainline and apply everything
+        run: |
+          git clone -q --depth 1 "$KORG/torvalds/linux.git" linux
+          cd linux
+          echo "mainline: $(git rev-parse --short=12 HEAD) $(git describe --tags 2>/dev/null || true)"
+          git config user.name ci
+          git config user.email ci@example.invalid
+          P=../ci-src/ci/sf19a2890/patches
+          git am -q $P/01-mips/*.patch
+          git branch s1
+          for s in 02-sysm 03-pinctrl 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts deps-leds deps-gsw; do
+            # MAINTAINERS entries are left out: each series adds its own at
+            # the same place, which only a merge could combine
+            git am -q --exclude=MAINTAINERS $P/$s/*.patch || { git am --abort; echo "::error::$s does not apply to mainline"; exit 1; }
+          done
+          git log --oneline -40
+
+      - name: dtbs_check W=1 (GL-SFT1200)
+        working-directory: linux
+        run: |
+          m="ARCH=mips CROSS_COMPILE=mipsel-linux-gnu-"
+          make $m sf19a2890_defconfig >/dev/null
+          make $m W=1 CHECK_DTBS=y siflower/sf19a2890-glinet-gl-sft1200.dtb 2>&1 | tee dtbs.log
+          if grep -E 'warning|error' dtbs.log; then exit 1; fi
+          make $m savedefconfig >/dev/null
+          diff -u arch/mips/configs/sf19a2890_defconfig defconfig && echo "savedefconfig: no change"
+
+      - name: Build the initramfs userland
+        run: |
+          set -e
+          mkdir -p user && cd user
+          CC=mipsel-linux-gnu-gcc
+          curl -fsSL https://busybox.net/downloads/busybox-1.37.0.tar.bz2 | tar xj
+          make -C busybox-1.37.0 defconfig >/dev/null
+          sed -i -e 's/^# CONFIG_STATIC is not set/CONFIG_STATIC=y/' \
+                 -e 's/^CONFIG_TC=y/# CONFIG_TC is not set/' busybox-1.37.0/.config
+          make -C busybox-1.37.0 CROSS_COMPILE=mipsel-linux-gnu- -j"$(nproc)" busybox busybox.links >/dev/null
+          curl -fsSL https://downloads.es.net/pub/iperf/iperf-3.18.tar.gz | tar xz
+          (cd iperf-3.18 && ./configure -q --host=mipsel-linux-gnu --disable-shared --enable-static \
+             --without-openssl --without-sctp >/dev/null && make -s -j"$(nproc)" LDFLAGS=-all-static >/dev/null)
+          curl -fsSL https://www.kernel.org/pub/software/network/ethtool/ethtool-6.15.tar.xz | tar xJ
+          (cd ethtool-6.15 && ./configure -q --host=mipsel-linux-gnu --disable-netlink \
+             LDFLAGS=-static >/dev/null && make -s -j"$(nproc)" >/dev/null)
+          $CC -static -O2 -o evdump ../ci-src/ci/sf19a2890/bench/evdump.c
+          file busybox-1.37.0/busybox iperf-3.18/src/iperf3 ethtool-6.15/ethtool evdump
+
+      - name: Build the bench images
+        working-directory: linux
+        run: |
+          set -e
+          m="ARCH=mips CROSS_COMPILE=mipsel-linux-gnu-"
+          B=../ci-src/ci/sf19a2890/bench
+          U=$(realpath ../user)
+          mkdir -p ../images
+          initramfs() { # id
+            r=../rootfs-$1; rm -rf $r; cp -a $B/rootfs $r
+            echo "$1" > $r/etc/bench-id
+            {
+              echo "dir /dev 755 0 0"; echo "nod /dev/console 600 0 0 c 5 1"
+              for d in proc sys tmp mnt etc bin sbin usr usr/bin usr/sbin root; do echo "dir /$d 755 0 0"; done
+              echo "file /init $(realpath $r/init) 755 0 0"
+              echo "file /etc/bench-id $(realpath $r/etc/bench-id) 644 0 0"
+              for f in $r/bin/*; do echo "file /bin/$(basename $f) $(realpath $f) 755 0 0"; done
+              echo "file /bin/busybox $U/busybox-1.37.0/busybox 755 0 0"
+              echo "file /usr/bin/iperf3 $U/iperf-3.18/src/iperf3 755 0 0"
+              echo "file /usr/sbin/ethtool $U/ethtool-6.15/ethtool 755 0 0"
+              echo "file /usr/bin/evdump $U/evdump 755 0 0"
+              for a in $(cat $U/busybox-1.37.0/busybox.links); do
+                case "$a" in /bin/busybox) ;; *) echo "slink $a /bin/busybox 777 0 0";; esac
+              done
+            } | grep -vE '^slink /(bin/(mem-report|net-up|rgmii-sweep))' > $r.list
+            echo $(realpath $r.list)
+          }
+          image() { # id
+            list=$(initramfs $1)
+            ./scripts/config -e BLK_DEV_INITRD --set-str INITRAMFS_SOURCE "$list"
+            make $m olddefconfig >/dev/null
+            make $m -j"$(nproc)" vmlinux.bin dtbs > build-$1.log 2>&1 || { tail -50 build-$1.log; exit 1; }
+            cat arch/mips/boot/vmlinux.bin arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dtb > ../k.bin
+            xz --format=lzma -9 -c ../k.bin > ../k.bin.lzma
+            entry=$(mipsel-linux-gnu-nm vmlinux | awk '$3 == "kernel_entry" { print "0x" $1 }')
+            mkimage -A mips -O linux -T kernel -C lzma -a 0x80100000 -e "$entry" \
+              -n "sf19a2890 bench $1" -d ../k.bin.lzma ../images/$1.uimg >/dev/null
+            cp .config ../images/$1.config
+            cp arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dtb ../images/$1.dtb
+            echo "$1: $(stat -c %s ../images/$1.uimg) bytes, vmlinux.bin $(stat -c %s arch/mips/boot/vmlinux.bin), entry $entry"
+          }
+          bench_cfg() {
+            make $m sf19a2890_defconfig >/dev/null
+            ./scripts/kconfig/merge_config.sh -m -O . .config $B/bench.config >/dev/null
+          }
+
+          # Full stack: mainline + every series + ET6326 + GSW1xx reset
+          bench_cfg; image full
+
+          # Series 1 alone, and the three kernels for the memory comparison
+          git checkout -q s1
+          bench_cfg; image s1-siflower
+          cp .config ../s1.config
+
+          sed -i '/^config MIPS_GENERIC_KERNEL$/,/^config /s/^\tselect MIPS_GENERIC$/\tselect MIPS_GENERIC\n\tselect ARM_AMBA/' arch/mips/Kconfig
+          cp ../s1.config .config
+          ./scripts/config -d MACH_SIFLOWER_MIPS -e MIPS_GENERIC_KERNEL -e CPU_MIPS32_R2 \
+            -e CPU_LITTLE_ENDIAN -e 32BIT -e MIPS_CPS --set-val NR_CPUS 4 -e MIPS_RAW_APPENDED_DTB \
+            -e SERIAL_AMBA_PL011 -e SERIAL_AMBA_PL011_CONSOLE
+          make $m olddefconfig >/dev/null
+          image s1-generic
+          diff <(grep '^CONFIG' ../s1.config | sort) <(grep '^CONFIG' .config | sort) > ../images/s1-generic.config-diff || true
+
+          sed -i 's/#define ARCH_DMA_MINALIGN\t128/#define ARCH_DMA_MINALIGN\t32/' arch/mips/include/asm/mach-generic/kmalloc.h
+          grep -n ARCH_DMA_MINALIGN arch/mips/include/asm/mach-generic/kmalloc.h
+          image s1-generic-align32
+          git checkout -q -- arch/mips
+
+          cd ../images && sha256sum *.uimg | tee SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sf19a2890-bench-images
+          path: images/

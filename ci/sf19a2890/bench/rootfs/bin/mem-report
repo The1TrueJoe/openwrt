@@ -1,0 +1,9 @@
+#!/bin/sh
+# Memory figures for the MIPS_GENERIC_KERNEL comparison. Run it after the
+# console has been idle for a minute.
+echo "image: $(cat /etc/bench-id)"
+echo "uptime: $(cut -d' ' -f1 /proc/uptime) s"
+grep -E '^(MemTotal|MemFree|MemAvailable|Slab|SReclaimable|SUnreclaim|KernelStack|PageTables|Percpu):' /proc/meminfo
+dmesg | grep -E 'Memory: |SLUB: HWalign|percpu: Embedded'
+echo "kmalloc caches (name active_objs num_objs objsize):"
+grep -E '^kmalloc-[0-9k]+ ' /proc/slabinfo | awk '{ print "  " $1, $2, $3, $4 }'

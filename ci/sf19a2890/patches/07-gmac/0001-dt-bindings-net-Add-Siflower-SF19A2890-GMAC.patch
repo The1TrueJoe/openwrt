@@ -1,0 +1,165 @@
+From 25822e0e98c704e6f58d3e3d5d7144c20af36dee Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Mon, 2 Nov 2026 18:03:33 -0500
+Subject: [PATCH 1/2] dt-bindings: net: Add Siflower SF19A2890 GMAC
+
+The Siflower SF19A2890 has a DesignWare GMAC 3.73a whose interface
+type and RGMII clock delays are set in the SoC's system manager. It
+takes a fourth clock, the RGMII transmit reference.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ .../bindings/net/siflower,sf19a2890-gmac.yaml | 110 ++++++++++++++++++
+ .../devicetree/bindings/net/snps,dwmac.yaml   |   1 +
+ MAINTAINERS                                   |   6 +
+ 3 files changed, 117 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
+
+diff --git a/Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml b/Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
+new file mode 100644
+index 000000000..ea7af68d8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
+@@ -0,0 +1,110 @@
++# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/net/siflower,sf19a2890-gmac.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: Siflower SF19A2890 GMAC
++
++maintainers:
++  - Joseph Telaak <joseph@telaak.dev>
++
++description:
++  The Siflower SF19A2890 has a Synopsys DesignWare GMAC 3.73a. Its
++  interface type and RGMII clock delays are set in the SoC's system
++  manager. The MAC adds an RGMII delay only where the
++  rx-internal-delay-ps or tx-internal-delay-ps property says so.
++
++select:
++  properties:
++    compatible:
++      contains:
++        const: siflower,sf19a2890-gmac
++  required:
++    - compatible
++
++properties:
++  compatible:
++    items:
++      - const: siflower,sf19a2890-gmac
++      - const: snps,dwmac
++
++  reg:
++    maxItems: 1
++
++  interrupts:
++    maxItems: 3
++
++  interrupt-names:
++    items:
++      - const: macirq
++      - const: eth_wake_irq
++      - const: eth_lpi
++
++  clocks:
++    items:
++      - description: GMAC main clock
++      - description: Peripheral registers interface clock
++      - description: PTP reference clock
++      - description: RGMII transmit reference clock
++
++  clock-names:
++    items:
++      - const: stmmaceth
++      - const: pclk
++      - const: ptp_ref
++      - const: byp_ref
++
++  siflower,sysm:
++    $ref: /schemas/types.yaml#/definitions/phandle
++    description:
++      The system manager, which holds the interface type and RGMII delay
++      settings of the GMAC.
++
++  rx-internal-delay-ps: true
++
++  tx-internal-delay-ps: true
++
++required:
++  - compatible
++  - reg
++  - interrupts
++  - interrupt-names
++  - clocks
++  - clock-names
++  - resets
++  - reset-names
++  - siflower,sysm
++
++allOf:
++  - $ref: snps,dwmac.yaml#
++
++unevaluatedProperties: false
++
++examples:
++  - |
++    #include <dt-bindings/interrupt-controller/irq.h>
++    #include <dt-bindings/interrupt-controller/mips-gic.h>
++
++    ethernet@10800000 {
++        compatible = "siflower,sf19a2890-gmac", "snps,dwmac";
++        reg = <0x10800000 0x200000>;
++        interrupt-parent = <&gic>;
++        interrupts = <GIC_SHARED 32 IRQ_TYPE_LEVEL_HIGH>,
++                     <GIC_SHARED 34 IRQ_TYPE_LEVEL_HIGH>,
++                     <GIC_SHARED 33 IRQ_TYPE_LEVEL_HIGH>;
++        interrupt-names = "macirq", "eth_wake_irq", "eth_lpi";
++        clocks = <&sysm 21>, <&sysm 22>, <&sysm 24>, <&sysm 23>;
++        clock-names = "stmmaceth", "pclk", "ptp_ref", "byp_ref";
++        resets = <&sysm 0>;
++        reset-names = "stmmaceth";
++        siflower,sysm = <&sysm>;
++        phy-mode = "rgmii-id";
++        rx-internal-delay-ps = <1000>;
++        tx-internal-delay-ps = <1700>;
++
++        fixed-link {
++            speed = <1000>;
++            full-duplex;
++        };
++    };
+diff --git a/Documentation/devicetree/bindings/net/snps,dwmac.yaml b/Documentation/devicetree/bindings/net/snps,dwmac.yaml
+index 2c4842404..c3d96d58a 100644
+--- a/Documentation/devicetree/bindings/net/snps,dwmac.yaml
++++ b/Documentation/devicetree/bindings/net/snps,dwmac.yaml
+@@ -98,6 +98,7 @@ properties:
+         - rockchip,rk3588-gmac
+         - rockchip,rv1108-gmac
+         - rockchip,rv1126-gmac
++        - siflower,sf19a2890-gmac
+         - snps,dwmac
+         - snps,dwmac-3.40a
+         - snps,dwmac-3.50a
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 09713dc4c..8ce21e37f 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25654,6 +25654,12 @@ N:	sifive
+ K:	fu[57]40
+ K:	[^@]sifive
+ 
++SIFLOWER SF19A2890 DWMAC GLUE
++M:	Joseph Telaak <joseph@telaak.dev>
++L:	netdev@vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
++
+ SILEAD TOUCHSCREEN DRIVER
+ M:	Hans de Goede <hansg@kernel.org>
+ L:	linux-input@vger.kernel.org
+-- 
+2.50.1 (Apple Git-155)
+

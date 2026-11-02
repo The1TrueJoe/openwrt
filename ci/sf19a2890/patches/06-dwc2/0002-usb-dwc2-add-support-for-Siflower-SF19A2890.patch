@@ -1,0 +1,47 @@
+From f01e79e372355119734ab5db2cb4bcf37e197f36 Mon Sep 17 00:00:00 2001
+From: Chuanhong Guo <gch981213@gmail.com>
+Date: Mon, 9 Sep 2024 16:46:53 +0800
+Subject: [PATCH 2/3] usb: dwc2: add support for Siflower SF19A2890
+
+The Siflower SF19A2890 has a DWC OTG 3.30a controller. Limit its
+transfers to 65535 bytes and its AHB bursts to INCR4, the settings the
+OpenWrt port has run it with.
+
+Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
+[jt: from OpenWrt's siflower target, rebased on v7.4-rc1, commit message]
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ drivers/usb/dwc2/params.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/usb/dwc2/params.c b/drivers/usb/dwc2/params.c
+index 091bfcfef..f6379e616 100644
+--- a/drivers/usb/dwc2/params.c
++++ b/drivers/usb/dwc2/params.c
+@@ -237,6 +237,14 @@ static void dwc2_set_cv1800_params(struct dwc2_hsotg *hsotg)
+ 	p->power_down = DWC2_POWER_DOWN_PARAM_NONE;
+ }
+ 
++static void dwc2_set_sf19a2890_params(struct dwc2_hsotg *hsotg)
++{
++	struct dwc2_core_params *p = &hsotg->params;
++
++	p->max_transfer_size = 65535;
++	p->ahbcfg = GAHBCFG_HBSTLEN_INCR4 << GAHBCFG_HBSTLEN_SHIFT;
++}
++
+ static void dwc2_set_stm32f4x9_fsotg_params(struct dwc2_hsotg *hsotg)
+ {
+ 	struct dwc2_core_params *p = &hsotg->params;
+@@ -336,6 +344,8 @@ const struct of_device_id dwc2_of_match_table[] = {
+ 	{ .compatible = "apm,apm82181-dwc-otg", .data = dwc2_set_amcc_params },
+ 	{ .compatible = "sophgo,cv1800b-usb",
+ 	  .data = dwc2_set_cv1800_params },
++	{ .compatible = "siflower,sf19a2890-usb",
++	  .data = dwc2_set_sf19a2890_params },
+ 	{ .compatible = "st,stm32f4x9-fsotg",
+ 	  .data = dwc2_set_stm32f4x9_fsotg_params },
+ 	{ .compatible = "st,stm32f4x9-hsotg" },
+-- 
+2.50.1 (Apple Git-155)
+

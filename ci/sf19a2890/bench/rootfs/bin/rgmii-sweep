@@ -1,0 +1,27 @@
+#!/bin/sh
+# Sweep one RGMII delay register of the GMAC and count ping replies.
+# Usage: rgmii-sweep tx|rx FIRST LAST HOST
+# The other delay keeps its current value. Both are restored at the end.
+which=$1; first=$2; last=$3; host=$4
+[ -n "$host" ] || { echo "usage: rgmii-sweep tx|rx FIRST LAST HOST"; exit 1; }
+TX=0x19e04444; RX=0x19e04448; RXEN=0x19e0444c
+otx=$(devmem $TX 32); orx=$(devmem $RX 32); orxen=$(devmem $RXEN 32)
+echo "# start: tx=$otx rx=$orx rx_en=$orxen"
+echo "which,value,replies_of_50,rx_crc_errors"
+v=$first
+while [ "$v" -le "$last" ]; do
+	if [ "$which" = tx ]; then
+		devmem $TX 32 "$v"
+	else
+		devmem $RX 32 "$v"
+		if [ "$v" -gt 0 ]; then devmem $RXEN 32 1; else devmem $RXEN 32 0; fi
+	fi
+	sleep 1
+	c0=$(ethtool -S eth0 | awk '/rx_crc_errors:/ { print $2; exit }')
+	r=$(ping -q -c 50 -s 1400 -w 4 "$host" 2>/dev/null | sed -n 's/.* \([0-9]*\) packets received.*/\1/p')
+	c1=$(ethtool -S eth0 | awk '/rx_crc_errors:/ { print $2; exit }')
+	echo "$which,$v,${r:-0},$(( ${c1:-0} - ${c0:-0} ))"
+	v=$((v + 1))
+done
+devmem $TX 32 "$otx"; devmem $RX 32 "$orx"; devmem $RXEN 32 "$orxen"
+echo "# restored: tx=$(devmem $TX 32) rx=$(devmem $RX 32) rx_en=$(devmem $RXEN 32)"
