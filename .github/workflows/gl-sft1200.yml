@@ -116,7 +116,7 @@ jobs:
           # The binding half of the pending reset-gpios series
           patch -p1 -d linux-bindings < .github/gl-sft1200/linux/0001-dt-bindings-net-dsa-lantiq-gswip-add-reset-gpios.patch
           # and the ET6326 compatible
-          patch -p1 -d linux-bindings < target/linux/generic/pending-6.18/881-05-dt-bindings-leds-kinetic-ktd202x-add-etek-et6326.patch
+          patch -p1 -d linux-bindings < target/linux/generic/pending-6.18/881-06-dt-bindings-leds-kinetic-ktd202x-add-etek-et6326.patch
           dt-mk-schema -j linux-bindings/Documentation/devicetree/bindings > processed-schema.json
           dtb=$(ls build_dir/target-*/linux-siflower_sf19a2890/image-sf19a2890_glinet_gl-sft1200.dtb)
           dt-validate -s processed-schema.json "$dtb" 2>&1 | tee dt-validate.txt
@@ -125,7 +125,7 @@ jobs:
         if: always() && steps.build.outcome == 'success'
         run: |
           # lantiq,gswip.yaml as patched by 723-46..52 and pending 761-01,
-          # kinetic,ktd202x.yaml as patched by pending 881-05
+          # kinetic,ktd202x.yaml as patched by pending 881-06
           make target/linux/dtbs_check DT_SCHEMA_FILES=lantiq,gswip.yaml:kinetic,ktd202x.yaml V=s 2>&1 | tee dtbs-check.txt
           test ${PIPESTATUS[0]} -eq 0
 

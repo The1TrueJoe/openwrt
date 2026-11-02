@@ -5,7 +5,7 @@ only on the `siflower-gl-sft1200-ci` branch and are never sent upstream.
 Both branches are pushed to The1TrueJoe/openwrt. Nothing has been submitted
 upstream: no openwrt/openwrt PR, no patch mail.
 
-Series, on openwrt/openwrt `main` 554f401d6b (Linux 6.18.60):
+Series, on openwrt/openwrt `main` c1bd42c934 (Linux 6.18.60):
 
 1. `kernel: 6.18: backport MaxLinear GSW1xx DSA switch support`
 2. `siflower: sf19a2890: terminate the RGMII delay string before parsing`
@@ -24,10 +24,23 @@ Series, on openwrt/openwrt `main` 554f401d6b (Linux 6.18.60):
 Rebased from 7cd9ef1f22 (6.18.55) onto 554f401d6b on 2026-11-01 with no
 conflicts. Only ipq40xx 701 was changed by both main (the 6.18.57 hunk
 headers) and commit 1 (tag ids and context), and git merged the two.
+Then onto c1bd42c934 on 2026-11-02 (14 commits, no kernel patch files),
+with no conflicts. On 554f401d6b, rockchip 184-03..05 (new in main since
+6.18.55) needed their MAINTAINERS hunk headers moved by one line for
+commit 1; that is folded in (all-target run 41356577085 found it, run
+41367090492 was green after).
 
-Commits 7-13 are the et6326-led session's (pending-6.18/881-01..10 and
+Commits 7-13 are the et6326-led session's (pending-6.18/881-01..11 and
 kmod-leds-ktd202x, then the board's I2C and LED nodes); its own notes hold
-their evidence. They were folded in on top of the six above unchanged.
+their evidence. 881-01..11 are LED v2 (linux-leds b4/ktd202x-et6326
+88a2f0c4f) ported to 6.18.60 the same way as v1: the i2c id table keeps
+6.18's style and setup_led_rgb() keeps fwnode_for_each_available_child_node;
+nothing else differs from v2. v2 adds fix 881-05 (unlit colors of a
+blinking LED), so the commit 7 and 11 messages were updated. v1 (posted
+2026-11-01) had bugs and is not in the series.
+
+761-02 carries the final net-next text (b4/mxl-gsw1xx-reset 176d0f15a):
+only the PHY paragraph is reworded; the code is unchanged.
 
 "Unit" below means the harvested GL-SFT1200, label MAC 94:83:c4:9a:ea:d1, read
 on GL firmware 4.8.3 (`device-dumps/glinet-sft1200/94-83-c4-9a-ea-d1`).
