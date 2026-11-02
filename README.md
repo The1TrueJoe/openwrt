@@ -1,9 +1,11 @@
 # Send the switch reset series from the other Mac
 
 The bundle `mxl-gsw1xx-reset.bundle` (4 KB) holds the b4 branch
-`b4/mxl-gsw1xx-reset`: the cover letter with its To/Cc and the 2 patches,
-on net-next main 4dd16e311 (its tip on 2026-11-02). `b4-preview/` is what
-`b4 send -o` rendered from it: 3 emails, `[PATCH net-next 0/2]` to `2/2`.
+`b4/mxl-gsw1xx-reset` at 176d0f15a: the cover letter with its To/Cc and
+the 2 patches, on net-next main 4dd16e311 (its tip on 2026-11-02).
+`b4-preview/` (and `b4-preview.txt`, the same three emails in one file) is
+what `b4 send -o` rendered from it: `[PATCH net-next 0/2]` to `2/2`.
+After step 2, `git rev-parse --short HEAD` should print 176d0f15a.
 
 Send from ONE Mac only. Nothing has been sent.
 
