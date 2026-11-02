@@ -1,4 +1,4 @@
-From 3a9b4894aba35f246dfaba2819000bb453585352 Mon Sep 17 00:00:00 2001
+From 5b7e5cc5dc9dc869d89acf9d78fdd1ecf4a8b754 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:25:12 -0400
 Subject: [PATCH 03/11] leds: rgb: ktd202x: Never program an on time of zero
@@ -10,8 +10,6 @@ trigger reports that it is blinking with delay_on = 0.
 
 Use the shortest on time the hardware has, 1/256 of the period, and
 report it back.
-
-Found with an LLM coding assistant while reviewing the driver.
 
 Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>

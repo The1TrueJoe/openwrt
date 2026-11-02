@@ -1,4 +1,4 @@
-From 67a70334d1755a5ff0f51f5cd08a7f642271eba1 Mon Sep 17 00:00:00 2001
+From d11f72628ca7b99b0a5ee5a61d5789ede55029bb Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Sun, 1 Nov 2026 21:38:31 -0500
 Subject: [PATCH 05/11] leds: rgb: ktd202x: Keep the unlit colors of a blinking
@@ -12,8 +12,6 @@ multi_intensity of "255 0 0" also blinks green and blue.
 
 Leave the channels of the colors with no brightness off, as
 brightness_set() does. A single color LED now passes its brightness too.
-
-Found by Sashiko in its review of v1 of this series.
 
 Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
 Cc: stable@vger.kernel.org

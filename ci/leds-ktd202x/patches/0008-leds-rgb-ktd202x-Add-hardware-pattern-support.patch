@@ -1,4 +1,4 @@
-From 6976d8eb50108e393126bd46e2b3cb7c5d08598b Mon Sep 17 00:00:00 2001
+From 036320faf2fa3f95cb93b79af09cfd5cdff2beba Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 08/11] leds: rgb: ktd202x: Add hardware pattern support

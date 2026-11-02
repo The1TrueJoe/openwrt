@@ -1,4 +1,4 @@
-From a3e10fb40dee78a37bd12356f1d56c86cc5d0ac7 Mon Sep 17 00:00:00 2001
+From 153665c3d5f9798a4580f6374fcf5e065d0401f6 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Tue, 27 Oct 2026 00:01:02 -0400
 Subject: [PATCH 04/11] leds: rgb: ktd202x: Fix a division by zero with long
@@ -17,8 +17,6 @@ trigger's sysfs files:
   get an arbitrary duty cycle
 
 Saturate the sum, and compute the on time with mul_u64_u64_div_u64().
-
-Found with an LLM coding assistant while reviewing the driver.
 
 Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
 Cc: stable@vger.kernel.org
