@@ -1,4 +1,4 @@
-From afe13ec2837eac9492d106a8849099bbe256048e Mon Sep 17 00:00:00 2001
+From 176d0f15acc214f4989d898044b5d9016aa5ec69 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Tue, 27 Oct 2026 22:01:01 -0400
 Subject: [PATCH 2/2] net: dsa: mxl-gsw1xx: reset the switch through
@@ -9,11 +9,11 @@ driver never resets it. The MDIO core asserts and releases reset-gpios
 only for PHY devices, so a reset line described on the switch node has
 no effect either.
 
-On the GL.iNet GL-SFT1200 the bootloader leaves the four internal PHYs
-of the GSW150 at MDIO addresses 1 to 4 instead of 0 to 3. Port 0 then
-fails with "failed to connect to PHY: -ENODEV", and the PHY that answers
-at a port's address belongs to the neighbouring port. After a hardware
-reset the PHYs are at 0 to 3 and all ports work.
+On the GL.iNet GL-SFT1200 the bootloader leaves each internal PHY of
+the GSW150 one MDIO address above its port. Port 0 then fails with
+"failed to connect to PHY: -ENODEV", and the PHY that answers at a
+port's address belongs to the neighbouring port. After a hardware reset
+every PHY is back at its port's address and all ports work.
 
 Request the reset GPIO in the driver and pulse it before the first
 register access. The timing follows the vendor driver: asserted for
