@@ -1,7 +1,7 @@
-From 48f9b4b96c5160a81e3fe0bf6bc6d93f98230fc2 Mon Sep 17 00:00:00 2001
+From 003ade4b79639c96b5301c45d8e59058d544debd Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:33:42 -0400
-Subject: [PATCH 10/11] leds: rgb: ktd202x: Don't let a blinking LED retime
+Subject: [PATCH 10/10] leds: rgb: ktd202x: Don't let a blinking LED retime
  another one
 
 Every LED blinks with the PWM1 flash timer. So when a second LED blinks,
@@ -20,8 +20,7 @@ back. A LED may join the timer while no other LED uses it, or when it
 asks for the very same period, on time and ramps. Otherwise it stays on
 and gets -EBUSY, which makes the LED core blink it in software. Only
 write the timer registers when they change, so that a LED joining the
-timer does not restart the blink of the others. Also never program an
-on time of zero for a hardware pattern.
+timer does not restart the blink of the others.
 
 The match is on the programmed values. The timer trigger writes delay_on
 and delay_off one at a time, and each write is rounded against the other's
@@ -29,14 +28,15 @@ rounded value, so two LEDs set to the same delays can get on times a few
 steps apart. The second one then blinks in software, at the timing it
 asked for. The documentation says how to make them share.
 
+Assisted-by: Claude:claude-opus-5-5
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  Documentation/leds/leds-ktd202x.rst |  13 +-
- drivers/leds/rgb/leds-ktd202x.c     | 218 +++++++++++++++++-----------
- 2 files changed, 146 insertions(+), 85 deletions(-)
+ drivers/leds/rgb/leds-ktd202x.c     | 213 +++++++++++++++++-----------
+ 2 files changed, 143 insertions(+), 83 deletions(-)
 
 diff --git a/Documentation/leds/leds-ktd202x.rst b/Documentation/leds/leds-ktd202x.rst
-index 2ee537f..32ea9d6 100644
+index 2ee537f57..32ea9d6f6 100644
 --- a/Documentation/leds/leds-ktd202x.rst
 +++ b/Documentation/leds/leds-ktd202x.rst
 @@ -31,9 +31,16 @@ equal and not 0. ``repeat`` must be -1, its default.
@@ -60,7 +60,7 @@ index 2ee537f..32ea9d6 100644
  For example, to breathe with a period of 4 seconds::
  
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index d0fea30..f4544ba 100644
+index 5f51df993..f4544ba33 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -128,6 +128,8 @@ struct ktd202x_led {
@@ -324,15 +324,8 @@ index d0fea30..f4544ba 100644
  	for (i = 0; i < KTD202X_PATTERN_LEN; i++)
  		t[i] = min_t(u32, pattern[i].delta_t, KTD202X_PATTERN_MAX_MS);
  
-@@ -512,28 +571,15 @@ static int ktd202x_pattern_program(struct ktd202x_led *led,
- 
- 	/* The on time includes the rise time */
- 	ton_ms = t[0] + t[1];
--	on = min_t(unsigned long, KTD202X_FLASH_ON_MAX - 1,
--		   DIV_ROUND_CLOSEST(ton_ms * KTD202X_FLASH_ON_MAX, period_ms));
-+	on = clamp_t(unsigned long,
-+		     DIV_ROUND_CLOSEST(ton_ms * KTD202X_FLASH_ON_MAX, period_ms),
-+		     1, KTD202X_FLASH_ON_MAX - 1);
+@@ -517,24 +576,10 @@ static int ktd202x_pattern_program(struct ktd202x_led *led,
+ 		     1, KTD202X_FLASH_ON_MAX - 1);
  
  	mutex_lock(&led->chip->mutex);
 -
@@ -359,7 +352,7 @@ index d0fea30..f4544ba 100644
  	return ret;
  }
  
-@@ -555,7 +601,11 @@ static int ktd202x_pattern_single_set(struct led_classdev *cdev,
+@@ -556,7 +601,11 @@ static int ktd202x_pattern_single_set(struct led_classdev *cdev,
  
  	info.channel = led->index;
  
@@ -372,7 +365,7 @@ index d0fea30..f4544ba 100644
  }
  
  static int ktd202x_pattern_single_clear(struct led_classdev *cdev)
-@@ -579,8 +629,12 @@ static int ktd202x_pattern_mc_set(struct led_classdev *cdev,
+@@ -580,8 +629,12 @@ static int ktd202x_pattern_mc_set(struct led_classdev *cdev,
  	if (ret)
  		return ret;
  

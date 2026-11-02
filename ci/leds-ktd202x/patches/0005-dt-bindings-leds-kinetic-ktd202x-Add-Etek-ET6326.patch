@@ -1,7 +1,7 @@
-From 21d12e54a36da9a1d00cc6819d757775d0857aa9 Mon Sep 17 00:00:00 2001
+From 77a2d410818abf53f22d9311f32c6ab5a0573694 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:31 -0400
-Subject: [PATCH 05/11] dt-bindings: leds: kinetic,ktd202x: Add Etek ET6326
+Subject: [PATCH 05/10] dt-bindings: leds: kinetic,ktd202x: Add Etek ET6326
 
 The Etek ET6326 is a 3 channel LED driver with the register map, the I2C
 address and the current steps of the KTD2026. It only differs in the
@@ -11,13 +11,14 @@ off. Document it with the KTD2026 as fallback.
 
 The ET6326 drives the status LED of the GL.iNet GL-SFT1200 (Opal).
 
+Assisted-by: Claude:claude-opus-5-5
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../devicetree/bindings/leds/kinetic,ktd202x.yaml | 15 ++++++++++++---
  1 file changed, 12 insertions(+), 3 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/leds/kinetic,ktd202x.yaml b/Documentation/devicetree/bindings/leds/kinetic,ktd202x.yaml
-index 832c030..b13c717 100644
+index 832c030a5..b13c71721 100644
 --- a/Documentation/devicetree/bindings/leds/kinetic,ktd202x.yaml
 +++ b/Documentation/devicetree/bindings/leds/kinetic,ktd202x.yaml
 @@ -15,11 +15,20 @@ description: |

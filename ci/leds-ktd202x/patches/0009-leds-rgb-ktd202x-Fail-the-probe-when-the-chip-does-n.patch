@@ -1,7 +1,7 @@
-From 1f160302a29642f6af7decc3b03c499f56e3cf9b Mon Sep 17 00:00:00 2001
+From 7289dbaf9ca2954b204b59a1f41ae849406efdd1 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
-Subject: [PATCH 09/11] leds: rgb: ktd202x: Fail the probe when the chip does
+Subject: [PATCH 09/10] leds: rgb: ktd202x: Fail the probe when the chip does
  not answer
 
 The driver never reads from the chip: the register cache starts from the
@@ -11,16 +11,17 @@ later write then fails.
 
 Fail the probe when the reset write fails.
 
+Assisted-by: Claude:claude-opus-5-5
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/leds/rgb/leds-ktd202x.c | 9 ++++++---
  1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 4b8786c..d0fea30 100644
+index 48521f1e5..5f51df993 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
-@@ -721,20 +721,23 @@ static int ktd202x_probe_fw(struct ktd202x *chip)
+@@ -722,20 +722,23 @@ static int ktd202x_probe_fw(struct ktd202x *chip)
  {
  	struct device *dev = chip->dev;
  	int count;
