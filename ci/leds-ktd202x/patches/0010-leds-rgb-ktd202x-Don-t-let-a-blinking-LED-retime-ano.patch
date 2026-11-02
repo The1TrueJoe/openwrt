@@ -1,4 +1,4 @@
-From 003ade4b79639c96b5301c45d8e59058d544debd Mon Sep 17 00:00:00 2001
+From 099ef53d49f9bc26e4ce835a90cdd9481592ca23 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:33:42 -0400
 Subject: [PATCH 10/10] leds: rgb: ktd202x: Don't let a blinking LED retime
@@ -60,7 +60,7 @@ index 2ee537f57..32ea9d6f6 100644
  For example, to breathe with a period of 4 seconds::
  
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 5f51df993..f4544ba33 100644
+index 534cb4ed1..042c9debb 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -128,6 +128,8 @@ struct ktd202x_led {
@@ -267,7 +267,7 @@ index 5f51df993..f4544ba33 100644
  		ret = regmap_update_bits(led->chip->regmap, KTD202X_REG_CHANNEL_CTRL,
  					 ctrl_mask, ctrl_on);
  		goto out;
-@@ -363,28 +440,19 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+@@ -363,29 +440,20 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
  	on = mul_u64_u64_div_u64(*delay_on, KTD202X_FLASH_ON_MAX, delay_total_ms);
  	on = clamp(on, 1, KTD202X_FLASH_ON_MAX - 1);
  
@@ -282,7 +282,8 @@ index 5f51df993..f4544ba33 100644
 +
  	/* Actually used delay_{on,off} values */
  	delay_total_ms = ktd202x_flash_period_ms(info, num_steps);
- 	*delay_on = (delay_total_ms * on) / KTD202X_FLASH_ON_MAX;
+ 	/* 1/256 of the 128 ms ET6326 period would round down to 0 ms */
+ 	*delay_on = max(delay_total_ms * on / KTD202X_FLASH_ON_MAX, 1UL);
  	*delay_off = delay_total_ms - *delay_on;
 -
 -	/* Set timings */
@@ -305,7 +306,7 @@ index 5f51df993..f4544ba33 100644
  out:
  	mutex_unlock(&led->chip->mutex);
  	return ret;
-@@ -484,18 +552,9 @@ static int ktd202x_pattern_program(struct ktd202x_led *led,
+@@ -485,18 +553,9 @@ static int ktd202x_pattern_program(struct ktd202x_led *led,
  	unsigned int t[KTD202X_PATTERN_LEN];
  	unsigned int rise, fall, num_steps, on;
  	unsigned long period_ms, ton_ms;
@@ -324,7 +325,7 @@ index 5f51df993..f4544ba33 100644
  	for (i = 0; i < KTD202X_PATTERN_LEN; i++)
  		t[i] = min_t(u32, pattern[i].delta_t, KTD202X_PATTERN_MAX_MS);
  
-@@ -517,24 +576,10 @@ static int ktd202x_pattern_program(struct ktd202x_led *led,
+@@ -518,24 +577,10 @@ static int ktd202x_pattern_program(struct ktd202x_led *led,
  		     1, KTD202X_FLASH_ON_MAX - 1);
  
  	mutex_lock(&led->chip->mutex);
@@ -352,7 +353,7 @@ index 5f51df993..f4544ba33 100644
  	return ret;
  }
  
-@@ -556,7 +601,11 @@ static int ktd202x_pattern_single_set(struct led_classdev *cdev,
+@@ -557,7 +602,11 @@ static int ktd202x_pattern_single_set(struct led_classdev *cdev,
  
  	info.channel = led->index;
  
@@ -365,7 +366,7 @@ index 5f51df993..f4544ba33 100644
  }
  
  static int ktd202x_pattern_single_clear(struct led_classdev *cdev)
-@@ -580,8 +629,12 @@ static int ktd202x_pattern_mc_set(struct led_classdev *cdev,
+@@ -581,8 +630,12 @@ static int ktd202x_pattern_mc_set(struct led_classdev *cdev,
  	if (ret)
  		return ret;
  

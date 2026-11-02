@@ -1,4 +1,4 @@
-From 332b0c9c9dfa2114b4de0c466cdfe656465d155e Mon Sep 17 00:00:00 2001
+From 3f36477e9fcb86ce11d700f9c832070fbe3b59d3 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 08/10] leds: rgb: ktd202x: Limit the LED current to
@@ -24,7 +24,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  1 file changed, 17 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index ed0e8e74c..48521f1e5 100644
+index 8d773d1fc..62d2f460c 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -78,6 +78,7 @@
@@ -35,7 +35,7 @@ index ed0e8e74c..48521f1e5 100644
  
  static const struct reg_default ktd202x_reg_defaults[] = {
  	{ KTD202X_REG_RESET_CONTROL, KTD202X_TIMER_SLOT_CONTROL_TSLOT1 |
-@@ -398,7 +399,7 @@ static int ktd202x_blink_single_set(struct led_classdev *cdev,
+@@ -399,7 +400,7 @@ static int ktd202x_blink_single_set(struct led_classdev *cdev,
  	int ret;
  
  	if (!cdev->brightness) {
@@ -44,7 +44,7 @@ index ed0e8e74c..48521f1e5 100644
  		if (ret)
  			return ret;
  	}
-@@ -588,6 +589,18 @@ static int ktd202x_pattern_mc_clear(struct led_classdev *cdev)
+@@ -589,6 +590,18 @@ static int ktd202x_pattern_mc_clear(struct led_classdev *cdev)
  	return ktd202x_brightness_mc_set(cdev, LED_OFF);
  }
  
@@ -63,7 +63,7 @@ index ed0e8e74c..48521f1e5 100644
  static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwnode,
  				 struct ktd202x_led *led, struct led_init_data *init_data)
  {
-@@ -637,6 +650,7 @@ static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwn
+@@ -638,6 +651,7 @@ static int ktd202x_setup_led_rgb(struct ktd202x *chip, struct fwnode_handle *fwn
  	led->mcdev.num_colors = num_channels;
  
  	cdev = &led->mcdev.led_cdev;
@@ -71,7 +71,7 @@ index ed0e8e74c..48521f1e5 100644
  	cdev->brightness_set_blocking = ktd202x_brightness_mc_set;
  	cdev->blink_set = ktd202x_blink_mc_set;
  	cdev->pattern_set = ktd202x_pattern_mc_set;
-@@ -660,6 +674,8 @@ static int ktd202x_setup_led_single(struct ktd202x *chip, struct fwnode_handle *
+@@ -661,6 +675,8 @@ static int ktd202x_setup_led_single(struct ktd202x *chip, struct fwnode_handle *
  	led->index = reg;
  
  	cdev = &led->cdev;
@@ -80,7 +80,7 @@ index ed0e8e74c..48521f1e5 100644
  	cdev->brightness_set_blocking = ktd202x_brightness_single_set;
  	cdev->blink_set = ktd202x_blink_single_set;
  	cdev->pattern_set = ktd202x_pattern_single_set;
-@@ -699,8 +715,6 @@ static int ktd202x_add_led(struct ktd202x *chip, struct fwnode_handle *fwnode, u
+@@ -700,8 +716,6 @@ static int ktd202x_add_led(struct ktd202x *chip, struct fwnode_handle *fwnode, u
  		return ret;
  	}
  

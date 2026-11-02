@@ -1,27 +1,29 @@
-From 7289dbaf9ca2954b204b59a1f41ae849406efdd1 Mon Sep 17 00:00:00 2001
+From 0996e7a7d9187a9f4aebf318de0110d60fab9c5e Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 09/10] leds: rgb: ktd202x: Fail the probe when the chip does
  not answer
 
 The driver never reads from the chip: the register cache starts from the
-defaults. So with a wrong address, or no chip at all, the reset write at
-probe NAKs, the error is ignored and the LEDs get registered anyway. Every
-later write then fails.
+defaults. So with a wrong address, or no chip at all, the LEDs get
+registered anyway, and every later write fails.
 
-Fail the probe when the reset write fails.
+The reset write can't tell: the KTD202x does not ACK the byte that
+resets it, and its data sheet says to ignore that. So once the reset
+is done, put the chip to sleep, as ktd202x_chip_disable() does, and
+fail the probe when that write fails.
 
 Assisted-by: Claude:claude-opus-5-5
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- drivers/leds/rgb/leds-ktd202x.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ drivers/leds/rgb/leds-ktd202x.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 48521f1e5..5f51df993 100644
+index 62d2f460c..534cb4ed1 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
-@@ -722,20 +722,23 @@ static int ktd202x_probe_fw(struct ktd202x *chip)
+@@ -723,20 +723,29 @@ static int ktd202x_probe_fw(struct ktd202x *chip)
  {
  	struct device *dev = chip->dev;
  	int count;
@@ -32,18 +34,23 @@ index 48521f1e5..5f51df993 100644
  	if (!count || count > chip->num_leds)
  		return -EINVAL;
  
--	regmap_write(chip->regmap, KTD202X_REG_RESET_CONTROL, KTD202X_RSTR_RESET);
-+	/* Nothing is read back, so a failed reset is the only sign of a missing chip */
-+	ret = regmap_write(chip->regmap, KTD202X_REG_RESET_CONTROL, KTD202X_RSTR_RESET);
-+	if (ret)
-+		return dev_err_probe(dev, ret, "Failed to reset the chip\n");
++	/* The KTD202x does not ACK the byte that resets it, so ignore the result */
+ 	regmap_write(chip->regmap, KTD202X_REG_RESET_CONTROL, KTD202X_RSTR_RESET);
  
  	/* Allow the device to execute the complete reset */
  	usleep_range(200, 300);
  
- 	device_for_each_child_node_scoped(dev, child) {
+-	device_for_each_child_node_scoped(dev, child) {
 -		int ret = ktd202x_add_led(chip, child, i);
--
++	/*
++	 * Nothing is read back, so a failed write is the only sign of a missing
++	 * chip. Leave it asleep until a LED is turned on.
++	 */
++	ret = regmap_write(chip->regmap, KTD202X_REG_RESET_CONTROL, KTD202X_ENABLE_CTRL_SLEEP);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to reach the chip\n");
+ 
++	device_for_each_child_node_scoped(dev, child) {
 +		ret = ktd202x_add_led(chip, child, i);
  		if (ret)
  			return ret;

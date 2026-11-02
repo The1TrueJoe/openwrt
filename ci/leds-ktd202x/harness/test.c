@@ -10,7 +10,7 @@ struct fwnode_handle { u32 reg; int color; u32 ua; struct fwnode_handle *kids; i
 
 static u8 hw[16], cache[16];
 static int writes[16];
-static int fail_io;
+static int fail_io, nak_reset;
 static const void *match;
 static struct fwnode_handle kids[4];
 static int nkids;
@@ -71,6 +71,8 @@ int regmap_write(struct regmap *m, unsigned int r, unsigned int v)
 	if (r > rcfg->max_register) { printf("    BAD REG %u\n", r); abort(); }
 	if (v > 0xff) { printf("    VALUE OVERFLOW reg %u = %u\n", r, v); abort(); }
 	hw[r] = cache[r] = v; writes[r]++;
+	/* The KTD202x resets on the data byte and does not ACK it ([KTD] p20) */
+	if (nak_reset && r == 0 && (v & 7) == 7) return -ENXIO;
 	return 0;
 }
 int regmap_read(struct regmap *m, unsigned int r, unsigned int *v) { *v = cache[r]; return 0; }
@@ -158,6 +160,15 @@ int main(void)
 	CHECK(ret == 0 && hw[2] == 1 && on > 0, "1/2000: ret %d Reg2 %u reported on %lu off %lu", ret, hw[2], on, off);
 	leds[0]->brightness_set_blocking(leds[0], 0);
 
+	printf("Sashiko: the 128 ms ET6326 period never reports an on time of 0\n");
+	ret = blink(0, 1, 200, &on, &off);
+	CHECK(ret == 0 && hw[1] == 0 && hw[2] == 1 && on == 1 && off == 127,
+	      "1/200: ret %d Reg1 %u Reg2 %u reported %lu/%lu", ret, hw[1], hw[2], on, off);
+	ret = blink(0, on, 300, &on, &off);	/* echo 300 > delay_off */
+	CHECK(ret == 0 && CH(0) == 2 && hw[1] == 1 && hw[2] == 1,
+	      "then delay_off 300: ret %d, still blinking (mode %d) Reg1 %u Reg2 %u", ret, CH(0), hw[1], hw[2]);
+	leds[0]->brightness_set_blocking(leds[0], 0);
+
 	printf("hostile delays from sysfs\n");
 	ret = blink(0, 1UL << 63, 1UL << 63, &on, &off);
 	CHECK(ret == 0 && hw[1] == 127 && hw[2] == 128, "2^63 + 2^63 (sum wraps to 0): ret %d Reg1 %u Reg2 %u, no division by zero", ret, hw[1], hw[2]);
@@ -194,8 +205,10 @@ int main(void)
 	leds[1]->brightness_set_blocking(leds[1], 0);
 
 	printf("KTD2026 keeps its own period encoding\n");
+	nak_reset = 1;	/* from here on, a KTD2026: the reset is not ACKed */
 	ret = probe(&ktd2026_info, 3, 0);
-	CHECK(ret == 0 && leds[2]->max_brightness == 192, "probe, max %u", leds[2]->max_brightness);
+	CHECK(ret == 0 && nleds == 3, "probe despite the NAKed reset: ret %d, %d LEDs", ret, nleds);
+	CHECK(leds[2]->max_brightness == 192, "max %u", leds[2]->max_brightness);
 	ret = blink(2, 500, 500, &on, &off);
 	CHECK(ret == 0 && hw[1] == 5 && on + off == 896, "500/500: Reg1 %u period %lu", hw[1], on + off);
 	ret = blink(2, 1, 1, &on, &off);
@@ -223,9 +236,12 @@ int main(void)
 
 	printf("absent chip\n");
 	fail_io = 1;
+	ret = probe(&ktd2026_info, 2, 0);
+	CHECK(ret == -ENXIO && nleds == 0, "KTD2026: probe returns %d, %d LEDs registered", ret, nleds);
+	nak_reset = 0;
 	ret = probe(&et6326_info, 2, 0);
 	fail_io = 0;
-	CHECK(ret == -ENXIO && nleds == 0, "probe returns %d, %d LEDs registered", ret, nleds);
+	CHECK(ret == -ENXIO && nleds == 0, "ET6326: probe returns %d, %d LEDs registered", ret, nleds);
 
 	printf("%s: %d failure(s)\n", fails ? "FAILED" : "PASSED", fails);
 	return fails != 0;
