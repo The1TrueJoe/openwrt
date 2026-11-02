@@ -1,4 +1,4 @@
-From 76707e27925d7932a262d7b757f3446cf4c988db Mon Sep 17 00:00:00 2001
+From 5340464d90c6abf5f99349c8bfea9ac1f5ba3202 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 10/11] leds: rgb: ktd202x: Fail the probe when the chip does
@@ -13,7 +13,6 @@ resets it, and its data sheet says to ignore that. So once the reset
 is done, put the chip to sleep, as ktd202x_chip_disable() does, and
 fail the probe when that write fails.
 
-Assisted-by: LLM
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/leds/rgb/leds-ktd202x.c | 13 +++++++++++--

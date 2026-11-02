@@ -1,4 +1,4 @@
-From 1476d0f569002977f217a5ed86153aebd9e38442 Mon Sep 17 00:00:00 2001
+From a11f60f0a233abefe29dbea876a049f01822aa4e Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:33:42 -0400
 Subject: [PATCH 11/11] leds: rgb: ktd202x: Don't let a blinking LED retime
@@ -37,7 +37,6 @@ rounded value, so two LEDs set to the same delays can get on times a few
 steps apart. The second one then blinks in software, at the timing it
 asked for. The documentation says how to make them share.
 
-Assisted-by: LLM
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  Documentation/leds/leds-ktd202x.rst |  16 +-

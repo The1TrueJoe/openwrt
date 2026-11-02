@@ -1,4 +1,4 @@
-From 610d72064514c0c9d86a1de0b4b93b94e68d1c8f Mon Sep 17 00:00:00 2001
+From fd6e987b604ed95ae2d6a46ce6ab889a15f46597 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 09/11] leds: rgb: ktd202x: Limit the LED current to
@@ -17,7 +17,6 @@ rather than at the chip maximum.
 Multicolor LEDs are left as they are: the LED core already bounds each
 color intensity, and the hardware this was tested on has none.
 
-Assisted-by: LLM
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/leds/rgb/leds-ktd202x.c | 20 +++++++++++++++++---

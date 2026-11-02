@@ -1,4 +1,4 @@
-From e77c40a2306568ebd9c8b3cd444b3c51eb9fecde Mon Sep 17 00:00:00 2001
+From 4e1e28b1169f5eec2eb3e2c1bb72ce6cdb5539d2 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:31 -0400
 Subject: [PATCH 01/11] leds: rgb: ktd202x: Fix the flash period of short
@@ -12,9 +12,10 @@ so asking for a fast blink gives a blink every 16 seconds.
 
 Compare before subtracting.
 
+Found with an LLM coding assistant while reviewing the driver.
+
 Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
 Cc: stable@vger.kernel.org
-Assisted-by: LLM
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/leds/rgb/leds-ktd202x.c | 10 +++++++---

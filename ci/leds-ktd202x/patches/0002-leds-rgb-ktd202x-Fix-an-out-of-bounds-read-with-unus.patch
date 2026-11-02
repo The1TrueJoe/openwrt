@@ -1,4 +1,4 @@
-From ec99d28c6b98a0e402b7231653d3109289cf60e8 Mon Sep 17 00:00:00 2001
+From d2c024138846b991ae15713d32104b1b7ecfccfe Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:58 -0400
 Subject: [PATCH 02/11] leds: rgb: ktd202x: Fix an out-of-bounds read with
@@ -12,9 +12,10 @@ __counted_by() annotation hides that from the bounds checkers.
 
 Allocate one entry per channel.
 
+Found with an LLM coding assistant while reviewing the driver.
+
 Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
 Cc: stable@vger.kernel.org
-Assisted-by: LLM
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/leds/rgb/leds-ktd202x.c | 8 +++++---

@@ -141,10 +141,8 @@ jobs:
       - name: checkpatch --strict with the tree
         working-directory: linux
         run: |
-          # Use the checkpatch of lee/leds for-leds-next, the tree the series
-          # is for: it knows the Assisted-by tag, which v7.4-rc1's does not.
-          curl -fsSL -o scripts/checkpatch.pl \
-            'https://git.kernel.org/pub/scm/linux/kernel/git/lee/leds.git/plain/scripts/checkpatch.pl?h=for-leds-next'
+          # v7.4-rc1's own checkpatch: for-leds-next predates 1e035297ffda
+          # ("docs: remove Assisted-by references") and is stale here.
           # The Fixes: commit predates this shallow clone; it was checked
           # by hand: 0ebdb7210943 ("leds: Add ktd202x driver"). The
           # MAINTAINERS reminder on the new doc file is answered by the

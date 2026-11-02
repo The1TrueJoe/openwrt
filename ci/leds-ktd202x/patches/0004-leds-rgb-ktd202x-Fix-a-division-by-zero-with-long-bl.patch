@@ -1,4 +1,4 @@
-From 10e031ed76ccba65a05e5ea14fc0a251bc04759c Mon Sep 17 00:00:00 2001
+From a3e10fb40dee78a37bd12356f1d56c86cc5d0ac7 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Tue, 27 Oct 2026 00:01:02 -0400
 Subject: [PATCH 04/11] leds: rgb: ktd202x: Fix a division by zero with long
@@ -18,9 +18,10 @@ trigger's sysfs files:
 
 Saturate the sum, and compute the on time with mul_u64_u64_div_u64().
 
+Found with an LLM coding assistant while reviewing the driver.
+
 Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
 Cc: stable@vger.kernel.org
-Assisted-by: LLM
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/leds/rgb/leds-ktd202x.c | 9 ++++++---

@@ -1,4 +1,4 @@
-From 1517096a2f9336428633708967bda8e7a8c7b0bd Mon Sep 17 00:00:00 2001
+From 6976d8eb50108e393126bd46e2b3cb7c5d08598b Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 08/11] leds: rgb: ktd202x: Add hardware pattern support
@@ -16,7 +16,6 @@ pattern trigger plays as the same breath, repeated forever.
 blink_set now clears the ramp times, so a blink after a pattern stays
 sharp.
 
-Assisted-by: LLM
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  Documentation/leds/index.rst        |   1 +
