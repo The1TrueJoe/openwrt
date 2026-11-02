@@ -1,7 +1,7 @@
-From 32df634e80dfc0d8580baa45677408366d7dea62 Mon Sep 17 00:00:00 2001
+From 8dea8a096bcd6dec8ae5ecae4f3520e7aa3a0948 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:31 -0400
-Subject: [PATCH 05/10] dt-bindings: leds: kinetic,ktd202x: Add Etek ET6326
+Subject: [PATCH 06/11] dt-bindings: leds: kinetic,ktd202x: Add Etek ET6326
 
 The Etek ET6326 is a 3 channel LED driver with the register map, the I2C
 address and the current steps of the KTD2026. It only differs in the

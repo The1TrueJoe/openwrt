@@ -234,6 +234,20 @@ int main(void)
 	CHECK(ret == 0 && hw[7] == 191 && CH(1) == 2, "blink: IOUT %u, green mode %d", hw[7], CH(1));
 	leds[0]->brightness_set_blocking(leds[0], 0);
 
+	printf("Sashiko: a color with no brightness stays off when blinking or breathing\n");
+	mc->subled_info[2].intensity = 0;
+	leds[0]->brightness_set_blocking(leds[0], 192);
+	CHECK(CH(1) == 1 && CH(2) == 0 && hw[8] == 191, "blue intensity 0: green mode %d, blue off (mode %d) with a stale IOUT %u", CH(1), CH(2), hw[8]);
+	ret = blink(0, 500, 500, &on, &off);
+	CHECK(ret == 0 && CH(1) == 2 && CH(2) == 0, "blink: green mode %d, blue mode %d", CH(1), CH(2));
+	ret = blink(0, 500, 0, &on, &off);
+	CHECK(ret == 0 && CH(1) == 1 && CH(2) == 0, "never off: green mode %d, blue mode %d", CH(1), CH(2));
+	struct led_pattern mp[4] = { { 1000, 0 }, { 1000, 192 }, { 1000, 192 }, { 1000, 0 } };
+	ret = leds[0]->pattern_set(leds[0], mp, 4, -1);
+	CHECK(ret == 0 && CH(1) == 2 && CH(2) == 0, "breathe: ret %d, green mode %d, blue mode %d", ret, CH(1), CH(2));
+	leds[0]->pattern_clear(leds[0]);
+	CHECK(CH(0) == 0 && CH(1) == 0 && CH(2) == 0, "pattern_clear: all off");
+
 	printf("absent chip\n");
 	fail_io = 1;
 	ret = probe(&ktd2026_info, 2, 0);

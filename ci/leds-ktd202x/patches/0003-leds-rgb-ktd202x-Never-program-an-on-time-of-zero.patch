@@ -1,7 +1,7 @@
-From 5fedbaa5a984076a756a73ad210a7c7fa7d01dae Mon Sep 17 00:00:00 2001
+From 928b48045c9ad82e24ffe1ce0864049f3373b671 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:25:12 -0400
-Subject: [PATCH 03/10] leds: rgb: ktd202x: Never program an on time of zero
+Subject: [PATCH 03/11] leds: rgb: ktd202x: Never program an on time of zero
 
 blink_set() turns delay_on into a fraction of the period in 1/256 steps.
 When delay_on is less than 1/256 of the period, for example 1 ms on and

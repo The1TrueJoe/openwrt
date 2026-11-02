@@ -1,7 +1,7 @@
-From 32eb07c2c43dfd56a0518141b9c7bc005b0df782 Mon Sep 17 00:00:00 2001
+From c26f52addc7c7e42165197e64412a4e4fc42dbe9 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
-Subject: [PATCH 06/10] leds: rgb: ktd202x: Add Etek ET6326 support
+Subject: [PATCH 07/11] leds: rgb: ktd202x: Add Etek ET6326 support
 
 The Etek ET6326 is a KTD2026 with a different flash period encoding:
 Reg1 = n selects (n + 1) * 128 ms, from 128 ms to 16.38 s, where the
@@ -40,7 +40,7 @@ index 6e9ab5f60..3a57e5819 100644
  
  	  To compile this driver as a module, choose M here: the module
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index feea33b7e..57534fad5 100644
+index 042de16c2..8a0497ab4 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -5,6 +5,7 @@
@@ -111,7 +111,7 @@ index feea33b7e..57534fad5 100644
  	unsigned long delay_total_ms;
  	int ret, num_steps, on;
  	u8 ctrl_mask = 0;
-@@ -300,11 +328,11 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+@@ -304,11 +332,11 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
  	/* Integer representation of time of flash period */
  	if (check_add_overflow(*delay_on, *delay_off, &delay_total_ms))
  		delay_total_ms = ULONG_MAX;
@@ -126,7 +126,7 @@ index feea33b7e..57534fad5 100644
  				  KTD202X_FLASH_PERIOD_STEP_MS);
  
  	/*
-@@ -315,8 +343,9 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+@@ -319,8 +347,9 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
  	on = clamp(on, 1, KTD202X_FLASH_ON_MAX - 1);
  
  	/* Actually used delay_{on,off} values */
@@ -138,7 +138,7 @@ index feea33b7e..57534fad5 100644
  	*delay_off = delay_total_ms - *delay_on;
  
  	/* Set timings */
-@@ -543,8 +572,8 @@ static const struct regmap_config ktd202x_regmap_config = {
+@@ -548,8 +577,8 @@ static const struct regmap_config ktd202x_regmap_config = {
  static int ktd202x_probe(struct i2c_client *client)
  {
  	struct device *dev = &client->dev;
@@ -148,7 +148,7 @@ index feea33b7e..57534fad5 100644
  	int count;
  	int ret;
  
-@@ -552,13 +581,17 @@ static int ktd202x_probe(struct i2c_client *client)
+@@ -557,13 +586,17 @@ static int ktd202x_probe(struct i2c_client *client)
  	if (!count || count > KTD202X_MAX_LEDS)
  		return dev_err_probe(dev, -EINVAL, "Incorrect number of leds (%d)", count);
  
@@ -169,7 +169,7 @@ index feea33b7e..57534fad5 100644
  	chip->dev = dev;
  	i2c_set_clientdata(client, chip);
  
-@@ -618,15 +651,17 @@ static void ktd202x_shutdown(struct i2c_client *client)
+@@ -623,15 +656,17 @@ static void ktd202x_shutdown(struct i2c_client *client)
  }
  
  static const struct i2c_device_id ktd202x_id[] = {
@@ -191,7 +191,7 @@ index feea33b7e..57534fad5 100644
  	{}
  };
  MODULE_DEVICE_TABLE(of, ktd202x_match_table);
-@@ -644,5 +679,5 @@ static struct i2c_driver ktd202x_driver = {
+@@ -649,5 +684,5 @@ static struct i2c_driver ktd202x_driver = {
  module_i2c_driver(ktd202x_driver);
  
  MODULE_AUTHOR("André Apitzsch <git@apitzsch.eu>");
