@@ -6,9 +6,9 @@ for-leds-next 59cf91cf8 (still its tip on 2026-11-03). b4 tracks it as
 revision 2, with v1's Message-Id in its history, so v2 threads under
 "Link to v1".
 
-NOT READY TO SEND YET. The cover's "Tested on" block has a PENDING marker
-for the pattern steps on the Opal. This bundle is rebuilt once they pass and
-the marker comes out. Send from ONE Mac only, around 2026-11-09.
+NOT READY TO SEND YET. The cover's "Tested on" block has one PENDING marker,
+for the owner's look at the breathing on the Opal. This bundle is rebuilt
+when the marker comes out. Send from ONE Mac only, around 2026-11-09.
 
 Use the linux-leds clone that sent v1.
 
@@ -21,7 +21,7 @@ Use the linux-leds clone that sent v1.
        git checkout b4/ktd202x-et6326
        rm ktd202x-et6326.bundle
 
-   `git rev-parse --short HEAD` must print 8f6a2e4ab.
+   `git rev-parse --short HEAD` must print 2bbfff93d.
 
 2. Check, then send once:
 
