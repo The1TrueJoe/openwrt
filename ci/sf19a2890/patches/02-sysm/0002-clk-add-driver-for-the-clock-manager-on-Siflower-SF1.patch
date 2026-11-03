@@ -1,4 +1,4 @@
-From 9c5653815d79a1d6e82dacbb266999bd6d57d0bc Mon Sep 17 00:00:00 2001
+From 9751dea0fa7ba533e0ab836ac7c264c39fd8a081 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
 Subject: [PATCH 2/4] clk: add driver for the clock manager on Siflower

@@ -1,4 +1,4 @@
-From aec145aeb234eeb21dc8aab26e2e591ee6265aff Mon Sep 17 00:00:00 2001
+From 2c307817f9a307a4fb0bc1c7c8b714a5fedc6d41 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:03:34 -0500
 Subject: [PATCH 2/2] net: stmmac: Add Siflower SF19A2890 glue
@@ -8,6 +8,11 @@ interface type is set in the GMAC's configuration block through the
 set_phy_intf_sel hook, and so are the RGMII clock delays, which the
 MAC adds only where rx-internal-delay-ps or tx-internal-delay-ps is
 present.
+
+The delay line's step is not documented. Sweeping each delay over its
+whole range with the link at 1000 Mb/s, the working windows repeat every
+145 steps, one 8 ns clock period, so a step is about 55 ps; the driver
+rounds to the nearest step.
 
 Based on Chuanhong Guo's driver from OpenWrt and his siflower-7.1
 branch, which read the delays from a factory flash cell in the delay
@@ -21,8 +26,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  MAINTAINERS                                   |   1 +
  drivers/net/ethernet/stmicro/stmmac/Kconfig   |  11 ++
  drivers/net/ethernet/stmicro/stmmac/Makefile  |   1 +
- .../ethernet/stmicro/stmmac/dwmac-sf19a2890.c | 160 ++++++++++++++++++
- 4 files changed, 173 insertions(+)
+ .../ethernet/stmicro/stmmac/dwmac-sf19a2890.c | 159 ++++++++++++++++++
+ 4 files changed, 172 insertions(+)
  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
@@ -73,10 +78,10 @@ index b16a456b7..9330de094 100644
  obj-$(CONFIG_DWMAC_SPACEMIT)	+= dwmac-spacemit.o
 diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
 new file mode 100644
-index 000000000..be307fbe6
+index 000000000..e2a72d82b
 --- /dev/null
 +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
-@@ -0,0 +1,160 @@
+@@ -0,0 +1,159 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Siflower SF19A2890 GMAC glue
@@ -90,6 +95,7 @@ index 000000000..be307fbe6
 +#include <linux/bitfield.h>
 +#include <linux/clk.h>
 +#include <linux/io.h>
++#include <linux/math.h>
 +#include <linux/module.h>
 +#include <linux/of.h>
 +#include <linux/platform_device.h>
@@ -106,10 +112,10 @@ index 000000000..be307fbe6
 +#define  SF19A2890_DELAY_MAX		0xff
 +
 +/*
-+ * PLACEHOLDER: the delay line step is not known yet. It is to be measured
-+ * on hardware (or taken from Siflower) before this driver is posted.
++ * The delay line's step is not documented. Sweeping a full 8 ns RGMII clock
++ * period at 1000 Mb/s takes 145 steps, so one step is about 55 ps.
 + */
-+#define SF19A2890_DELAY_STEP_PS		100
++#define SF19A2890_DELAY_STEP_PS		55
 +
 +struct sf19a2890_gmac {
 +	struct device *dev;
@@ -144,12 +150,10 @@ index 000000000..be307fbe6
 +	if (of_property_read_u32(gmac->dev->of_node, prop, &ps))
 +		return 0;
 +
-+	if (ps % SF19A2890_DELAY_STEP_PS ||
-+	    ps / SF19A2890_DELAY_STEP_PS > SF19A2890_DELAY_MAX)
++	*steps = DIV_ROUND_CLOSEST(ps, SF19A2890_DELAY_STEP_PS);
++	if (*steps > SF19A2890_DELAY_MAX)
 +		return dev_err_probe(gmac->dev, -EINVAL,
-+				     "invalid %s: %u\n", prop, ps);
-+
-+	*steps = ps / SF19A2890_DELAY_STEP_PS;
++				     "%s too large: %u\n", prop, ps);
 +
 +	return 0;
 +}

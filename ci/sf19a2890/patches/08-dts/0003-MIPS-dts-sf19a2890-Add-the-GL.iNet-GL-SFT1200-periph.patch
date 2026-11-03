@@ -1,4 +1,4 @@
-From 98739d569a08fef62027368bc86faafecf695b0a Mon Sep 17 00:00:00 2001
+From 96a670e63756235538b4de5d20fac24e3bf9b10b Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 3/4] MIPS: dts: sf19a2890: Add the GL.iNet GL-SFT1200
@@ -11,7 +11,8 @@ Describe the rest of the GL.iNet GL-SFT1200 ("Opal"):
   partition;
 - the MaxLinear GSW150 switch on the GMAC's MDIO bus, with its WAN
   port and two LAN ports and the GMAC on its RGMII port; the GMAC adds
-  both RGMII clock delays;
+  both RGMII clock delays, 935 ps TX and 550 ps RX, the delays the
+  bootloader sets, which sit inside the windows a sweep finds;
 - the Etek ET6326 LED driver on I2C, with the blue status and white
   WAN lights;
 - the USB 2.0 host port.
@@ -26,7 +27,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  1 file changed, 223 insertions(+)
 
 diff --git a/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts b/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
-index 13e6a0c8b..242750d79 100644
+index 13e6a0c8b..6f10a02fa 100644
 --- a/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
 +++ b/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
 @@ -2,6 +2,10 @@
@@ -65,8 +66,8 @@ index 13e6a0c8b..242750d79 100644
 +
 +&gmac {
 +	phy-mode = "rgmii-id";
-+	tx-internal-delay-ps = <1700>;
-+	rx-internal-delay-ps = <1000>;
++	tx-internal-delay-ps = <935>;
++	rx-internal-delay-ps = <550>;
 +	nvmem-cells = <&macaddr_factory_0 0>;
 +	nvmem-cell-names = "mac-address";
 +
