@@ -1,41 +1,37 @@
-From 6ee97b556b8b91a41539bf1e3a1b9a1f9e94561f Mon Sep 17 00:00:00 2001
+From 891980233b9ae596beacbe99785dfb0cc3b5f748 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
-Subject: [PATCH 1/3] MIPS: dts: sf19a2890: Describe the system manager and
- peripherals
+Subject: [PATCH 2/4] MIPS: dts: sf19a2890: Describe the clocks and peripherals
 
-Replace the fixed clocks that stood in for the system manager with the
-system manager itself, which provides the SoC's clocks and resets, and
-add the peripherals that have drivers: the pin and GPIO controllers,
-the GMAC, the USB controller and its PHY, the I2C and SPI controllers,
-the other two UARTs and the watchdog. The system manager also holds
-the reboot register.
+Replace the fixed clocks that stood in for the clock manager with the
+clock manager itself, add each peripheral block's clock and reset
+manager, and add the peripherals that have drivers: the pin and GPIO
+controllers, the GMAC, the USB controller and its PHY, the I2C and SPI
+controllers, the other two UARTs and the watchdog. The system
+controller holds the reboot register.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- arch/mips/boot/dts/siflower/sf19a2890.dtsi | 286 +++++++++++++++++++--
- 1 file changed, 270 insertions(+), 16 deletions(-)
+ arch/mips/boot/dts/siflower/sf19a2890.dtsi | 390 ++++++++++++++++++++-
+ 1 file changed, 374 insertions(+), 16 deletions(-)
 
 diff --git a/arch/mips/boot/dts/siflower/sf19a2890.dtsi b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
-index 3a4b39971..e8f6c7d86 100644
+index 3a4b39971..3b1e50edd 100644
 --- a/arch/mips/boot/dts/siflower/sf19a2890.dtsi
 +++ b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
-@@ -1,7 +1,9 @@
+@@ -1,5 +1,6 @@
  // SPDX-License-Identifier: GPL-2.0-or-later OR MIT
  
-+#include <dt-bindings/clock/siflower,sf19a2890-sysm.h>
++#include <dt-bindings/clock/siflower,sf19a2890-clk.h>
  #include <dt-bindings/interrupt-controller/irq.h>
  #include <dt-bindings/interrupt-controller/mips-gic.h>
-+#include <dt-bindings/reset/siflower,sf19a2890-sysm.h>
  
- / {
- 	compatible = "siflower,sf19a2890";
-@@ -16,51 +18,57 @@ cpu@0 {
+@@ -16,51 +17,47 @@ cpu@0 {
  			device_type = "cpu";
  			compatible = "mti,interaptiv";
  			reg = <0>;
 -			clocks = <&cpu_clk>;
-+			clocks = <&sysm CLK_MUXDIV_CPU>;
++			clocks = <&clk CLK_MUXDIV_CPU>;
  		};
  
  		cpu@1 {
@@ -43,7 +39,7 @@ index 3a4b39971..e8f6c7d86 100644
  			compatible = "mti,interaptiv";
  			reg = <1>;
 -			clocks = <&cpu_clk>;
-+			clocks = <&sysm CLK_MUXDIV_CPU>;
++			clocks = <&clk CLK_MUXDIV_CPU>;
  		};
  
  		cpu@2 {
@@ -51,7 +47,7 @@ index 3a4b39971..e8f6c7d86 100644
  			compatible = "mti,interaptiv";
  			reg = <2>;
 -			clocks = <&cpu_clk>;
-+			clocks = <&sysm CLK_MUXDIV_CPU>;
++			clocks = <&clk CLK_MUXDIV_CPU>;
  		};
  
  		cpu@3 {
@@ -59,7 +55,7 @@ index 3a4b39971..e8f6c7d86 100644
  			compatible = "mti,interaptiv";
  			reg = <3>;
 -			clocks = <&cpu_clk>;
-+			clocks = <&sysm CLK_MUXDIV_CPU>;
++			clocks = <&clk CLK_MUXDIV_CPU>;
  		};
  	};
  
@@ -89,36 +85,24 @@ index 3a4b39971..e8f6c7d86 100644
  		#clock-cells = <0>;
 -		clock-frequency = <125000000>;
 +		clock-frequency = <40000000>;
-+	};
-+
-+	usb_phy: usb-phy {
-+		compatible = "siflower,sf19a2890-usb-phy";
-+		clocks = <&sysm CLK_USBPHY_REF>;
-+		resets = <&sysm RST_USB_PHY_POR>, <&sysm RST_USB_PHY>;
-+		reset-names = "por", "phy";
-+		siflower,sysm = <&sysm>;
-+		#phy-cells = <0>;
-+		status = "disabled";
  	};
  
  	soc {
-@@ -70,15 +78,261 @@ soc {
+@@ -70,15 +67,376 @@ soc {
  		ranges;
  		interrupt-parent = <&gic>;
  
 +		gmac: ethernet@10800000 {
 +			compatible = "siflower,sf19a2890-gmac", "snps,dwmac";
-+			reg = <0x10800000 0x200000>;
++			reg = <0x10800000 0x200000>, <0x19e04440 0x10>;
 +			interrupts = <GIC_SHARED 32 IRQ_TYPE_LEVEL_HIGH>,
 +				     <GIC_SHARED 34 IRQ_TYPE_LEVEL_HIGH>,
 +				     <GIC_SHARED 33 IRQ_TYPE_LEVEL_HIGH>;
 +			interrupt-names = "macirq", "eth_wake_irq", "eth_lpi";
-+			clocks = <&sysm CLK_GMAC>, <&sysm CLK_GMAC_PCLK>,
-+				 <&sysm CLK_GMAC_ETH_TSU>, <&sysm CLK_GMAC_BYP_REF>;
++			clocks = <&gmac_crm 0>, <&gmac_crm 1>, <&gmac_crm 3>, <&gmac_crm 2>;
 +			clock-names = "stmmaceth", "pclk", "ptp_ref", "byp_ref";
-+			resets = <&sysm RST_GMAC>;
++			resets = <&gmac_crm 0>;
 +			reset-names = "stmmaceth";
-+			siflower,sysm = <&sysm>;
 +			pinctrl-names = "default";
 +			pinctrl-0 = <&rgmii_pins>, <&mdio_pins>;
 +			status = "disabled";
@@ -134,9 +118,9 @@ index 3a4b39971..e8f6c7d86 100644
 +			compatible = "siflower,sf19a2890-usb";
 +			reg = <0x17000000 0x40000>;
 +			interrupts = <GIC_SHARED 128 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sysm CLK_USB>;
++			clocks = <&usb_crm 0>;
 +			clock-names = "otg";
-+			resets = <&sysm RST_USB>;
++			resets = <&usb_crm 0>;
 +			reset-names = "dwc2";
 +			phys = <&usb_phy>;
 +			phy-names = "usb2-phy";
@@ -148,8 +132,8 @@ index 3a4b39971..e8f6c7d86 100644
 +			compatible = "snps,designware-i2c";
 +			reg = <0x18100000 0x1000>;
 +			interrupts = <GIC_SHARED 217 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sysm CLK_I2C0>;
-+			resets = <&sysm RST_I2C0>;
++			clocks = <&i2c_crm 0>;
++			resets = <&i2c_crm 0>;
 +			pinctrl-names = "default";
 +			pinctrl-0 = <&i2c0_pins>;
 +			#address-cells = <1>;
@@ -161,9 +145,9 @@ index 3a4b39971..e8f6c7d86 100644
 +			compatible = "arm,pl022", "arm,primecell";
 +			reg = <0x18202000 0x1000>;
 +			interrupts = <GIC_SHARED 225 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sysm CLK_SPI_SSP>, <&sysm CLK_SPI_APB>;
++			clocks = <&spi_crm 1>, <&spi_crm 0>;
 +			clock-names = "sspclk", "apb_pclk";
-+			resets = <&sysm RST_SPI>;
++			resets = <&spi_crm 0>;
 +			pinctrl-names = "default";
 +			pinctrl-0 = <&spi_pins>;
 +			#address-cells = <1>;
@@ -176,21 +160,21 @@ index 3a4b39971..e8f6c7d86 100644
  			reg = <0x18300000 0x1000>;
  			interrupts = <GIC_SHARED 226 IRQ_TYPE_LEVEL_HIGH>;
 -			clocks = <&uart_clk>, <&pbus_clk>;
-+			clocks = <&sysm CLK_UART0>, <&sysm CLK_UART0_APB>;
-+			clock-names = "uartclk", "apb_pclk";
-+			resets = <&sysm RST_UART0>;
++			clocks = <&uart_crm 3>, <&uart_crm 0>;
+ 			clock-names = "uartclk", "apb_pclk";
++			resets = <&uart_crm 0>;
 +			pinctrl-names = "default";
 +			pinctrl-0 = <&uart0_pins>;
-+			status = "disabled";
-+		};
-+
+ 			status = "disabled";
+ 		};
+ 
 +		uart1: serial@18301000 {
 +			compatible = "arm,pl011", "arm,primecell";
 +			reg = <0x18301000 0x1000>;
 +			interrupts = <GIC_SHARED 227 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sysm CLK_UART1>, <&sysm CLK_UART1_APB>;
++			clocks = <&uart_crm 4>, <&uart_crm 1>;
 +			clock-names = "uartclk", "apb_pclk";
-+			resets = <&sysm RST_UART1>;
++			resets = <&uart_crm 1>;
 +			pinctrl-names = "default";
 +			pinctrl-0 = <&uart1_pins>;
 +			status = "disabled";
@@ -200,20 +184,20 @@ index 3a4b39971..e8f6c7d86 100644
 +			compatible = "arm,pl011", "arm,primecell";
 +			reg = <0x18302000 0x1000>;
 +			interrupts = <GIC_SHARED 228 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sysm CLK_UART2>, <&sysm CLK_UART2_APB>;
- 			clock-names = "uartclk", "apb_pclk";
-+			resets = <&sysm RST_UART2>;
++			clocks = <&uart_crm 5>, <&uart_crm 2>;
++			clock-names = "uartclk", "apb_pclk";
++			resets = <&uart_crm 2>;
 +			pinctrl-names = "default";
 +			pinctrl-0 = <&uart2_pins>;
- 			status = "disabled";
- 		};
- 
++			status = "disabled";
++		};
++
 +		watchdog: watchdog@18700000 {
 +			compatible = "snps,dw-wdt";
 +			reg = <0x18700000 0x1000>;
 +			interrupts = <GIC_SHARED 238 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sysm CLK_WDT>;
-+			resets = <&sysm RST_WDT>;
++			clocks = <&wdt_crm 0>;
++			resets = <&wdt_crm 0>;
 +		};
 +
 +		gpio: gpio@19d00000 {
@@ -223,8 +207,8 @@ index 3a4b39971..e8f6c7d86 100644
 +				     <GIC_SHARED 247 IRQ_TYPE_LEVEL_HIGH>,
 +				     <GIC_SHARED 248 IRQ_TYPE_LEVEL_HIGH>,
 +				     <GIC_SHARED 249 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sysm CLK_GPIO>;
-+			resets = <&sysm RST_GPIO>;
++			clocks = <&gpio_crm 0>;
++			resets = <&gpio_crm 0>;
 +			gpio-controller;
 +			#gpio-cells = <2>;
 +			ngpios = <49>;
@@ -233,19 +217,136 @@ index 3a4b39971..e8f6c7d86 100644
 +			#interrupt-cells = <2>;
 +		};
 +
-+		sysm: clock-controller@19e00000 {
-+			compatible = "siflower,sf19a2890-sysm", "syscon";
-+			reg = <0x19e00000 0x30000>;
-+			clocks = <&osc12m>, <&osc40m>, <&osc32k>;
-+			clock-names = "osc12m", "osc40m", "osc32k";
++		clk: clock-controller@19e01000 {
++			compatible = "siflower,sf19a2890-clk";
++			reg = <0x19e01000 0x800>;
++			clocks = <&osc12m>, <&osc40m>;
++			clock-names = "osc12m", "osc40m";
 +			#clock-cells = <1>;
-+			#reset-cells = <1>;
++		};
++
++		sysctl: syscon@19e02000 {
++			compatible = "siflower,sf19a2890-sysctl", "syscon", "simple-mfd";
++			reg = <0x19e02000 0x100>;
 +
 +			reboot {
 +				compatible = "syscon-reboot";
-+				offset = <0x2030>;
++				offset = <0x30>;
 +				value = <0x1>;
 +			};
++		};
++
++		gmac_crm: clock-controller@19e04400 {
++			compatible = "siflower,sf19a2890-gmac-crm";
++			reg = <0x19e04400 0x10>;
++			clocks = <&clk CLK_MUXDIV_BUS1>, <&clk CLK_MUXDIV_CPU>,
++				 <&clk CLK_MUXDIV_GMAC_BYP_REF>, <&clk CLK_MUXDIV_ETH_TSU>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		wlan24_crm: clock-controller@19e08000 {
++			compatible = "siflower,sf19a2890-wlan24-crm";
++			reg = <0x19e08000 0x10>;
++			clocks = <&clk CLK_MUXDIV_CPU>, <&clk CLK_MUXDIV_BUS2>,
++				 <&clk CLK_MUXDIV_WLAN24_PLF>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		rf_crm: clock-controller@19e08800 {
++			compatible = "siflower,sf19a2890-rf-crm";
++			reg = <0x19e08800 0x10>;
++			clocks = <&clk CLK_MUXDIV_BUS2>, <&clk CLK_MUXDIV_CPU>,
++				 <&osc12m>, <&osc32k>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		usb_crm: clock-controller@19e0c000 {
++			compatible = "siflower,sf19a2890-usb-crm";
++			reg = <0x19e0c000 0x10>;
++			clocks = <&clk CLK_MUXDIV_BUS3>, <&clk CLK_MUXDIV_CPU>,
++				 <&clk CLK_MUXDIV_USBPHY_REF>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		usb_phy: usb-phy@19e0c040 {
++			compatible = "siflower,sf19a2890-usb-phy";
++			reg = <0x19e0c040 0x60>;
++			clocks = <&usb_crm 2>;
++			resets = <&usb_crm 1>, <&usb_crm 2>;
++			reset-names = "por", "phy";
++			#phy-cells = <0>;
++			status = "disabled";
++		};
++
++		wlan5_crm: clock-controller@19e0c400 {
++			compatible = "siflower,sf19a2890-wlan5-crm";
++			reg = <0x19e0c400 0x10>;
++			clocks = <&clk CLK_MUXDIV_CPU>, <&clk CLK_MUXDIV_BUS2>,
++				 <&clk CLK_MUXDIV_WLAN5_PLF>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		i2c_crm: clock-controller@19e24400 {
++			compatible = "siflower,sf19a2890-i2c-crm";
++			reg = <0x19e24400 0x10>;
++			clocks = <&clk CLK_MUXDIV_PBUS>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		spi_crm: clock-controller@19e24800 {
++			compatible = "siflower,sf19a2890-spi-crm";
++			reg = <0x19e24800 0x10>;
++			clocks = <&clk CLK_MUXDIV_PBUS>, <&clk CLK_MUXDIV_PBUS>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		uart_crm: clock-controller@19e24c00 {
++			compatible = "siflower,sf19a2890-uart-crm";
++			reg = <0x19e24c00 0x10>;
++			clocks = <&clk CLK_MUXDIV_PBUS>, <&clk CLK_MUXDIV_PBUS>,
++				 <&clk CLK_MUXDIV_PBUS>, <&clk CLK_MUXDIV_UART>,
++				 <&clk CLK_MUXDIV_UART>, <&clk CLK_MUXDIV_UART>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		pwm_crm: clock-controller@19e25400 {
++			compatible = "siflower,sf19a2890-pwm-crm";
++			reg = <0x19e25400 0x10>;
++			clocks = <&clk CLK_MUXDIV_PBUS>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		timer_crm: clock-controller@19e25800 {
++			compatible = "siflower,sf19a2890-timer-crm";
++			reg = <0x19e25800 0x10>;
++			clocks = <&clk CLK_MUXDIV_PBUS>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		wdt_crm: clock-controller@19e25c00 {
++			compatible = "siflower,sf19a2890-wdt-crm";
++			reg = <0x19e25c00 0x10>;
++			clocks = <&clk CLK_MUXDIV_PBUS>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		gpio_crm: clock-controller@19e2b400 {
++			compatible = "siflower,sf19a2890-gpio-crm";
++			reg = <0x19e2b400 0x10>;
++			clocks = <&clk CLK_MUXDIV_PBUS>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
 +		};
 +
 +		pinctrl: pinctrl@19e3fc00 {
@@ -365,12 +466,12 @@ index 3a4b39971..e8f6c7d86 100644
  		gic: interrupt-controller@1bdc0000 {
  			compatible = "mti,gic";
  			reg = <0x1bdc0000 0x20000>;
-@@ -89,7 +343,7 @@ gic: interrupt-controller@1bdc0000 {
+@@ -89,7 +447,7 @@ gic: interrupt-controller@1bdc0000 {
  			timer {
  				compatible = "mti,gic-timer";
  				interrupts = <GIC_LOCAL 1 IRQ_TYPE_NONE>;
 -				clocks = <&cpu_clk>;
-+				clocks = <&sysm CLK_MUXDIV_CPU>;
++				clocks = <&clk CLK_MUXDIV_CPU>;
  			};
  		};
  	};

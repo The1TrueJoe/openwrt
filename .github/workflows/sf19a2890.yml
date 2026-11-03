@@ -35,9 +35,9 @@ jobs:
             prereq: 01-mips
             tree: clk/linux.git
             branch: clk-next
-            bindings: clock/siflower,sf19a2890-sysm.yaml
-            syms: COMMON_CLK CLK_SF19A2890
-            objs: drivers/clk/siflower/clk-sf19a2890.o
+            bindings: clock/siflower,sf19a2890-clk.yaml clock/siflower,sf19a2890-periph-crm.yaml
+            syms: COMMON_CLK CLK_SF19A2890 CLK_SF19A2890_PERIPHCRM
+            objs: drivers/clk/siflower/clk-sf19a2890.o drivers/clk/siflower/clk-sf19a2890-periphcrm.o
           - series: 03-pinctrl
             prereq: 01-mips
             tree: linusw/linux-pinctrl.git
@@ -251,7 +251,7 @@ jobs:
           echo "dtbs_check W=1: no findings"
           # Every driver the GL-SFT1200 needs must end up built in
           fail=0
-          for s in MACH_SIFLOWER_MIPS CLK_SF19A2890 PINCTRL_SF19A2890 GPIO_SIFLOWER \
+          for s in MACH_SIFLOWER_MIPS CLK_SF19A2890 CLK_SF19A2890_PERIPHCRM PINCTRL_SF19A2890 GPIO_SIFLOWER \
                    PHY_SF19A2890_USB USB_DWC2 DWMAC_SF19A2890 NET_DSA_MXL_GSW1XX \
                    INTEL_XWAY_PHY MTD_SPI_NAND SPI_PL022 I2C_DESIGNWARE_PLATFORM \
                    LEDS_KTD202X KEYBOARD_GPIO DW_WATCHDOG POWER_RESET_SYSCON \
@@ -308,7 +308,7 @@ jobs:
           U=$(realpath ../user)
           mkdir -p ../images
           initramfs() { # id
-            r=../rootfs-$1; rm -rf $r; cp -a $B/rootfs $r
+            r=../rootfs-$1; rm -rf $r; cp -a $B/rootfs $r; mkdir -p $r/etc
             echo "$1" > $r/etc/bench-id
             {
               echo "dir /dev 755 0 0"; echo "nod /dev/console 600 0 0 c 5 1"

@@ -1,24 +1,25 @@
-From eaae0dfef645f669543eb2de83915b8bc4d03a75 Mon Sep 17 00:00:00 2001
-From: Chuanhong Guo <gch981213@gmail.com>
+From 47090c66f7591389fe9a74bb950396713fd39cd0 Mon Sep 17 00:00:00 2001
+From: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
-Subject: [PATCH 2/2] gpio: add support for siflower socs
+Subject: [PATCH 2/2] gpio: add support for GPIO controller on Siflower SoCs
 
-Add support for the GPIO controller on Siflower SoCs.
-This controller is found on Siflower SF19A2890 (MIPS) and SF21A6826
-(RISC-V)
+Add a driver for the GPIO controller on Siflower SoCs.
+This controller is found on all current Siflower MIPS and RISC-V
+chips including SF19A2890, SF21A6826 and SF21H8898.
 
+Signed-off-by: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: from OpenWrt's siflower target; depend on MACH_SIFLOWER_MIPS and OF,
+[jt: from Chuanhong's siflower-7.1 branch; depend on MACH_SIFLOWER_MIPS,
  longer Kconfig help, assert the reset through a devm action instead of
- in .remove, which ran before the GPIO chip was removed, drop .owner,
- MAINTAINERS lines]
+ in .remove, which ran before the GPIO chip was removed, drop .owner and
+ the unused drvdata, MAINTAINERS line]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  MAINTAINERS                  |   1 +
  drivers/gpio/Kconfig         |  11 ++
  drivers/gpio/Makefile        |   1 +
- drivers/gpio/gpio-siflower.c | 345 +++++++++++++++++++++++++++++++++++
- 4 files changed, 358 insertions(+)
+ drivers/gpio/gpio-siflower.c | 352 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 365 insertions(+)
  create mode 100644 drivers/gpio/gpio-siflower.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
@@ -34,7 +35,7 @@ index ed97ad542..6c096f496 100644
  SILEAD TOUCHSCREEN DRIVER
  M:	Hans de Goede <hansg@kernel.org>
 diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 55e428002..fc529a52a 100644
+index 55e428002..48873b939 100644
 --- a/drivers/gpio/Kconfig
 +++ b/drivers/gpio/Kconfig
 @@ -721,6 +721,17 @@ config GPIO_SIFIVE
@@ -42,15 +43,15 @@ index 55e428002..fc529a52a 100644
  	  Say yes here to support the GPIO device on SiFive SoCs.
  
 +config GPIO_SIFLOWER
-+	tristate "Siflower GPIO support"
-+	depends on OF
++	tristate "SiFlower GPIO support"
++	depends on OF_GPIO
 +	depends on MACH_SIFLOWER_MIPS || COMPILE_TEST
 +	select GPIOLIB_IRQCHIP
 +	help
-+	  Say yes here to support the GPIO controller of Siflower SoCs such
-+	  as the SF19A2890. Each line can be an input or an output and raise
-+	  an interrupt on either edge or level, and inputs can be debounced
-+	  in hardware.
++	  GPIO controller driver for SiFlower MIPS and RISC-V SoCs
++	  including SF19A2890, SF21A6826 and SF21H8898. Each line can be an
++	  input or an output and raise an interrupt on either edge or level,
++	  and inputs can be debounced in hardware.
 +
  config GPIO_SIOX
  	tristate "SIOX GPIO support"
@@ -69,20 +70,25 @@ index 88f748846..bde618108 100644
  obj-$(CONFIG_GPIO_SL28CPLD)		+= gpio-sl28cpld.o
 diff --git a/drivers/gpio/gpio-siflower.c b/drivers/gpio/gpio-siflower.c
 new file mode 100644
-index 000000000..09105bfbd
+index 000000000..309a3ae4f
 --- /dev/null
 +++ b/drivers/gpio/gpio-siflower.c
-@@ -0,0 +1,345 @@
+@@ -0,0 +1,352 @@
 +// SPDX-License-Identifier: GPL-2.0+
-+
++/*
++ * GPIO controller driver for Siflower MIPS and RISC-V SoCs including:
++ *  Siflower SF19A2890
++ *  Siflower SF21A6826
++ *  Siflower SF21H8898
++ *
++ */
++#include <linux/pinctrl/consumer.h>
 +#include <linux/clk.h>
 +#include <linux/gpio/driver.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/math64.h>
 +#include <linux/module.h>
-+#include <linux/pinctrl/consumer.h>
 +#include <linux/platform_device.h>
 +#include <linux/reset.h>
++#include <asm/div64.h>
 +
 +#define GPIO_IR(n)	(0x40 * (n) + 0x00)
 +#define GPIO_OR(n)	(0x40 * (n) + 0x04)
@@ -105,6 +111,8 @@ index 000000000..09105bfbd
 +	unsigned int irq[];
 +};
 +
++#define to_sf_gpio(x)	container_of(x, struct sf_gpio_priv, gc)
++
 +static u32 sf_gpio_rd(struct sf_gpio_priv *priv, unsigned long reg)
 +{
 +	return readl_relaxed(priv->base + reg);
@@ -118,7 +126,7 @@ index 000000000..09105bfbd
 +
 +static int sf_gpio_get_value(struct gpio_chip *gc, unsigned int offset)
 +{
-+	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
++	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +
 +	return sf_gpio_rd(priv, GPIO_IR(offset));
 +}
@@ -126,7 +134,7 @@ index 000000000..09105bfbd
 +static int sf_gpio_set_value(struct gpio_chip *gc, unsigned int offset,
 +			     int value)
 +{
-+	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
++	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +
 +	sf_gpio_wr(priv, GPIO_OR(offset), value);
 +	return 0;
@@ -134,7 +142,7 @@ index 000000000..09105bfbd
 +
 +static int sf_gpio_get_direction(struct gpio_chip *gc, unsigned int offset)
 +{
-+	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
++	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +
 +	if (sf_gpio_rd(priv, GPIO_OEN(offset)))
 +		return GPIO_LINE_DIRECTION_IN;
@@ -144,7 +152,7 @@ index 000000000..09105bfbd
 +
 +static int sf_gpio_direction_input(struct gpio_chip *gc, unsigned int offset)
 +{
-+	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
++	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +
 +	sf_gpio_wr(priv, GPIO_OEN(offset), 1);
 +	return 0;
@@ -153,7 +161,7 @@ index 000000000..09105bfbd
 +static int sf_gpio_direction_output(struct gpio_chip *gc, unsigned int offset,
 +				    int value)
 +{
-+	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
++	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +
 +	sf_gpio_wr(priv, GPIO_OR(offset), value);
 +	sf_gpio_wr(priv, GPIO_OEN(offset), 0);
@@ -163,7 +171,7 @@ index 000000000..09105bfbd
 +static int sf_gpio_set_debounce(struct gpio_chip *gc, unsigned int offset,
 +				u32 debounce)
 +{
-+	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
++	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +	unsigned long freq = clk_get_rate(priv->clk);
 +	u64 mul;
 +
@@ -194,7 +202,7 @@ index 000000000..09105bfbd
 +static void sf_gpio_irq_ack(struct irq_data *data)
 +{
 +	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-+	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
++	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +	unsigned long offset = irqd_to_hwirq(data);
 +
 +	sf_gpio_wr(priv, GPIO_PIR(offset), 0);
@@ -203,7 +211,7 @@ index 000000000..09105bfbd
 +static void sf_gpio_irq_mask(struct irq_data *data)
 +{
 +	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-+	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
++	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +	unsigned long offset = irqd_to_hwirq(data);
 +
 +	sf_gpio_wr(priv, GPIO_IMR(offset), 1);
@@ -213,7 +221,7 @@ index 000000000..09105bfbd
 +static void sf_gpio_irq_unmask(struct irq_data *data)
 +{
 +	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-+	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
++	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +	unsigned long offset = irqd_to_hwirq(data);
 +
 +	sf_gpio_wr(priv, GPIO_IMR(offset), 0);
@@ -258,7 +266,7 @@ index 000000000..09105bfbd
 +static int sf_gpio_irq_set_type(struct irq_data *data, unsigned int flow_type)
 +{
 +	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-+	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
++	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +	unsigned long offset = irqd_to_hwirq(data);
 +	u32 val;
 +
@@ -306,7 +314,7 @@ index 000000000..09105bfbd
 +{
 +	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
 +	struct irq_chip *ic = irq_desc_get_chip(desc);
-+	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
++	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +	unsigned int irq = irq_desc_get_irq(desc);
 +	unsigned int group = irq - priv->irq[0];
 +	unsigned long pending;

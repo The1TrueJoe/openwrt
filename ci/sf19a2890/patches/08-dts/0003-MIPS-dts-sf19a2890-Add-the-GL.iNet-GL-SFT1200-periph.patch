@@ -1,7 +1,7 @@
-From 3fe2652e16dae239aff668b09d74254c51e7ca94 Mon Sep 17 00:00:00 2001
+From 1848d75b8351cdde122ef659a6b4f20dec1e915f Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
-Subject: [PATCH 2/3] MIPS: dts: sf19a2890: Add the GL.iNet GL-SFT1200
+Subject: [PATCH 3/4] MIPS: dts: sf19a2890: Add the GL.iNet GL-SFT1200
  peripherals
 
 Describe the rest of the GL.iNet GL-SFT1200 ("Opal"):

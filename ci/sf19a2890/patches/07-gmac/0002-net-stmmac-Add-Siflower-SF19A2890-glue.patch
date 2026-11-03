@@ -1,24 +1,28 @@
-From 8f714a3d4d5f0ab31aa71ac456ff7a17498d0ecb Mon Sep 17 00:00:00 2001
+From aec145aeb234eeb21dc8aab26e2e591ee6265aff Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:03:34 -0500
 Subject: [PATCH 2/2] net: stmmac: Add Siflower SF19A2890 glue
 
 Add the glue for the DesignWare GMAC of the Siflower SF19A2890. The
-interface type is set in the SoC's system manager through the
+interface type is set in the GMAC's configuration block through the
 set_phy_intf_sel hook, and so are the RGMII clock delays, which the
 MAC adds only where rx-internal-delay-ps or tx-internal-delay-ps is
 present.
 
-Based on the OpenWrt driver by Chuanhong Guo, which read the delays
-from a factory flash cell in the delay line's own units.
+Based on Chuanhong Guo's driver from OpenWrt and his siflower-7.1
+branch, which read the delays from a factory flash cell in the delay
+line's own units and always applied them. That driver also set
+STMMAC_FLAG_HAS_INTEGRATED_PCS, because the core reports a PCS that
+does not work in RGMII mode; stmmac now uses the integrated PCS only
+for SGMII, and the flag is gone.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  MAINTAINERS                                   |   1 +
- drivers/net/ethernet/stmicro/stmmac/Kconfig   |  12 ++
+ drivers/net/ethernet/stmicro/stmmac/Kconfig   |  11 ++
  drivers/net/ethernet/stmicro/stmmac/Makefile  |   1 +
- .../ethernet/stmicro/stmmac/dwmac-sf19a2890.c | 162 ++++++++++++++++++
- 4 files changed, 176 insertions(+)
+ .../ethernet/stmicro/stmmac/dwmac-sf19a2890.c | 160 ++++++++++++++++++
+ 4 files changed, 173 insertions(+)
  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
@@ -34,10 +38,10 @@ index ee9d3b91c..38ee05a98 100644
  SILEAD TOUCHSCREEN DRIVER
  M:	Hans de Goede <hansg@kernel.org>
 diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-index c6559e749..e09e61497 100644
+index c6559e749..78efe7859 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
 +++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-@@ -201,6 +201,18 @@ config DWMAC_S32
+@@ -201,6 +201,17 @@ config DWMAC_S32
  	  SOCs GMAC ethernet controller, ie. S32G2xx, S32G3xx and
  	  S32R45.
  
@@ -45,13 +49,12 @@ index c6559e749..e09e61497 100644
 +	tristate "Siflower SF19A2890 GMAC support"
 +	default MACH_SIFLOWER_MIPS
 +	depends on OF && (MACH_SIFLOWER_MIPS || COMPILE_TEST)
-+	select MFD_SYSCON
 +	help
 +	  Support for the Ethernet controller of the Siflower SF19A2890 SoC.
 +
 +	  This selects the SF19A2890 glue layer support for the stmmac
 +	  device driver. It sets the interface type and the RGMII clock
-+	  delays in the SoC's system manager.
++	  delays in the GMAC's configuration block.
 +
  config DWMAC_SOCFPGA
  	tristate "SOCFPGA dwmac support"
@@ -70,37 +73,36 @@ index b16a456b7..9330de094 100644
  obj-$(CONFIG_DWMAC_SPACEMIT)	+= dwmac-spacemit.o
 diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
 new file mode 100644
-index 000000000..6a5da964e
+index 000000000..be307fbe6
 --- /dev/null
 +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,160 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Siflower SF19A2890 GMAC glue
 + *
 + * The SF19A2890 has a DWMAC 3.73a. Its interface type and RGMII clock
-+ * delays are set in the SoC's system manager.
++ * delays are set in a register block of their own.
 + *
-+ * Based on the OpenWrt driver by Chuanhong Guo <gch981213@gmail.com>.
++ * Based on the driver by Chuanhong Guo <gch981213@gmail.com>.
 + */
 +
 +#include <linux/bitfield.h>
 +#include <linux/clk.h>
-+#include <linux/mfd/syscon.h>
++#include <linux/io.h>
 +#include <linux/module.h>
 +#include <linux/of.h>
 +#include <linux/platform_device.h>
-+#include <linux/regmap.h>
 +#include <linux/stmmac.h>
 +
 +#include "stmmac_platform.h"
 +
-+/* GMAC configuration in the system manager */
-+#define SF19A2890_GMAC_MISC		0x4440
++/* GMAC configuration block */
++#define SF19A2890_GMAC_MISC		0x0
 +#define  SF19A2890_PHY_INTF_SEL		GENMASK(2, 0)
-+#define SF19A2890_GMAC_TX_DELAY		0x4444
-+#define SF19A2890_GMAC_RX_DELAY		0x4448
-+#define SF19A2890_GMAC_RX_DELAY_EN	0x444c
++#define SF19A2890_GMAC_TX_DELAY		0x4
++#define SF19A2890_GMAC_RX_DELAY		0x8
++#define SF19A2890_GMAC_RX_DELAY_EN	0xc
 +#define  SF19A2890_DELAY_MAX		0xff
 +
 +/*
@@ -111,7 +113,7 @@ index 000000000..6a5da964e
 +
 +struct sf19a2890_gmac {
 +	struct device *dev;
-+	struct regmap *sysm;
++	void __iomem *cfg;
 +};
 +
 +static int sf19a2890_gmac_set_phy_intf_sel(void *bsp_priv, u8 phy_intf_sel)
@@ -123,10 +125,14 @@ index 000000000..6a5da964e
 +	    phy_intf_sel != PHY_INTF_SEL_RMII)
 +		return -EINVAL;
 +
-+	return regmap_update_bits(gmac->sysm, SF19A2890_GMAC_MISC,
-+				  SF19A2890_PHY_INTF_SEL,
-+				  FIELD_PREP(SF19A2890_PHY_INTF_SEL,
-+					     phy_intf_sel));
++	u32 val;
++
++	val = readl(gmac->cfg + SF19A2890_GMAC_MISC);
++	val &= ~SF19A2890_PHY_INTF_SEL;
++	val |= FIELD_PREP(SF19A2890_PHY_INTF_SEL, phy_intf_sel);
++	writel(val, gmac->cfg + SF19A2890_GMAC_MISC);
++
++	return 0;
 +}
 +
 +static int sf19a2890_gmac_get_delay(struct sf19a2890_gmac *gmac,
@@ -162,15 +168,11 @@ index 000000000..6a5da964e
 +	if (ret)
 +		return ret;
 +
-+	ret = regmap_write(gmac->sysm, SF19A2890_GMAC_TX_DELAY, tx);
-+	if (ret)
-+		return ret;
++	writel(tx, gmac->cfg + SF19A2890_GMAC_TX_DELAY);
++	writel(rx, gmac->cfg + SF19A2890_GMAC_RX_DELAY);
++	writel(!!rx, gmac->cfg + SF19A2890_GMAC_RX_DELAY_EN);
 +
-+	ret = regmap_write(gmac->sysm, SF19A2890_GMAC_RX_DELAY, rx);
-+	if (ret)
-+		return ret;
-+
-+	return regmap_write(gmac->sysm, SF19A2890_GMAC_RX_DELAY_EN, !!rx);
++	return 0;
 +}
 +
 +static int sf19a2890_gmac_probe(struct platform_device *pdev)
@@ -188,11 +190,10 @@ index 000000000..6a5da964e
 +
 +	gmac->dev = dev;
 +
-+	gmac->sysm = syscon_regmap_lookup_by_phandle(dev->of_node,
-+						     "siflower,sysm");
-+	if (IS_ERR(gmac->sysm))
-+		return dev_err_probe(dev, PTR_ERR(gmac->sysm),
-+				     "failed to get the system manager\n");
++	gmac->cfg = devm_platform_ioremap_resource(pdev, 1);
++	if (IS_ERR(gmac->cfg))
++		return dev_err_probe(dev, PTR_ERR(gmac->cfg),
++				     "failed to map the configuration block\n");
 +
 +	clk = devm_clk_get_enabled(dev, "byp_ref");
 +	if (IS_ERR(clk))

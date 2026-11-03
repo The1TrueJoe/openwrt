@@ -1,26 +1,25 @@
-From 5c0fcd885aa80a0abad5608f12613a194189637f Mon Sep 17 00:00:00 2001
+From aaa703cf9ea0f7ff6b15550783adbfa1cc14ef95 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
-Date: Mon, 2 Nov 2026 18:02:03 -0500
+Date: Mon, 2 Nov 2026 22:22:24 -0500
 Subject: [PATCH 1/2] dt-bindings: phy: Add Siflower SF19A2890 USB 2.0 PHY
 
-The USB 2.0 PHY of the Siflower SF19A2890 is controlled from the SoC's
-system manager, which also provides its clock and its power-on and PHY
-resets. It has no registers of its own outside that block, so it
-refers to the system manager instead of taking a reg.
+The USB 2.0 PHY of the Siflower SF19A2890 serves its DWC2 controller.
+It takes a reference clock and two resets, power-on and PHY, from the
+USB block's clock and reset manager.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- .../phy/siflower,sf19a2890-usb-phy.yaml       | 60 +++++++++++++++++++
+ .../phy/siflower,sf19a2890-usb-phy.yaml       | 58 +++++++++++++++++++
  MAINTAINERS                                   |  1 +
- 2 files changed, 61 insertions(+)
+ 2 files changed, 59 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
 
 diff --git a/Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml b/Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
 new file mode 100644
-index 000000000..2251836c9
+index 000000000..77b8e35d8
 --- /dev/null
 +++ b/Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,58 @@
 +# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 +%YAML 1.2
 +---
@@ -34,11 +33,13 @@ index 000000000..2251836c9
 +
 +description:
 +  The USB 2.0 PHY of the Siflower SF19A2890, used by its DWC2 controller.
-+  Its controls are in the SoC's system manager.
 +
 +properties:
 +  compatible:
 +    const: siflower,sf19a2890-usb-phy
++
++  reg:
++    maxItems: 1
 +
 +  clocks:
 +    maxItems: 1
@@ -54,31 +55,27 @@ index 000000000..2251836c9
 +      - const: por
 +      - const: phy
 +
-+  siflower,sysm:
-+    $ref: /schemas/types.yaml#/definitions/phandle
-+    description: The system manager, which holds the PHY's controls.
-+
 +  "#phy-cells":
 +    const: 0
 +
 +required:
 +  - compatible
++  - reg
 +  - clocks
 +  - resets
 +  - reset-names
-+  - siflower,sysm
 +  - "#phy-cells"
 +
 +additionalProperties: false
 +
 +examples:
 +  - |
-+    usb-phy {
++    usb-phy@19e0c040 {
 +        compatible = "siflower,sf19a2890-usb-phy";
-+        clocks = <&sysm 34>;
-+        resets = <&sysm 4>, <&sysm 5>;
++        reg = <0x19e0c040 0x60>;
++        clocks = <&usb_crm 2>;
++        resets = <&usb_crm 1>, <&usb_crm 2>;
 +        reset-names = "por", "phy";
-+        siflower,sysm = <&sysm>;
 +        #phy-cells = <0>;
 +    };
 diff --git a/MAINTAINERS b/MAINTAINERS

@@ -1,26 +1,27 @@
-From 588d159c6a2722ae30a4da549134ada2cf4b496d Mon Sep 17 00:00:00 2001
+From 29716092f49a888e1d0a7f2a6835ebca4366cd41 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:03:33 -0500
 Subject: [PATCH 1/2] dt-bindings: net: Add Siflower SF19A2890 GMAC
 
 The Siflower SF19A2890 has a DesignWare GMAC 3.73a whose interface
-type and RGMII clock delays are set in the SoC's system manager. It
-takes a fourth clock, the RGMII transmit reference.
+type and RGMII clock delays are set in a configuration block of their
+own, next to its clock and reset manager. It takes a fourth clock, the
+RGMII transmit reference.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- .../bindings/net/siflower,sf19a2890-gmac.yaml | 110 ++++++++++++++++++
+ .../bindings/net/siflower,sf19a2890-gmac.yaml | 104 ++++++++++++++++++
  .../devicetree/bindings/net/snps,dwmac.yaml   |   1 +
  MAINTAINERS                                   |   1 +
- 3 files changed, 112 insertions(+)
+ 3 files changed, 106 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
 
 diff --git a/Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml b/Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
 new file mode 100644
-index 000000000..ea7af68d8
+index 000000000..e035dd8a2
 --- /dev/null
 +++ b/Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,104 @@
 +# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 +%YAML 1.2
 +---
@@ -34,8 +35,8 @@ index 000000000..ea7af68d8
 +
 +description:
 +  The Siflower SF19A2890 has a Synopsys DesignWare GMAC 3.73a. Its
-+  interface type and RGMII clock delays are set in the SoC's system
-+  manager. The MAC adds an RGMII delay only where the
++  interface type and RGMII clock delays are set in a configuration block
++  of their own. The MAC adds an RGMII delay only where the
 +  rx-internal-delay-ps or tx-internal-delay-ps property says so.
 +
 +select:
@@ -53,7 +54,9 @@ index 000000000..ea7af68d8
 +      - const: snps,dwmac
 +
 +  reg:
-+    maxItems: 1
++    items:
++      - description: MAC registers
++      - description: Interface configuration registers
 +
 +  interrupts:
 +    maxItems: 3
@@ -78,12 +81,6 @@ index 000000000..ea7af68d8
 +      - const: ptp_ref
 +      - const: byp_ref
 +
-+  siflower,sysm:
-+    $ref: /schemas/types.yaml#/definitions/phandle
-+    description:
-+      The system manager, which holds the interface type and RGMII delay
-+      settings of the GMAC.
-+
 +  rx-internal-delay-ps: true
 +
 +  tx-internal-delay-ps: true
@@ -97,7 +94,6 @@ index 000000000..ea7af68d8
 +  - clock-names
 +  - resets
 +  - reset-names
-+  - siflower,sysm
 +
 +allOf:
 +  - $ref: snps,dwmac.yaml#
@@ -111,17 +107,16 @@ index 000000000..ea7af68d8
 +
 +    ethernet@10800000 {
 +        compatible = "siflower,sf19a2890-gmac", "snps,dwmac";
-+        reg = <0x10800000 0x200000>;
++        reg = <0x10800000 0x200000>, <0x19e04440 0x10>;
 +        interrupt-parent = <&gic>;
 +        interrupts = <GIC_SHARED 32 IRQ_TYPE_LEVEL_HIGH>,
 +                     <GIC_SHARED 34 IRQ_TYPE_LEVEL_HIGH>,
 +                     <GIC_SHARED 33 IRQ_TYPE_LEVEL_HIGH>;
 +        interrupt-names = "macirq", "eth_wake_irq", "eth_lpi";
-+        clocks = <&sysm 21>, <&sysm 22>, <&sysm 24>, <&sysm 23>;
++        clocks = <&gmac_crm 0>, <&gmac_crm 1>, <&gmac_crm 3>, <&gmac_crm 2>;
 +        clock-names = "stmmaceth", "pclk", "ptp_ref", "byp_ref";
-+        resets = <&sysm 0>;
++        resets = <&gmac_crm 0>;
 +        reset-names = "stmmaceth";
-+        siflower,sysm = <&sysm>;
 +        phy-mode = "rgmii-id";
 +        rx-internal-delay-ps = <1000>;
 +        tx-internal-delay-ps = <1700>;

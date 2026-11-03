@@ -1,27 +1,25 @@
-From 234f22d27b3af909e3caf479247ad14f58ff33d5 Mon Sep 17 00:00:00 2001
+From 18f1172ad4906d8f095dc5e0eb861ba59941251d Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 9 Sep 2024 10:18:33 +0800
-Subject: [PATCH 2/2] phy: add support for Siflower SF19A2890 USB PHY
+Subject: [PATCH 2/2] phy: add support for Siflower USB PHYs
 
 Add a driver for the USB 2.0 PHY of the Siflower SF19A2890. Powering it
 on enables its reference clock, releases its two resets and takes it
 out of sleep.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: from OpenWrt's siflower target, SF19A2890 part only; reach the
- sleep control through the system manager syscon instead of a reg of
- its own, reset names "por" and "phy", undo the resets if the sleep
- control write fails, Kconfig dependencies and help, commit message,
- MAINTAINERS lines]
+[jt: from Chuanhong's siflower-7.1 branch, the SF19A2890 PHY only;
+ reset names "por" and "phy", Kconfig dependencies and help, commit
+ message, MAINTAINERS line]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  MAINTAINERS                              |   1 +
  drivers/phy/Kconfig                      |   1 +
  drivers/phy/Makefile                     |   1 +
- drivers/phy/siflower/Kconfig             |  13 ++
+ drivers/phy/siflower/Kconfig             |  12 ++
  drivers/phy/siflower/Makefile            |   2 +
- drivers/phy/siflower/phy-sf19a2890-usb.c | 152 +++++++++++++++++++++++
- 6 files changed, 170 insertions(+)
+ drivers/phy/siflower/phy-sf19a2890-usb.c | 145 +++++++++++++++++++++++
+ 6 files changed, 162 insertions(+)
  create mode 100644 drivers/phy/siflower/Kconfig
  create mode 100644 drivers/phy/siflower/Makefile
  create mode 100644 drivers/phy/siflower/phy-sf19a2890-usb.c
@@ -64,10 +62,10 @@ index c6dd02003..8c917c4c5 100644
  					   spacemit/	\
 diff --git a/drivers/phy/siflower/Kconfig b/drivers/phy/siflower/Kconfig
 new file mode 100644
-index 000000000..353fc717c
+index 000000000..5ae1f83d1
 --- /dev/null
 +++ b/drivers/phy/siflower/Kconfig
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,12 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +
 +config PHY_SF19A2890_USB
@@ -75,11 +73,10 @@ index 000000000..353fc717c
 +	depends on MACH_SIFLOWER_MIPS || COMPILE_TEST
 +	depends on OF
 +	select GENERIC_PHY
-+	select MFD_SYSCON
 +	help
 +	  Enable this to support the USB 2.0 PHY of the Siflower SF19A2890,
-+	  used by its DWC2 controller. The PHY is controlled through the
-+	  SoC's system manager, which also provides its clock and resets.
++	  used by its DWC2 controller. Its reference clock and its resets
++	  come from the USB block's clock and reset manager.
 +	  Say M or Y if the kernel is to run on this SoC.
 diff --git a/drivers/phy/siflower/Makefile b/drivers/phy/siflower/Makefile
 new file mode 100644
@@ -91,31 +88,31 @@ index 000000000..a12383193
 +obj-$(CONFIG_PHY_SF19A2890_USB)	+= phy-sf19a2890-usb.o
 diff --git a/drivers/phy/siflower/phy-sf19a2890-usb.c b/drivers/phy/siflower/phy-sf19a2890-usb.c
 new file mode 100644
-index 000000000..3376cf1f1
+index 000000000..f6c2e27fd
 --- /dev/null
 +++ b/drivers/phy/siflower/phy-sf19a2890-usb.c
-@@ -0,0 +1,152 @@
+@@ -0,0 +1,145 @@
 +// SPDX-License-Identifier: GPL-2.0
 +
 +#include <linux/clk.h>
-+#include <linux/err.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
 +#include <linux/mfd/syscon.h>
 +#include <linux/module.h>
 +#include <linux/of.h>
 +#include <linux/phy/phy.h>
 +#include <linux/platform_device.h>
-+#include <linux/regmap.h>
 +#include <linux/reset.h>
 +
-+/* In the system manager */
-+#define USB_PHY_SLEEPM	0xc044
++#define USB_SLEEPM 0x4
 +
 +struct sf19a2890_usb_phy {
 +	struct device *dev;
 +	struct clk *phy_clk;
 +	struct reset_control *usb_phy_rst;
 +	struct reset_control *power_on_rst;
-+	struct regmap *sysm;
++	void __iomem *base;
 +};
 +
 +static int sf19a2890_usb_phy_power_on(struct phy *phy)
@@ -137,13 +134,8 @@ index 000000000..3376cf1f1
 +	if (ret)
 +		goto err2;
 +
-+	ret = regmap_write(p_phy->sysm, USB_PHY_SLEEPM, 1);
-+	if (ret)
-+		goto err3;
-+
++	writel(1, p_phy->base + USB_SLEEPM);
 +	return 0;
-+err3:
-+	reset_control_assert(p_phy->power_on_rst);
 +err2:
 +	reset_control_assert(p_phy->usb_phy_rst);
 +err1:
@@ -155,7 +147,7 @@ index 000000000..3376cf1f1
 +{
 +	struct sf19a2890_usb_phy *p_phy = phy_get_drvdata(phy);
 +
-+	regmap_write(p_phy->sysm, USB_PHY_SLEEPM, 0);
++	writel(0, p_phy->base + USB_SLEEPM);
 +	reset_control_assert(p_phy->power_on_rst);
 +	reset_control_assert(p_phy->usb_phy_rst);
 +	clk_disable_unprepare(p_phy->phy_clk);
@@ -181,11 +173,9 @@ index 000000000..3376cf1f1
 +
 +	p_phy->dev = &pdev->dev;
 +
-+	p_phy->sysm = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-+						      "siflower,sysm");
-+	if (IS_ERR(p_phy->sysm))
-+		return dev_err_probe(p_phy->dev, PTR_ERR(p_phy->sysm),
-+				     "failed to get the system manager\n");
++	p_phy->base = devm_platform_ioremap_resource(pdev, 0);
++	if (IS_ERR(p_phy->base))
++		return PTR_ERR(p_phy->base);
 +
 +	p_phy->phy_clk = devm_clk_get(p_phy->dev, NULL);
 +	if (IS_ERR(p_phy->phy_clk))

@@ -1,7 +1,7 @@
-From 21c951a96ae4f8164e311cd6805fac19e3b7a5e4 Mon Sep 17 00:00:00 2001
+From e9c6c9c3ba9583a09e2c40a1bbf75839cc79bfc9 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
-Subject: [PATCH 3/3] MIPS: configs: sf19a2890: Enable the SoC and GL-SFT1200
+Subject: [PATCH 4/4] MIPS: configs: sf19a2890: Enable the SoC and GL-SFT1200
  drivers
 
 Enable the drivers for the SF19A2890's peripherals and for the
