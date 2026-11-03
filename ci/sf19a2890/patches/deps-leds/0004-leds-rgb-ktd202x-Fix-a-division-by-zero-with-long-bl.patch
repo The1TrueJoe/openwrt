@@ -1,4 +1,4 @@
-From 153665c3d5f9798a4580f6374fcf5e065d0401f6 Mon Sep 17 00:00:00 2001
+From 3a195912d5553259907fe406775001b2baa33c17 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Tue, 27 Oct 2026 00:01:02 -0400
 Subject: [PATCH 04/11] leds: rgb: ktd202x: Fix a division by zero with long

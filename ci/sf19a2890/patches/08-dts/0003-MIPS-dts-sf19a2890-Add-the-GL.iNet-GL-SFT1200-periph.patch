@@ -1,4 +1,4 @@
-From 1848d75b8351cdde122ef659a6b4f20dec1e915f Mon Sep 17 00:00:00 2001
+From 98739d569a08fef62027368bc86faafecf695b0a Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 3/4] MIPS: dts: sf19a2890: Add the GL.iNet GL-SFT1200
@@ -26,7 +26,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  1 file changed, 223 insertions(+)
 
 diff --git a/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts b/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
-index 13e6a0c8b..279085346 100644
+index 13e6a0c8b..242750d79 100644
 --- a/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
 +++ b/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
 @@ -2,6 +2,10 @@
@@ -54,11 +54,11 @@ index 13e6a0c8b..279085346 100644
 +			linux,code = <KEY_RESTART>;
 +		};
 +
++		/* A slide switch: BTN_0 is pressed while it is in one position */
 +		switch-mode {
 +			label = "mode";
 +			gpios = <&gpio 1 GPIO_ACTIVE_LOW>;
 +			linux,code = <BTN_0>;
-+			linux,input-type = <EV_SW>;
 +		};
 +	};
 +};
