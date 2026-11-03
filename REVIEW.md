@@ -43,9 +43,11 @@ blinking LED), so the commit 7 and 11 messages were updated. v1 (posted
 only the PHY paragraph is reworded; the code is unchanged.
 
 Commit 13 also adds board.d/01_leds (2026-11-03): white:wan-online gets a
-netdev trigger on wan (link tx rx), the usual OpenWrt convention for a WAN
-LED. Without it white had no default trigger and stayed off. The bench run
-on a316cca1e1 (the tip before this) is in the shared notes.
+netdev trigger on wan. Without it white had no default trigger and stayed
+off. The bench run on a316cca1e1 (the tip before this) is in the shared
+notes. The trigger first used mode link tx rx; the owner asked for no
+flicker on traffic, so it is link only since c512f9406c (2026-11-03): white
+is steady while wan has link.
 
 "Unit" below means the harvested GL-SFT1200, label MAC 94:83:c4:9a:ea:d1, read
 on GL firmware 4.8.3 (`device-dumps/glinet-sft1200/94-83-c4-9a-ea-d1`).
