@@ -1,4 +1,4 @@
-From 47090c66f7591389fe9a74bb950396713fd39cd0 Mon Sep 17 00:00:00 2001
+From 41a95d05978cd24c060350cc7026d07fcf841fe2 Mon Sep 17 00:00:00 2001
 From: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
 Subject: [PATCH 2/2] gpio: add support for GPIO controller on Siflower SoCs

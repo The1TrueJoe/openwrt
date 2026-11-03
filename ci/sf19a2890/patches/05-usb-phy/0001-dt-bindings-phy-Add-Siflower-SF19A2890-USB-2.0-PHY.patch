@@ -1,4 +1,4 @@
-From aaa703cf9ea0f7ff6b15550783adbfa1cc14ef95 Mon Sep 17 00:00:00 2001
+From 89496f8130da97d42387bc46f560d01bd3a9caf7 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:22:24 -0500
 Subject: [PATCH 1/2] dt-bindings: phy: Add Siflower SF19A2890 USB 2.0 PHY

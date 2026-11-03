@@ -1,4 +1,4 @@
-From ef7f435690131350a123c24a0391227fe2ee82f3 Mon Sep 17 00:00:00 2001
+From 57761281ce64bc7b178d64566c75becc689d7cdd Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:26:43 -0500
 Subject: [PATCH 1/4] dt-bindings: mips: Add Siflower SF19A2890 system

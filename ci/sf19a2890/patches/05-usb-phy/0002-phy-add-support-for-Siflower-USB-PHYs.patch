@@ -1,4 +1,4 @@
-From 18f1172ad4906d8f095dc5e0eb861ba59941251d Mon Sep 17 00:00:00 2001
+From d7d8f5c3a122fdf68a1b138f05e27136aba83750 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 9 Sep 2024 10:18:33 +0800
 Subject: [PATCH 2/2] phy: add support for Siflower USB PHYs

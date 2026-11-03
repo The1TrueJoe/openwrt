@@ -1,4 +1,4 @@
-From e17ffcde10ed184840e4cd90be5cccfafa2adf77 Mon Sep 17 00:00:00 2001
+From 5c5f3be3811c45c00e34ad6cce9bb9ef0951ce4b Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Tue, 10 Sep 2024 09:10:27 +0800
 Subject: [PATCH 3/3] usb: dwc2: handle OTG interrupt regardless of GINTSTS
@@ -12,10 +12,14 @@ because "nobody cares".
 Handle OTG interrupt in IRQ handler regardless of whether the
 OTGInt bit in GINTSTS is set or not.
 
+On a GL.iNet GL-SFT1200 it shows differently: after a few replugs of a
+USB stick the system stops making progress, the console repeating its
+last message with the same timestamp, until a power cycle.
+
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 [jt: only on cores with the new otg_int_unflagged parameter, which
  SF19A2890 sets; the others still handle OTG interrupts only when
- GINTSTS flags them]
+ GINTSTS flags them; what a GL-SFT1200 does without the patch]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/usb/dwc2/core.h      |  6 ++++++

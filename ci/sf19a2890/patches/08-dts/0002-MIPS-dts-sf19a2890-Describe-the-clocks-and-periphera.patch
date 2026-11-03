@@ -1,4 +1,4 @@
-From 891980233b9ae596beacbe99785dfb0cc3b5f748 Mon Sep 17 00:00:00 2001
+From 1439da8b97f64d233e39a26cdbe75ee24597bc19 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 2/4] MIPS: dts: sf19a2890: Describe the clocks and peripherals
@@ -10,13 +10,19 @@ controllers, the GMAC, the USB controller and its PHY, the I2C and SPI
 controllers, the other two UARTs and the watchdog. The system
 controller holds the reboot register.
 
+The watchdog is left disabled. Its reset reaches the SoC only while
+bit 7 of the system controller register at 0x50 is clear, which
+Siflower's own driver does when it starts the watchdog, and nothing in
+mainline does that yet. On the GL-SFT1200 the bootloader leaves the
+watchdog running, and left unfed it does not reset the board.
+
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- arch/mips/boot/dts/siflower/sf19a2890.dtsi | 390 ++++++++++++++++++++-
- 1 file changed, 374 insertions(+), 16 deletions(-)
+ arch/mips/boot/dts/siflower/sf19a2890.dtsi | 395 ++++++++++++++++++++-
+ 1 file changed, 379 insertions(+), 16 deletions(-)
 
 diff --git a/arch/mips/boot/dts/siflower/sf19a2890.dtsi b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
-index 3a4b39971..3b1e50edd 100644
+index 3a4b39971..ac983d5c3 100644
 --- a/arch/mips/boot/dts/siflower/sf19a2890.dtsi
 +++ b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
 @@ -1,5 +1,6 @@
@@ -88,7 +94,7 @@ index 3a4b39971..3b1e50edd 100644
  	};
  
  	soc {
-@@ -70,15 +67,376 @@ soc {
+@@ -70,15 +67,381 @@ soc {
  		ranges;
  		interrupt-parent = <&gic>;
  
@@ -165,9 +171,9 @@ index 3a4b39971..3b1e50edd 100644
 +			resets = <&uart_crm 0>;
 +			pinctrl-names = "default";
 +			pinctrl-0 = <&uart0_pins>;
- 			status = "disabled";
- 		};
- 
++			status = "disabled";
++		};
++
 +		uart1: serial@18301000 {
 +			compatible = "arm,pl011", "arm,primecell";
 +			reg = <0x18301000 0x1000>;
@@ -192,12 +198,17 @@ index 3a4b39971..3b1e50edd 100644
 +			status = "disabled";
 +		};
 +
++		/*
++		 * Its reset reaches the SoC only while bit 7 of the system
++		 * controller's register 0x50 is clear, and nothing clears it.
++		 */
 +		watchdog: watchdog@18700000 {
 +			compatible = "snps,dw-wdt";
 +			reg = <0x18700000 0x1000>;
 +			interrupts = <GIC_SHARED 238 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&wdt_crm 0>;
 +			resets = <&wdt_crm 0>;
++			status = "disabled";
 +		};
 +
 +		gpio: gpio@19d00000 {
@@ -279,9 +290,9 @@ index 3a4b39971..3b1e50edd 100644
 +			resets = <&usb_crm 1>, <&usb_crm 2>;
 +			reset-names = "por", "phy";
 +			#phy-cells = <0>;
-+			status = "disabled";
-+		};
-+
+ 			status = "disabled";
+ 		};
+ 
 +		wlan5_crm: clock-controller@19e0c400 {
 +			compatible = "siflower,sf19a2890-wlan5-crm";
 +			reg = <0x19e0c400 0x10>;
@@ -466,7 +477,7 @@ index 3a4b39971..3b1e50edd 100644
  		gic: interrupt-controller@1bdc0000 {
  			compatible = "mti,gic";
  			reg = <0x1bdc0000 0x20000>;
-@@ -89,7 +447,7 @@ gic: interrupt-controller@1bdc0000 {
+@@ -89,7 +452,7 @@ gic: interrupt-controller@1bdc0000 {
  			timer {
  				compatible = "mti,gic-timer";
  				interrupts = <GIC_LOCAL 1 IRQ_TYPE_NONE>;
