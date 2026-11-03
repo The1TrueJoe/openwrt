@@ -1,4 +1,4 @@
-From 1d29b90b68ce229e1b323569fe25603aaa1282e7 Mon Sep 17 00:00:00 2001
+From eaae0dfef645f669543eb2de83915b8bc4d03a75 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
 Subject: [PATCH 2/2] gpio: add support for siflower socs
@@ -11,7 +11,7 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 [jt: from OpenWrt's siflower target; depend on MACH_SIFLOWER_MIPS and OF,
  longer Kconfig help, assert the reset through a devm action instead of
  in .remove, which ran before the GPIO chip was removed, drop .owner,
- MAINTAINERS entry]
+ MAINTAINERS lines]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  MAINTAINERS                  |   1 +
@@ -22,13 +22,13 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  create mode 100644 drivers/gpio/gpio-siflower.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 4193b433c..0a3f91844 100644
+index ed97ad542..6c096f496 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -25711,6 +25711,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
- L:	linux-gpio@vger.kernel.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml
+@@ -25715,6 +25715,7 @@ F:	Documentation/devicetree/bindings/mips/siflower.yaml
+ F:	arch/mips/boot/dts/siflower/
+ F:	arch/mips/configs/sf19a2890_defconfig
+ F:	arch/mips/include/asm/mach-siflower/
 +F:	drivers/gpio/gpio-siflower.c
  
  SILEAD TOUCHSCREEN DRIVER

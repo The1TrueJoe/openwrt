@@ -1,4 +1,4 @@
-From 58c4ce4eeb387683b4062c85c80395e014631d73 Mon Sep 17 00:00:00 2001
+From ae48317199b96101124e953ec7330ffb46450154 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:58:30 -0500
 Subject: [PATCH 2/2] pinctrl: Add Siflower SF19A2890 pin controller driver
@@ -23,13 +23,13 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  create mode 100644 drivers/pinctrl/pinctrl-sf19a2890.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 9a31712fe..743dcfc86 100644
+index d37f753b9..fffd53964 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -25082,6 +25082,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
- L:	linux-gpio@vger.kernel.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
+@@ -25086,6 +25086,7 @@ F:	Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
+ F:	arch/mips/boot/dts/siflower/
+ F:	arch/mips/configs/sf19a2890_defconfig
+ F:	arch/mips/include/asm/mach-siflower/
 +F:	drivers/pinctrl/pinctrl-sf19a2890.c
  
  SILEAD TOUCHSCREEN DRIVER

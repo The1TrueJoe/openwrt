@@ -1,4 +1,4 @@
-From 97d0372efff16d8c877518b1e6f2a5a3be87c9e8 Mon Sep 17 00:00:00 2001
+From 076e37bfca917ab21b123b42d5f6895d0aa21a3b Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:00:02 -0500
 Subject: [PATCH 1/2] dt-bindings: gpio: Add Siflower SF19A2890 GPIO controller
@@ -10,8 +10,8 @@ lines reach the pins through the pin controller.
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../gpio/siflower,sf19a2890-gpio.yaml         | 88 +++++++++++++++++++
- MAINTAINERS                                   |  6 ++
- 2 files changed, 94 insertions(+)
+ MAINTAINERS                                   |  1 +
+ 2 files changed, 89 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml
 
 diff --git a/Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml b/Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml
@@ -109,22 +109,17 @@ index 000000000..1265fe286
 +        #interrupt-cells = <2>;
 +    };
 diff --git a/MAINTAINERS b/MAINTAINERS
-index b5a6dc379..4193b433c 100644
+index 754d3d7d4..ed97ad542 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -25706,6 +25706,12 @@ N:	sifive
- K:	fu[57]40
- K:	[^@]sifive
- 
-+SIFLOWER GPIO DRIVER
-+M:	Joseph Telaak <joseph@telaak.dev>
-+L:	linux-gpio@vger.kernel.org
-+S:	Maintained
+@@ -25710,6 +25710,7 @@ SIFLOWER SF19A2890 SOC SUPPORT
+ M:	Joseph Telaak <joseph@telaak.dev>
+ L:	linux-mips@vger.kernel.org
+ S:	Maintained
 +F:	Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml
-+
- SILEAD TOUCHSCREEN DRIVER
- M:	Hans de Goede <hansg@kernel.org>
- L:	linux-input@vger.kernel.org
+ F:	Documentation/devicetree/bindings/mips/siflower.yaml
+ F:	arch/mips/boot/dts/siflower/
+ F:	arch/mips/configs/sf19a2890_defconfig
 -- 
 2.50.1 (Apple Git-155)
 

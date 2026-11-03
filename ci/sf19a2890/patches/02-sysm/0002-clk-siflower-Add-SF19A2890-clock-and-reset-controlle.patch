@@ -1,4 +1,4 @@
-From d18055521858e262ceb54994028ec6c142c92645 Mon Sep 17 00:00:00 2001
+From e9e8953e3ed7ec701c53a3de613d62b72c325d20 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:55:00 -0500
 Subject: [PATCH 2/2] clk: siflower: Add SF19A2890 clock and reset controller
@@ -32,13 +32,13 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  create mode 100644 drivers/clk/siflower/clk-sf19a2890.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index be46a39a5..d17e12e77 100644
+index cdd042fd7..89cc71bd7 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
- L:	linux-clk@vger.kernel.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-sysm.yaml
+@@ -25707,6 +25707,7 @@ F:	Documentation/devicetree/bindings/mips/siflower.yaml
+ F:	arch/mips/boot/dts/siflower/
+ F:	arch/mips/configs/sf19a2890_defconfig
+ F:	arch/mips/include/asm/mach-siflower/
 +F:	drivers/clk/siflower/
  F:	include/dt-bindings/clock/siflower,sf19a2890-sysm.h
  F:	include/dt-bindings/reset/siflower,sf19a2890-sysm.h

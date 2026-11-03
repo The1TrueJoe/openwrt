@@ -1,4 +1,4 @@
-From 342dd9a51820446834873ed54cbfb349a8286e88 Mon Sep 17 00:00:00 2001
+From 5c0fcd885aa80a0abad5608f12613a194189637f Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:02:03 -0500
 Subject: [PATCH 1/2] dt-bindings: phy: Add Siflower SF19A2890 USB 2.0 PHY
@@ -11,8 +11,8 @@ refers to the system manager instead of taking a reg.
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../phy/siflower,sf19a2890-usb-phy.yaml       | 60 +++++++++++++++++++
- MAINTAINERS                                   |  6 ++
- 2 files changed, 66 insertions(+)
+ MAINTAINERS                                   |  1 +
+ 2 files changed, 61 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
 
 diff --git a/Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml b/Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
@@ -82,22 +82,17 @@ index 000000000..2251836c9
 +        #phy-cells = <0>;
 +    };
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 93abbb315..c80bb8634 100644
+index 6f1412c7e..50f236b74 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -25698,6 +25698,12 @@ N:	sifive
- K:	fu[57]40
- K:	[^@]sifive
- 
-+SIFLOWER SF19A2890 USB2 PHY DRIVER
-+M:	Joseph Telaak <joseph@telaak.dev>
-+L:	linux-phy@lists.infradead.org
-+S:	Maintained
+@@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
+ L:	linux-mips@vger.kernel.org
+ S:	Maintained
+ F:	Documentation/devicetree/bindings/mips/siflower.yaml
 +F:	Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
-+
- SILEAD TOUCHSCREEN DRIVER
- M:	Hans de Goede <hansg@kernel.org>
- L:	linux-input@vger.kernel.org
+ F:	arch/mips/boot/dts/siflower/
+ F:	arch/mips/configs/sf19a2890_defconfig
+ F:	arch/mips/include/asm/mach-siflower/
 -- 
 2.50.1 (Apple Git-155)
 

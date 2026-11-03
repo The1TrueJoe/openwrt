@@ -1,4 +1,4 @@
-From 342916f6c47f12ee86cf78a7558fe1b76df65ff2 Mon Sep 17 00:00:00 2001
+From 8b072c259822f0dd5f106a6186234e9d8c9a6dec Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:54:59 -0500
 Subject: [PATCH 1/2] dt-bindings: clock: Add Siflower SF19A2890 system manager
@@ -11,10 +11,10 @@ the reboot register, so it is a syscon as well.
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../clock/siflower,sf19a2890-sysm.yaml        | 82 +++++++++++++++++++
- MAINTAINERS                                   |  8 ++
+ MAINTAINERS                                   |  3 +
  .../clock/siflower,sf19a2890-sysm.h           | 58 +++++++++++++
  .../reset/siflower,sf19a2890-sysm.h           | 22 +++++
- 4 files changed, 170 insertions(+)
+ 4 files changed, 165 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/siflower,sf19a2890-sysm.yaml
  create mode 100644 include/dt-bindings/clock/siflower,sf19a2890-sysm.h
  create mode 100644 include/dt-bindings/reset/siflower,sf19a2890-sysm.h
@@ -108,24 +108,23 @@ index 000000000..f536de426
 +        };
 +    };
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 93abbb315..be46a39a5 100644
+index 6f1412c7e..cdd042fd7 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -25698,6 +25698,14 @@ N:	sifive
- K:	fu[57]40
- K:	[^@]sifive
- 
-+SIFLOWER SF19A2890 CLOCK AND RESET DRIVER
-+M:	Joseph Telaak <joseph@telaak.dev>
-+L:	linux-clk@vger.kernel.org
-+S:	Maintained
+@@ -25702,10 +25702,13 @@ SIFLOWER SF19A2890 SOC SUPPORT
+ M:	Joseph Telaak <joseph@telaak.dev>
+ L:	linux-mips@vger.kernel.org
+ S:	Maintained
 +F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-sysm.yaml
+ F:	Documentation/devicetree/bindings/mips/siflower.yaml
+ F:	arch/mips/boot/dts/siflower/
+ F:	arch/mips/configs/sf19a2890_defconfig
+ F:	arch/mips/include/asm/mach-siflower/
 +F:	include/dt-bindings/clock/siflower,sf19a2890-sysm.h
 +F:	include/dt-bindings/reset/siflower,sf19a2890-sysm.h
-+
+ 
  SILEAD TOUCHSCREEN DRIVER
  M:	Hans de Goede <hansg@kernel.org>
- L:	linux-input@vger.kernel.org
 diff --git a/include/dt-bindings/clock/siflower,sf19a2890-sysm.h b/include/dt-bindings/clock/siflower,sf19a2890-sysm.h
 new file mode 100644
 index 000000000..fa7207188

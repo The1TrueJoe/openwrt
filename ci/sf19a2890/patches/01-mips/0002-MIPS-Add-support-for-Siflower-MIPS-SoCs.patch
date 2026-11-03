@@ -1,4 +1,4 @@
-From ae526c7ca5051f530783c4068d8d692666aed8ff Mon Sep 17 00:00:00 2001
+From 32b16ddf23aed39b8b57683b74eb926dde6eea5f Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 20 Jan 2025 09:52:52 +0800
 Subject: [PATCH 2/4] MIPS: Add support for Siflower MIPS SoCs
@@ -14,7 +14,7 @@ conserve memory, and a MACH_SIFLOWER_MIPS is created with reduced
 features instead of using the generic kernel.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: rebased on v7.4-rc1, "MIPS:" prefix, longer Kconfig help, MAINTAINERS entry]
+[jt: rebased on v7.4-rc1, "MIPS:" prefix, longer Kconfig help, MAINTAINERS line]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  MAINTAINERS                                   |  1 +
@@ -25,7 +25,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  create mode 100644 arch/mips/include/asm/mach-siflower/kmalloc.h
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index b95874a96..1885b562a 100644
+index 3548d4d41..4d81ee7f3 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
 @@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>

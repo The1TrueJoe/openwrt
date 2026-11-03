@@ -1,4 +1,4 @@
-From c9a395bec1370efc88c4739a8695d53c0b9a141b Mon Sep 17 00:00:00 2001
+From 0a322c3d5dc1ba6a99553ed4e62bbd09ded40ce2 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 3/3] MIPS: configs: sf19a2890: Enable the SoC and GL-SFT1200

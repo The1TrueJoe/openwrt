@@ -1,4 +1,4 @@
-From c2bca54b31baf4aeccbc9744ee8dcc981f03b28e Mon Sep 17 00:00:00 2001
+From 4ffacc6d15c2fe7527a0d66a059014c67bfff53e Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:51:28 -0500
 Subject: [PATCH 3/4] MIPS: dts: Add Siflower SF19A2890 and GL.iNet GL-SFT1200
@@ -26,7 +26,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  create mode 100644 arch/mips/boot/dts/siflower/sf19a2890.dtsi
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 1885b562a..22428520c 100644
+index 4d81ee7f3..a45c79092 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
 @@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>

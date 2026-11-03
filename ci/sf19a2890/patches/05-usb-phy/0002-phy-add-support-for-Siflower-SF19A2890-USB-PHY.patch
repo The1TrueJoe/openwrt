@@ -1,4 +1,4 @@
-From d9888368276bf356f066c7668262bb597c88e95b Mon Sep 17 00:00:00 2001
+From 234f22d27b3af909e3caf479247ad14f58ff33d5 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 9 Sep 2024 10:18:33 +0800
 Subject: [PATCH 2/2] phy: add support for Siflower SF19A2890 USB PHY
@@ -12,7 +12,7 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
  sleep control through the system manager syscon instead of a reg of
  its own, reset names "por" and "phy", undo the resets if the sleep
  control write fails, Kconfig dependencies and help, commit message,
- MAINTAINERS entry]
+ MAINTAINERS lines]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  MAINTAINERS                              |   1 +
@@ -27,13 +27,13 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  create mode 100644 drivers/phy/siflower/phy-sf19a2890-usb.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index c80bb8634..e1a92bd7d 100644
+index 50f236b74..a9e001e39 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
- L:	linux-phy@lists.infradead.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
+@@ -25707,6 +25707,7 @@ F:	Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
+ F:	arch/mips/boot/dts/siflower/
+ F:	arch/mips/configs/sf19a2890_defconfig
+ F:	arch/mips/include/asm/mach-siflower/
 +F:	drivers/phy/siflower/
  
  SILEAD TOUCHSCREEN DRIVER

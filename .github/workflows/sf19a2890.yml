@@ -32,24 +32,28 @@ jobs:
             bindings: mips/siflower.yaml
             mips_defconfig: sf19a2890_defconfig
           - series: 02-sysm
+            prereq: 01-mips
             tree: clk/linux.git
             branch: clk-next
             bindings: clock/siflower,sf19a2890-sysm.yaml
             syms: COMMON_CLK CLK_SF19A2890
             objs: drivers/clk/siflower/clk-sf19a2890.o
           - series: 03-pinctrl
+            prereq: 01-mips
             tree: linusw/linux-pinctrl.git
             branch: devel
             bindings: pinctrl/siflower,sf19a2890-pinctrl.yaml
             syms: PINCTRL PINCTRL_SF19A2890
             objs: drivers/pinctrl/pinctrl-sf19a2890.o
           - series: 04-gpio
+            prereq: 01-mips
             tree: brgl/linux.git
             branch: gpio/for-next
             bindings: gpio/siflower,sf19a2890-gpio.yaml
             syms: GPIOLIB PINCTRL GPIO_SIFLOWER
             objs: drivers/gpio/gpio-siflower.o
           - series: 05-usb-phy
+            prereq: 01-mips
             tree: phy/linux-phy.git
             branch: next
             bindings: phy/siflower,sf19a2890-usb-phy.yaml
@@ -62,6 +66,7 @@ jobs:
             syms: USB USB_DWC2 USB_DWC2_HOST
             objs: drivers/usb/dwc2/core_intr.o drivers/usb/dwc2/params.o
           - series: 07-gmac
+            prereq: 01-mips
             tree: netdev/net-next.git
             branch: main
             bindings: net/siflower,sf19a2890-gmac.yaml net/snps,dwmac.yaml
@@ -77,9 +82,9 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq bc bison flex libssl-dev libelf-dev \
             gcc-mipsel-linux-gnu clang lld llvm sparse u-boot-tools \
-            python3-venv swig libyaml-dev
+            python3-venv swig libyaml-dev python3-ply
           python3 -m venv ~/venv
-          ~/venv/bin/pip install -q dtschema yamllint
+          ~/venv/bin/pip install -q dtschema yamllint ply
           echo "$HOME/venv/bin" >> "$GITHUB_PATH"
 
       - name: Fetch the tree and apply the series
@@ -89,8 +94,14 @@ jobs:
           echo "base: ${{ matrix.tree }} ${{ matrix.branch }} $(git rev-parse --short=12 HEAD) $(git log -1 --format=%s)"
           git config user.name ci
           git config user.email ci@example.invalid
+          # A prerequisite series (series 1, which adds the MAINTAINERS entry)
+          # goes in first; only this series' own patches are checked below
+          if [ -n "${{ matrix.prereq }}" ]; then
+            git am -q ../ci-src/ci/sf19a2890/patches/${{ matrix.prereq }}/*.patch
+          fi
           git am -q ../ci-src/ci/sf19a2890/patches/${{ matrix.series }}/*.patch
           git log --oneline -12
+          echo "TIP=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "NPATCHES=$(ls ../ci-src/ci/sf19a2890/patches/${{ matrix.series }}/*.patch | wc -l)" >> "$GITHUB_ENV"
 
       - name: checkpatch --strict
@@ -105,11 +116,13 @@ jobs:
       - name: dt_binding_check (full)
         working-directory: linux
         run: |
-          make -j"$(nproc)" dt_binding_check > dt.log 2>&1 || { tail -50 dt.log; exit 1; }
+          # -k: a broken example elsewhere in the tree must not hide ours
+          make -k -j"$(nproc)" dt_binding_check > dt.log 2>&1 && st=0 || st=$?
           f=""
-          for b in ${{ matrix.bindings }}; do f="$f|$b"; done
-          grep -iE "(warning|error)" dt.log | grep -E "${f#|}" && exit 1
-          echo "full dt_binding_check: $(grep -ciE 'warning|error' dt.log) warnings or errors in the whole tree, none in this series' bindings"
+          for b in ${{ matrix.bindings }}; do f="$f|${b%.yaml}"; done
+          if grep -iE "(warning|error)" dt.log | grep -E "${f#|}"; then exit 1; fi
+          echo "full dt_binding_check exit $st; lines with warning/error in the tree: $(grep -ciE 'warning|error' dt.log), none from this series' bindings:"
+          grep -iE "(warning|error)" dt.log | grep -v '^  ' | head -20 || true
 
       - name: MIPS W=1, every commit
         if: matrix.mips_defconfig
@@ -134,7 +147,7 @@ jobs:
               echo "ok: $subj"
             fi
           done
-          git checkout -q -
+          git checkout -q $TIP
           make $m sf19a2890_defconfig >/dev/null
           make $m savedefconfig >/dev/null
           diff -u arch/mips/configs/sf19a2890_defconfig defconfig && echo "savedefconfig: no change"
@@ -174,7 +187,7 @@ jobs:
                 echo "$name ok: $subj"
               fi
             done
-            git checkout -q -
+            git checkout -q $TIP
           done
           exit $fail
 
@@ -207,10 +220,24 @@ jobs:
           git am -q $P/01-mips/*.patch
           git branch s1
           for s in 02-sysm 03-pinctrl 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts deps-leds deps-gsw; do
-            # MAINTAINERS entries are left out: each series adds its own at
-            # the same place, which only a merge could combine
+            # Each series adds its F: lines to series 1's entry on its own
+            # tree; here they are merged in one go below, as a merge would
             git am -q --exclude=MAINTAINERS $P/$s/*.patch || { git am --abort; echo "::error::$s does not apply to mainline"; exit 1; }
           done
+          python3 - $P <<'PY'
+          import glob, sys
+          f = set()
+          for p in glob.glob(sys.argv[1] + '/0[2-8]*/*.patch'):
+              f |= {l[3:].strip() for l in open(p) if l.startswith('+F:\t')}
+          lines = open('MAINTAINERS').read().split('\n')
+          i = lines.index('SIFLOWER SF19A2890 SOC SUPPORT'); j = i + 1
+          while lines[j]: j += 1
+          head = [l for l in lines[i+1:j] if not l.startswith('F:')]
+          fs = sorted({l for l in lines[i+1:j] if l.startswith('F:')} | {'F:\t' + x for x in f}, key=lambda l: l[3:])
+          lines[i+1:j] = head + fs
+          open('MAINTAINERS', 'w').write('\n'.join(lines))
+          PY
+          git commit -q -a -m "MAINTAINERS: merge the SIFLOWER F: lines of all series"
           git log --oneline -40
 
       - name: dtbs_check W=1 (GL-SFT1200)
@@ -219,9 +246,22 @@ jobs:
           m="ARCH=mips CROSS_COMPILE=mipsel-linux-gnu-"
           make $m sf19a2890_defconfig >/dev/null
           make $m W=1 CHECK_DTBS=y siflower/sf19a2890-glinet-gl-sft1200.dtb 2>&1 | tee dtbs.log
-          if grep -E 'warning|error' dtbs.log; then exit 1; fi
+          # Anything but make's own progress lines is a finding
+          if grep -vE '^  [A-Z]+ ' dtbs.log; then exit 1; fi
+          echo "dtbs_check W=1: no findings"
           make $m savedefconfig >/dev/null
           diff -u arch/mips/configs/sf19a2890_defconfig defconfig && echo "savedefconfig: no change"
+
+      - name: MAINTAINERS checks
+        working-directory: linux
+        run: |
+          awk '/^SIFLOWER SF19A2890 SOC SUPPORT$/,/^$/' MAINTAINERS
+          perl scripts/get_maintainer.pl --self-test=patterns,sections 2>&1 | tee selftest.log | grep -i siflower && exit 1
+          echo "get_maintainer --self-test: nothing about the SIFLOWER entry ($(wc -l < selftest.log) lines in all)"
+          perl scripts/parse-maintainers.pl --input=MAINTAINERS --output=M.sorted --order
+          diff <(awk '/^SIFLOWER SF19A2890 SOC SUPPORT$/,/^$/' MAINTAINERS) <(awk '/^SIFLOWER SF19A2890 SOC SUPPORT$/,/^$/' M.sorted)
+          echo "parse-maintainers: the SIFLOWER entry is already in canonical order"
+          perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/clk/siflower/clk-sf19a2890.c
 
       - name: Build the initramfs userland
         run: |

@@ -1,4 +1,4 @@
-From 19abd0711bbc552109333e76eb1109a4893839f1 Mon Sep 17 00:00:00 2001
+From 8f714a3d4d5f0ab31aa71ac456ff7a17498d0ecb Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:03:34 -0500
 Subject: [PATCH 2/2] net: stmmac: Add Siflower SF19A2890 glue
@@ -22,13 +22,13 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 8ce21e37f..5d408f342 100644
+index ee9d3b91c..38ee05a98 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -25659,6 +25659,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
- L:	netdev@vger.kernel.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
+@@ -25663,6 +25663,7 @@ F:	Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
+ F:	arch/mips/boot/dts/siflower/
+ F:	arch/mips/configs/sf19a2890_defconfig
+ F:	arch/mips/include/asm/mach-siflower/
 +F:	drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
  
  SILEAD TOUCHSCREEN DRIVER

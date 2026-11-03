@@ -1,4 +1,4 @@
-From 68e7ae6297be949e8e1988f796a00808ae327ece Mon Sep 17 00:00:00 2001
+From 6ee97b556b8b91a41539bf1e3a1b9a1f9e94561f Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 1/3] MIPS: dts: sf19a2890: Describe the system manager and
