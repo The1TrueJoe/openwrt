@@ -1,4 +1,4 @@
-From e15a35f8314248a6ff3a7c1ab074e6c7e7d0190d Mon Sep 17 00:00:00 2001
+From 21c951a96ae4f8164e311cd6805fac19e3b7a5e4 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 3/3] MIPS: configs: sf19a2890: Enable the SoC and GL-SFT1200
@@ -9,14 +9,14 @@ GL.iNet GL-SFT1200's switch, SPI NAND, LEDs and buttons.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- arch/mips/configs/sf19a2890_defconfig | 35 +++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ arch/mips/configs/sf19a2890_defconfig | 36 +++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
 diff --git a/arch/mips/configs/sf19a2890_defconfig b/arch/mips/configs/sf19a2890_defconfig
-index ec0992ac6..ea01e76cf 100644
+index ec0992ac6..e0db386e7 100644
 --- a/arch/mips/configs/sf19a2890_defconfig
 +++ b/arch/mips/configs/sf19a2890_defconfig
-@@ -7,9 +7,44 @@ CONFIG_MACH_SIFLOWER_MIPS=y
+@@ -7,9 +7,45 @@ CONFIG_MACH_SIFLOWER_MIPS=y
  CONFIG_MIPS_CPS=y
  CONFIG_NR_CPUS=4
  CONFIG_MIPS_RAW_APPENDED_DTB=y
@@ -47,6 +47,7 @@ index ec0992ac6..ea01e76cf 100644
 +CONFIG_SPI_PL022=y
 +CONFIG_PINCTRL=y
 +CONFIG_GPIOLIB=y
++CONFIG_GPIO_SIFLOWER=y
 +CONFIG_POWER_RESET=y
 +CONFIG_POWER_RESET_SYSCON=y
 +CONFIG_WATCHDOG=y
