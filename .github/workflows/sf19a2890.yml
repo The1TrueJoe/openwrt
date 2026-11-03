@@ -149,23 +149,8 @@ jobs:
           done
           git checkout -q $TIP
           make $m sf19a2890_defconfig >/dev/null
-          # Every driver the GL-SFT1200 needs must end up built in
-          fail=0
-          for s in MACH_SIFLOWER_MIPS CLK_SF19A2890 PINCTRL_SF19A2890 GPIO_SIFLOWER \
-                   PHY_SF19A2890_USB USB_DWC2 DWMAC_SF19A2890 NET_DSA_MXL_GSW1XX \
-                   INTEL_XWAY_PHY MTD_SPI_NAND SPI_PL022 I2C_DESIGNWARE_PLATFORM \
-                   LEDS_KTD202X KEYBOARD_GPIO DW_WATCHDOG POWER_RESET_SYSCON \
-                   SERIAL_AMBA_PL011_CONSOLE USB_STORAGE; do
-            grep -q "^CONFIG_$s=y" .config || { echo "::error::CONFIG_$s is not built in"; fail=1; }
-          done
           make $m savedefconfig >/dev/null
-          if diff -u arch/mips/configs/sf19a2890_defconfig defconfig; then
-            echo "savedefconfig: no change"
-          else
-            echo "::warning::sf19a2890_defconfig differs from savedefconfig; savedefconfig output:"
-            cat defconfig
-          fi
-          exit $fail
+          if diff -u arch/mips/configs/sf19a2890_defconfig defconfig; then echo "savedefconfig: no change"; else fail=1; fi
           exit $fail
 
       - name: COMPILE_TEST W=1, every commit (mipsel gcc, x86_64 clang, x86_64 gcc + sparse)
@@ -264,8 +249,23 @@ jobs:
           # Anything but make's own progress lines is a finding
           if grep -vE '^  [A-Z]+ ' dtbs.log; then exit 1; fi
           echo "dtbs_check W=1: no findings"
+          # Every driver the GL-SFT1200 needs must end up built in
+          fail=0
+          for s in MACH_SIFLOWER_MIPS CLK_SF19A2890 PINCTRL_SF19A2890 GPIO_SIFLOWER \
+                   PHY_SF19A2890_USB USB_DWC2 DWMAC_SF19A2890 NET_DSA_MXL_GSW1XX \
+                   INTEL_XWAY_PHY MTD_SPI_NAND SPI_PL022 I2C_DESIGNWARE_PLATFORM \
+                   LEDS_KTD202X KEYBOARD_GPIO DW_WATCHDOG POWER_RESET_SYSCON \
+                   SERIAL_AMBA_PL011_CONSOLE USB_STORAGE; do
+            grep -q "^CONFIG_$s=y" .config || { echo "::error::CONFIG_$s is not built in"; fail=1; }
+          done
           make $m savedefconfig >/dev/null
-          diff -u arch/mips/configs/sf19a2890_defconfig defconfig && echo "savedefconfig: no change"
+          if diff -u arch/mips/configs/sf19a2890_defconfig defconfig; then
+            echo "savedefconfig: no change"
+          else
+            echo "::warning::sf19a2890_defconfig differs from savedefconfig; savedefconfig output:"
+            cat defconfig
+          fi
+          exit $fail
 
       - name: MAINTAINERS checks
         working-directory: linux
@@ -286,7 +286,9 @@ jobs:
           curl -fsSL https://busybox.net/downloads/busybox-1.37.0.tar.bz2 | tar xj
           make -C busybox-1.37.0 defconfig >/dev/null
           sed -i -e 's/^# CONFIG_STATIC is not set/CONFIG_STATIC=y/' \
-                 -e 's/^CONFIG_TC=y/# CONFIG_TC is not set/' busybox-1.37.0/.config
+                 -e 's/^CONFIG_TC=y/# CONFIG_TC is not set/' \
+                 -e 's/^CONFIG_SHA1_HWACCEL=y/# CONFIG_SHA1_HWACCEL is not set/' \
+                 -e 's/^CONFIG_SHA256_HWACCEL=y/# CONFIG_SHA256_HWACCEL is not set/' busybox-1.37.0/.config
           make -C busybox-1.37.0 CROSS_COMPILE=mipsel-linux-gnu- -j"$(nproc)" busybox busybox.links >/dev/null
           curl -fsSL https://downloads.es.net/pub/iperf/iperf-3.18.tar.gz | tar xz
           (cd iperf-3.18 && ./configure -q --host=mipsel-linux-gnu --disable-shared --enable-static \
