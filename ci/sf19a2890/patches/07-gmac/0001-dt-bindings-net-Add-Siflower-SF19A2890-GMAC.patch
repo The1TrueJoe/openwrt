@@ -1,4 +1,4 @@
-From d80b987181af006e70f354ea012b5671da3175c3 Mon Sep 17 00:00:00 2001
+From 24a0cbc54fb60a0eb5fd58e386d90b399a02c8cd Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:03:33 -0500
 Subject: [PATCH 1/2] dt-bindings: net: Add Siflower SF19A2890 GMAC
@@ -12,7 +12,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../bindings/net/siflower,sf19a2890-gmac.yaml | 110 ++++++++++++++++++
  .../devicetree/bindings/net/snps,dwmac.yaml   |   1 +
- 2 files changed, 111 insertions(+)
+ MAINTAINERS                                   |   6 +
+ 3 files changed, 117 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
 
 diff --git a/Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml b/Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
@@ -143,6 +144,23 @@ index 2c4842404..c3d96d58a 100644
          - snps,dwmac
          - snps,dwmac-3.40a
          - snps,dwmac-3.50a
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 09713dc4c..f4b3a33bf 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25654,6 +25654,12 @@ N:	sifive
+ K:	fu[57]40
+ K:	[^@]sifive
+ 
++SIFLOWER SF19A2890 DWMAC GLUE LAYER
++M:	Joseph Telaak <joseph@telaak.dev>
++L:	netdev@vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
++
+ SILEAD TOUCHSCREEN DRIVER
+ M:	Hans de Goede <hansg@kernel.org>
+ L:	linux-input@vger.kernel.org
 -- 
 2.50.1 (Apple Git-155)
 

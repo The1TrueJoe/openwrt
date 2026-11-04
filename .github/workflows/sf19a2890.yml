@@ -246,11 +246,24 @@ jobs:
           echo "mainline: $(git rev-parse --short=12 HEAD) $(git describe --tags 2>/dev/null || true)"
           git config user.name ci
           git config user.email ci@example.invalid
-          P=../ci-src/ci/sf19a2890/patches
+          P=$(realpath ../ci-src/ci/sf19a2890/patches)
+          base=$(git rev-parse HEAD)
           git am -q $P/01-mips/*.patch
           git branch s1
           for s in 02-sysm 03-pinctrl 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts deps-leds deps-gsw; do
-            git am -q $P/$s/*.patch || { git am --abort; echo "::error::$s does not apply to mainline"; exit 1; }
+            git am -q $P/$s/*.patch && continue
+            git am --abort
+            # Series for different trees may add MAINTAINERS entries at the
+            # same place. Apply the rest, then merge this series' entries in
+            # title order, as a maintainer would.
+            git am -q --exclude=MAINTAINERS $P/$s/*.patch || { git am --abort; echo "::error::$s does not apply to mainline"; exit 1; }
+            rm -rf ../m; git init -q ../m; git show $base:MAINTAINERS > ../m/base; cp ../m/base ../m/MAINTAINERS
+            for f in $P/$s/*.patch; do git -C ../m apply --include=MAINTAINERS $f; done
+            git merge-file -L ours -L base -L $s MAINTAINERS ../m/base ../m/MAINTAINERS ||
+              python3 ../ci-src/ci/sf19a2890/merge-maintainers.py MAINTAINERS
+            if grep -qE '^(<<<<<<<|>>>>>>>) ' MAINTAINERS; then echo "::error::$s: MAINTAINERS conflict left"; exit 1; fi
+            git commit -qam "MAINTAINERS: merge the $s entries"
+            echo "$s: MAINTAINERS entries merged"
           done
           git log --oneline -40
 
@@ -284,13 +297,18 @@ jobs:
       - name: MAINTAINERS checks
         working-directory: linux
         run: |
-          awk '/^SIFLOWER SF19A2890 SOC SUPPORT$/,/^$/' MAINTAINERS
+          awk '/^SIFLOWER /,/^$/' MAINTAINERS
           perl scripts/get_maintainer.pl --self-test=patterns,sections 2>&1 | tee selftest.log | grep -i siflower && exit 1
-          echo "get_maintainer --self-test: nothing about the SIFLOWER entry ($(wc -l < selftest.log) lines in all)"
+          echo "get_maintainer --self-test: nothing about the SIFLOWER entries ($(wc -l < selftest.log) lines in all)"
           perl scripts/parse-maintainers.pl --input=MAINTAINERS --output=M.sorted --order
-          diff <(awk '/^SIFLOWER SF19A2890 SOC SUPPORT$/,/^$/' MAINTAINERS) <(awk '/^SIFLOWER SF19A2890 SOC SUPPORT$/,/^$/' M.sorted)
-          echo "parse-maintainers: the SIFLOWER entry is already in canonical order"
+          for e in "SIFLOWER SF19A2890 DWMAC GLUE LAYER" "SIFLOWER SF19A2890 SOC SUPPORT"; do
+            grep -qx "$e" MAINTAINERS || { echo "::error::no $e entry"; exit 1; }
+            diff <(awk -v e="$e" '$0 == e, /^$/' MAINTAINERS) <(awk -v e="$e" '$0 == e, /^$/' M.sorted)
+          done
+          diff <(grep '^SIFLOWER ' MAINTAINERS) <(grep '^SIFLOWER ' M.sorted)
+          echo "parse-maintainers: the SIFLOWER entries are already in canonical order"
           perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/clk/siflower/clk-sf19a2890.c
+          perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
 
       - name: Build the initramfs userland
         run: |
@@ -363,6 +381,8 @@ jobs:
 
           # Full stack: mainline + every series + ET6326 + GSW1xx reset
           bench_cfg; image full
+          # mxl-gsw1xx takes the switch's reset-gpios through the reset framework
+          grep -q '^CONFIG_RESET_GPIO=y' ../images/full.config || { echo "::error::RESET_GPIO is not built in"; exit 1; }
 
           # The same without the dwc2 OTG interrupt patch, to show it is needed
           c=$(git log --format=%H -1 --grep='^usb: dwc2: Handle OTG interrupts that GINTSTS does not flag$')

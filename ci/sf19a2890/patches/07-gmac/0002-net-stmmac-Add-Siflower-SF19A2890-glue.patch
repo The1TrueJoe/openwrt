@@ -1,4 +1,4 @@
-From 67920ed860443f65be8e1d2a77fb9f25490b4d05 Mon Sep 17 00:00:00 2001
+From 08a27d0e1cb910dfc4deb9f2839a0423d182008c Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:03:34 -0500
 Subject: [PATCH 2/2] net: stmmac: Add Siflower SF19A2890 glue
@@ -7,7 +7,9 @@ Add the glue for the DesignWare GMAC of the Siflower SF19A2890. The
 interface type is set in the GMAC's configuration block through the
 set_phy_intf_sel hook, and so are the RGMII clock delays, which the
 MAC adds only where rx-internal-delay-ps or tx-internal-delay-ps is
-present.
+present. It then sets has_internal_tx_delay and has_internal_rx_delay,
+so stmmac takes those delays off the mode it passes on and the PHY does
+not add them as well: "rgmii-id" with both delays becomes "rgmii".
 
 The delay line's step is not documented. Sweeping each delay over its
 whole range with the link at 1000 Mb/s, the working windows repeat every
@@ -23,12 +25,25 @@ for SGMII, and the flag is gone.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
+ MAINTAINERS                                   |   1 +
  drivers/net/ethernet/stmicro/stmmac/Kconfig   |  11 ++
  drivers/net/ethernet/stmicro/stmmac/Makefile  |   1 +
- .../ethernet/stmicro/stmmac/dwmac-sf19a2890.c | 158 ++++++++++++++++++
- 3 files changed, 170 insertions(+)
+ .../ethernet/stmicro/stmmac/dwmac-sf19a2890.c | 162 ++++++++++++++++++
+ 4 files changed, 175 insertions(+)
  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f4b3a33bf..46d0c907f 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25659,6 +25659,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
+ L:	netdev@vger.kernel.org
+ S:	Maintained
+ F:	Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
++F:	drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
+ 
+ SILEAD TOUCHSCREEN DRIVER
+ M:	Hans de Goede <hansg@kernel.org>
 diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
 index c6559e749..78efe7859 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
@@ -65,10 +80,10 @@ index b16a456b7..9330de094 100644
  obj-$(CONFIG_DWMAC_SPACEMIT)	+= dwmac-spacemit.o
 diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
 new file mode 100644
-index 000000000..41bfe7a4a
+index 000000000..8cb44c538
 --- /dev/null
 +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
-@@ -0,0 +1,158 @@
+@@ -0,0 +1,162 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Siflower SF19A2890 GMAC glue
@@ -105,7 +120,6 @@ index 000000000..41bfe7a4a
 +#define SF19A2890_DELAY_STEP_PS		55
 +
 +struct sf19a2890_gmac {
-+	struct device *dev;
 +	void __iomem *cfg;
 +};
 +
@@ -127,40 +141,48 @@ index 000000000..41bfe7a4a
 +	return 0;
 +}
 +
-+static int sf19a2890_gmac_get_delay(struct sf19a2890_gmac *gmac,
-+				    const char *prop, u32 *steps)
++static int sf19a2890_gmac_get_delay(struct device *dev, const char *prop,
++				    u32 *steps)
 +{
 +	u32 ps;
 +
 +	*steps = 0;
-+	if (of_property_read_u32(gmac->dev->of_node, prop, &ps))
++	if (of_property_read_u32(dev->of_node, prop, &ps))
 +		return 0;
 +
 +	*steps = DIV_ROUND_CLOSEST(ps, SF19A2890_DELAY_STEP_PS);
 +	if (*steps > SF19A2890_DELAY_MAX)
-+		return dev_err_probe(gmac->dev, -EINVAL,
-+				     "%s too large: %u\n", prop, ps);
++		return dev_err_probe(dev, -EINVAL, "%s too large: %u\n",
++				     prop, ps);
 +
 +	return 0;
 +}
 +
-+/* The MAC adds an RGMII delay only where the device tree asks for one */
-+static int sf19a2890_gmac_set_delays(struct sf19a2890_gmac *gmac)
++/*
++ * The MAC adds an RGMII delay only where the device tree asks for one, and
++ * tells stmmac so that the same delay is not asked of the PHY as well.
++ */
++static int sf19a2890_gmac_set_delays(struct device *dev,
++				     struct sf19a2890_gmac *gmac,
++				     struct plat_stmmacenet_data *plat_dat)
 +{
 +	u32 tx, rx;
 +	int ret;
 +
-+	ret = sf19a2890_gmac_get_delay(gmac, "tx-internal-delay-ps", &tx);
++	ret = sf19a2890_gmac_get_delay(dev, "tx-internal-delay-ps", &tx);
 +	if (ret)
 +		return ret;
 +
-+	ret = sf19a2890_gmac_get_delay(gmac, "rx-internal-delay-ps", &rx);
++	ret = sf19a2890_gmac_get_delay(dev, "rx-internal-delay-ps", &rx);
 +	if (ret)
 +		return ret;
 +
 +	writel(tx, gmac->cfg + SF19A2890_GMAC_TX_DELAY);
 +	writel(rx, gmac->cfg + SF19A2890_GMAC_RX_DELAY);
 +	writel(!!rx, gmac->cfg + SF19A2890_GMAC_RX_DELAY_EN);
++
++	plat_dat->has_internal_tx_delay = !!tx;
++	plat_dat->has_internal_rx_delay = !!rx;
 +
 +	return 0;
 +}
@@ -178,8 +200,6 @@ index 000000000..41bfe7a4a
 +	if (!gmac)
 +		return -ENOMEM;
 +
-+	gmac->dev = dev;
-+
 +	gmac->cfg = devm_platform_ioremap_resource(pdev, 1);
 +	if (IS_ERR(gmac->cfg))
 +		return dev_err_probe(dev, PTR_ERR(gmac->cfg),
@@ -190,10 +210,6 @@ index 000000000..41bfe7a4a
 +		return dev_err_probe(dev, PTR_ERR(clk),
 +				     "failed to enable the byp_ref clock\n");
 +
-+	ret = sf19a2890_gmac_set_delays(gmac);
-+	if (ret)
-+		return ret;
-+
 +	ret = stmmac_get_platform_resources(pdev, &stmmac_res);
 +	if (ret)
 +		return ret;
@@ -202,10 +218,14 @@ index 000000000..41bfe7a4a
 +	if (IS_ERR(plat_dat))
 +		return PTR_ERR(plat_dat);
 +
++	ret = sf19a2890_gmac_set_delays(dev, gmac, plat_dat);
++	if (ret)
++		return ret;
++
 +	plat_dat->bsp_priv = gmac;
 +	plat_dat->set_phy_intf_sel = sf19a2890_gmac_set_phy_intf_sel;
 +
-+	return stmmac_dvr_probe(dev, plat_dat, &stmmac_res);
++	return devm_stmmac_pltfr_probe(pdev, plat_dat, &stmmac_res);
 +}
 +
 +static const struct of_device_id sf19a2890_gmac_match[] = {
@@ -216,7 +236,6 @@ index 000000000..41bfe7a4a
 +
 +static struct platform_driver sf19a2890_gmac_driver = {
 +	.probe = sf19a2890_gmac_probe,
-+	.remove = stmmac_pltfr_remove,
 +	.driver = {
 +		.name = "sf19a2890-gmac",
 +		.pm = &stmmac_pltfr_pm_ops,
