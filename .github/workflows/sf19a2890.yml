@@ -43,30 +43,35 @@ jobs:
             bindings: pinctrl/siflower,sf19a2890-pinctrl.yaml
             syms: PINCTRL PINCTRL_SF19A2890
             objs: drivers/pinctrl/pinctrl-sf19a2890.o
+            mods: PINCTRL_SF19A2890
           - series: 04-gpio
             tree: brgl/linux.git
             branch: gpio/for-next
             bindings: gpio/siflower,sf19a2890-gpio.yaml
             syms: GPIOLIB PINCTRL GPIO_SIFLOWER
             objs: drivers/gpio/gpio-siflower.o
+            mods: GPIO_SIFLOWER
           - series: 05-usb-phy
             tree: phy/linux-phy.git
             branch: next
             bindings: phy/siflower,sf19a2890-usb-phy.yaml
             syms: PHY_SF19A2890_USB
             objs: drivers/phy/siflower/phy-sf19a2890-usb.o
+            mods: PHY_SF19A2890_USB
           - series: 06-dwc2
             tree: gregkh/usb.git
             branch: usb-next
             bindings: usb/dwc2.yaml
             syms: USB USB_DWC2 USB_DWC2_HOST
             objs: drivers/usb/dwc2/core_intr.o drivers/usb/dwc2/params.o
+            mods: USB_DWC2
           - series: 07-gmac
             tree: netdev/net-next.git
             branch: main
             bindings: net/siflower,sf19a2890-gmac.yaml net/snps,dwmac.yaml
             syms: NETDEVICES STMMAC_ETH STMMAC_PLATFORM DWMAC_SF19A2890
             objs: drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.o
+            mods: STMMAC_ETH STMMAC_PLATFORM DWMAC_SF19A2890
     steps:
       - uses: actions/checkout@v4
         with:
@@ -198,21 +203,21 @@ jobs:
           out=../out-mod
           make O=$out defconfig >/dev/null
           ./scripts/config --file $out/.config -e COMPILE_TEST -e OF -e RESET_CONTROLLER -e MFD_SYSCON -e NET -e INET -e SPARSE_IRQ
+          # Frameworks and bool drivers built in, our tristate drivers as
+          # modules; every intended module must really end up =m
           for s in ${{ matrix.syms }}; do ./scripts/config --file $out/.config -e $s; done
+          for s in ${{ matrix.mods }}; do ./scripts/config --file $out/.config -m $s; done
           make O=$out olddefconfig >/dev/null
-          # Tristate symbols as modules; bool ones stay built in
-          for s in ${{ matrix.syms }}; do
-            ./scripts/config --file $out/.config -m $s
-            make O=$out olddefconfig >/dev/null 2>&1
-            grep -qE "^CONFIG_$s=[ym]" $out/.config || {
-              ./scripts/config --file $out/.config -e $s
-              make O=$out olddefconfig >/dev/null 2>&1
-            }
+          for s in ${{ matrix.mods }}; do
+            grep -q "^CONFIG_$s=m" $out/.config || { echo "::error::CONFIG_$s is not =m"; exit 1; }
           done
-          grep -E "^CONFIG_($(echo ${{ matrix.syms }} | tr ' ' '|'))=" $out/.config
+          for s in ${{ matrix.syms }}; do
+            grep -qE "^CONFIG_$s=[ym]" $out/.config || { echo "::error::CONFIG_$s not set"; exit 1; }
+          done
           grep -q '^CONFIG_SPARSE_IRQ=y' $out/.config
-          make O=$out -j"$(nproc)" vmlinux modules > $out/mod.log 2>&1 || { grep -E 'error|ERROR' $out/mod.log | head -20; tail -30 $out/mod.log; exit 1; }
+          make O=$out -j"$(nproc)" vmlinux modules > $out/mod.log 2>&1 && st=0 || st=$?
           if grep -E 'ERROR: modpost|WARNING: modpost' $out/mod.log; then exit 1; fi
+          if [ $st -ne 0 ]; then grep -E 'error' $out/mod.log | head -20; tail -30 $out/mod.log; exit 1; fi
           find $out/drivers -name '*siflower*.ko' -o -name '*sf19a2890*.ko' | sed 's#^../out-mod/##'
           echo "modules and modpost: clean"
 
