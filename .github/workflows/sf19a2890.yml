@@ -124,16 +124,17 @@ jobs:
           echo "full dt_binding_check exit $st; lines with warning/error in the tree: $(grep -ciE 'warning|error' dt.log), none from this series' bindings:"
           grep -iE "(warning|error)" dt.log | grep -v '^  ' | head -20 || true
 
-      - name: dt-check-style --mode=strict, linux-next's (new bindings)
+      - name: dt-check-style --mode=strict, linux-next's (new bindings, changed .dts/.dtsi)
         working-directory: linux
         run: |
           # linux-next's, like checkpatch: a tree's own copy may predate rule changes
           s=../dt-check-style; curl -fsSL "$KORG/next/linux-next.git/plain/scripts/dtc/dt-check-style" -o $s
           echo "dt-check-style from linux$(curl -fsSL "$KORG/next/linux-next.git/plain/localversion-next")"
           new=$(git diff --name-only --diff-filter=A HEAD~$NPATCHES HEAD -- 'Documentation/devicetree/bindings/*.yaml')
-          [ -n "$new" ] || { echo "no new bindings"; exit 0; }
-          python3 $s --mode=strict $new
-          echo "dt-check-style --mode=strict: clean on" $new
+          dts=$(git diff --name-only --diff-filter=AM HEAD~$NPATCHES HEAD -- '*.dts' '*.dtsi')
+          [ -n "$new$dts" ] || { echo "no new bindings or changed dts"; exit 0; }
+          python3 $s --mode=strict $new $dts
+          echo "dt-check-style --mode=strict: clean on" $new $dts
 
       - name: MIPS W=1, every commit
         if: matrix.mips_defconfig

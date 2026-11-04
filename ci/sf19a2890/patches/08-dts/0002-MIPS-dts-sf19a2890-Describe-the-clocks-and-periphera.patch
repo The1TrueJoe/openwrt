@@ -1,4 +1,4 @@
-From 1a807b0b8b2f52c0ce0cb6778430466dd71a32d1 Mon Sep 17 00:00:00 2001
+From 1a655fb42727bee51f77524e088b1ff32d108454 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 2/4] MIPS: dts: sf19a2890: Describe the clocks and peripherals
@@ -22,7 +22,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  1 file changed, 378 insertions(+), 16 deletions(-)
 
 diff --git a/arch/mips/boot/dts/siflower/sf19a2890.dtsi b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
-index 3a4b39971..e13332ff5 100644
+index 1c342cbaa..1b77952de 100644
 --- a/arch/mips/boot/dts/siflower/sf19a2890.dtsi
 +++ b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
 @@ -1,5 +1,6 @@
@@ -32,7 +32,40 @@ index 3a4b39971..e13332ff5 100644
  #include <dt-bindings/interrupt-controller/irq.h>
  #include <dt-bindings/interrupt-controller/mips-gic.h>
  
-@@ -16,51 +17,47 @@ cpu@0 {
+@@ -8,26 +9,22 @@ / {
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
+ 
+-	/*
+-	 * The bootloader sets up these clocks. They stand in for the system
+-	 * clock controller until it has a driver.
+-	 */
+-	pbus_clk: clock-100000000 {
++	osc12m: clock-12000000 {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-		clock-frequency = <100000000>;
++		clock-frequency = <12000000>;
+ 	};
+ 
+-	uart_clk: clock-125000000 {
++	osc32k: clock-32768 {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-		clock-frequency = <125000000>;
++		clock-frequency = <32768>;
+ 	};
+ 
+-	cpu_clk: clock-800000000 {
++	osc40m: clock-40000000 {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-		clock-frequency = <800000000>;
++		clock-frequency = <40000000>;
+ 	};
+ 
+ 	cpus {
+@@ -38,28 +35,28 @@ cpu@0 {
  			device_type = "cpu";
  			compatible = "mti,interaptiv";
  			reg = <0>;
@@ -65,37 +98,8 @@ index 3a4b39971..e13332ff5 100644
  		};
  	};
  
--	/*
--	 * The bootloader sets up these clocks. They stand in for the system
--	 * clock controller until it has a driver.
--	 */
--	cpu_clk: clock-800000000 {
-+	osc12m: clock-12000000 {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
--		clock-frequency = <800000000>;
-+		clock-frequency = <12000000>;
- 	};
- 
--	pbus_clk: clock-100000000 {
-+	osc32k: clock-32768 {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
--		clock-frequency = <100000000>;
-+		clock-frequency = <32768>;
- 	};
- 
--	uart_clk: clock-125000000 {
-+	osc40m: clock-40000000 {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
--		clock-frequency = <125000000>;
-+		clock-frequency = <40000000>;
- 	};
- 
- 	soc {
-@@ -70,15 +67,380 @@ soc {
- 		ranges;
+@@ -70,16 +67,381 @@ soc {
+ 		#size-cells = <1>;
  		interrupt-parent = <&gic>;
  
 +		gmac: ethernet@10800000 {
@@ -171,6 +175,7 @@ index 3a4b39971..e13332ff5 100644
 +			resets = <&uart_crm 0>;
 +			pinctrl-names = "default";
 +			pinctrl-0 = <&uart0_pins>;
++
 +			status = "disabled";
 +		};
 +
@@ -263,7 +268,7 @@ index 3a4b39971..e13332ff5 100644
 +			#clock-cells = <1>;
 +			#reset-cells = <1>;
 +		};
-+
+ 
 +		rf_crm: clock-controller@19e08800 {
 +			compatible = "siflower,sf19a2890-rf-crm";
 +			reg = <0x19e08800 0x10>;
@@ -476,7 +481,7 @@ index 3a4b39971..e13332ff5 100644
  		gic: interrupt-controller@1bdc0000 {
  			compatible = "mti,gic";
  			reg = <0x1bdc0000 0x20000>;
-@@ -89,7 +451,7 @@ gic: interrupt-controller@1bdc0000 {
+@@ -90,7 +452,7 @@ gic: interrupt-controller@1bdc0000 {
  			timer {
  				compatible = "mti,gic-timer";
  				interrupts = <GIC_LOCAL 1 IRQ_TYPE_NONE>;

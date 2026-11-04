@@ -1,4 +1,4 @@
-From 620e3fd35d9eee21a0b7148e378887c08cdb2a11 Mon Sep 17 00:00:00 2001
+From 90a50f2e4673e79fce5d1126039e46e2a1e36be8 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:51:28 -0500
 Subject: [PATCH 3/4] MIPS: dts: Add Siflower SF19A2890 and GL.iNet GL-SFT1200
@@ -19,8 +19,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  arch/mips/boot/dts/Makefile                   |  1 +
  arch/mips/boot/dts/siflower/Makefile          |  2 +
  .../siflower/sf19a2890-glinet-gl-sft1200.dts  | 27 ++++++
- arch/mips/boot/dts/siflower/sf19a2890.dtsi    | 96 +++++++++++++++++++
- 5 files changed, 127 insertions(+)
+ arch/mips/boot/dts/siflower/sf19a2890.dtsi    | 97 +++++++++++++++++++
+ 5 files changed, 128 insertions(+)
  create mode 100644 arch/mips/boot/dts/siflower/Makefile
  create mode 100644 arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
  create mode 100644 arch/mips/boot/dts/siflower/sf19a2890.dtsi
@@ -90,10 +90,10 @@ index 000000000..13e6a0c8b
 +};
 diff --git a/arch/mips/boot/dts/siflower/sf19a2890.dtsi b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
 new file mode 100644
-index 000000000..3a4b39971
+index 000000000..1c342cbaa
 --- /dev/null
 +++ b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
-@@ -0,0 +1,96 @@
+@@ -0,0 +1,97 @@
 +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
 +
 +#include <dt-bindings/interrupt-controller/irq.h>
@@ -103,6 +103,28 @@ index 000000000..3a4b39971
 +	compatible = "siflower,sf19a2890";
 +	#address-cells = <1>;
 +	#size-cells = <1>;
++
++	/*
++	 * The bootloader sets up these clocks. They stand in for the system
++	 * clock controller until it has a driver.
++	 */
++	pbus_clk: clock-100000000 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <100000000>;
++	};
++
++	uart_clk: clock-125000000 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <125000000>;
++	};
++
++	cpu_clk: clock-800000000 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <800000000>;
++	};
 +
 +	cpus {
 +		#address-cells = <1>;
@@ -137,33 +159,11 @@ index 000000000..3a4b39971
 +		};
 +	};
 +
-+	/*
-+	 * The bootloader sets up these clocks. They stand in for the system
-+	 * clock controller until it has a driver.
-+	 */
-+	cpu_clk: clock-800000000 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <800000000>;
-+	};
-+
-+	pbus_clk: clock-100000000 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <100000000>;
-+	};
-+
-+	uart_clk: clock-125000000 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+	};
-+
 +	soc {
 +		compatible = "simple-bus";
++		ranges;
 +		#address-cells = <1>;
 +		#size-cells = <1>;
-+		ranges;
 +		interrupt-parent = <&gic>;
 +
 +		uart0: serial@18300000 {
@@ -172,6 +172,7 @@ index 000000000..3a4b39971
 +			interrupts = <GIC_SHARED 226 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&uart_clk>, <&pbus_clk>;
 +			clock-names = "uartclk", "apb_pclk";
++
 +			status = "disabled";
 +		};
 +

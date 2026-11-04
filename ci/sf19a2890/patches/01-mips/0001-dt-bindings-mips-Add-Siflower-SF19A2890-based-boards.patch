@@ -1,4 +1,4 @@
-From fc2926cf0143ab579955398af720fd9041452ca9 Mon Sep 17 00:00:00 2001
+From 074ff2c0dbf61056d88835d410f952eae8bfc11d Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:49:40 -0500
 Subject: [PATCH 1/4] dt-bindings: mips: Add Siflower SF19A2890 based boards
