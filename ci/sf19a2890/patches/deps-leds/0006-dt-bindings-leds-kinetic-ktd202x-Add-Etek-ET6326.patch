@@ -18,7 +18,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  1 file changed, 12 insertions(+), 3 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/leds/kinetic,ktd202x.yaml b/Documentation/devicetree/bindings/leds/kinetic,ktd202x.yaml
-index 832c030a5..b13c71721 100644
+index 832c030a5acf..b13c71721853 100644
 --- a/Documentation/devicetree/bindings/leds/kinetic,ktd202x.yaml
 +++ b/Documentation/devicetree/bindings/leds/kinetic,ktd202x.yaml
 @@ -15,11 +15,20 @@ description: |

@@ -1,4 +1,4 @@
-From 66dc05a3eddb5f394b4e45952854b6c222fec196 Mon Sep 17 00:00:00 2001
+From 7479aa1c39e99e8953e5b1cef59afab6612b9e15 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:58:29 -0500
 Subject: [PATCH 1/2] dt-bindings: pinctrl: Add Siflower SF19A2890 pin
@@ -12,8 +12,7 @@ pin state node holds subnodes that set some of its pins.
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../pinctrl/siflower,sf19a2890-pinctrl.yaml   | 113 ++++++++++++++++++
- MAINTAINERS                                   |   1 +
- 2 files changed, 114 insertions(+)
+ 1 file changed, 113 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
 
 diff --git a/Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml b/Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
@@ -135,18 +134,6 @@ index 000000000..8b52d3175
 +            };
 +        };
 +    };
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1dc9819fe..d37f753b9 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -25082,6 +25082,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
- L:	linux-mips@vger.kernel.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/mips/siflower.yaml
-+F:	Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
- F:	arch/mips/boot/dts/siflower/
- F:	arch/mips/configs/sf19a2890_defconfig
- F:	arch/mips/include/asm/mach-siflower/
 -- 
 2.50.1 (Apple Git-155)
 

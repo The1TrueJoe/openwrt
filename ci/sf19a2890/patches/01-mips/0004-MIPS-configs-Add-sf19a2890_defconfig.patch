@@ -1,4 +1,4 @@
-From 91fd682d1db96eb3ab0b9d6e16f7f815cf66a15d Mon Sep 17 00:00:00 2001
+From de5d1161605409929494427f443a2d7715797f0b Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:51:28 -0500
 Subject: [PATCH 4/4] MIPS: configs: Add sf19a2890_defconfig
@@ -15,7 +15,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  create mode 100644 arch/mips/configs/sf19a2890_defconfig
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index a45c79092..6f1412c7e 100644
+index 425b52d4f..4eaa92605 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
 @@ -25704,6 +25704,7 @@ L:	linux-mips@vger.kernel.org
@@ -24,8 +24,8 @@ index a45c79092..6f1412c7e 100644
  F:	arch/mips/boot/dts/siflower/
 +F:	arch/mips/configs/sf19a2890_defconfig
  F:	arch/mips/include/asm/mach-siflower/
- 
- SILEAD TOUCHSCREEN DRIVER
+ F:	drivers/gpio/gpio-siflower.c
+ N:	sf19a2890
 diff --git a/arch/mips/configs/sf19a2890_defconfig b/arch/mips/configs/sf19a2890_defconfig
 new file mode 100644
 index 000000000..ec0992ac6

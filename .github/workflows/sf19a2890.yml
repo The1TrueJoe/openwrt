@@ -32,28 +32,24 @@ jobs:
             bindings: mips/siflower.yaml
             mips_defconfig: sf19a2890_defconfig
           - series: 02-sysm
-            prereq: 01-mips
             tree: clk/linux.git
             branch: clk-next
             bindings: clock/siflower,sf19a2890-clk.yaml clock/siflower,sf19a2890-periph-crm.yaml
             syms: COMMON_CLK CLK_SF19A2890 CLK_SF19A2890_PERIPHCRM
             objs: drivers/clk/siflower/clk-sf19a2890.o drivers/clk/siflower/clk-sf19a2890-periphcrm.o
           - series: 03-pinctrl
-            prereq: 01-mips
             tree: linusw/linux-pinctrl.git
             branch: devel
             bindings: pinctrl/siflower,sf19a2890-pinctrl.yaml
             syms: PINCTRL PINCTRL_SF19A2890
             objs: drivers/pinctrl/pinctrl-sf19a2890.o
           - series: 04-gpio
-            prereq: 01-mips
             tree: brgl/linux.git
             branch: gpio/for-next
             bindings: gpio/siflower,sf19a2890-gpio.yaml
             syms: GPIOLIB PINCTRL GPIO_SIFLOWER
             objs: drivers/gpio/gpio-siflower.o
           - series: 05-usb-phy
-            prereq: 01-mips
             tree: phy/linux-phy.git
             branch: next
             bindings: phy/siflower,sf19a2890-usb-phy.yaml
@@ -66,7 +62,6 @@ jobs:
             syms: USB USB_DWC2 USB_DWC2_HOST
             objs: drivers/usb/dwc2/core_intr.o drivers/usb/dwc2/params.o
           - series: 07-gmac
-            prereq: 01-mips
             tree: netdev/net-next.git
             branch: main
             bindings: net/siflower,sf19a2890-gmac.yaml net/snps,dwmac.yaml
@@ -109,9 +104,11 @@ jobs:
         run: |
           perl scripts/checkpatch.pl --strict --summary-file --show-types \
             ../ci-src/ci/sf19a2890/patches/${{ matrix.series }}/*.patch | tee checkpatch.log
-          # The only accepted finding is ENOTSUPP, which the pinconf core
-          # requires from pin_config_get/set for unsupported parameters.
-          if grep -E '^(ERROR|WARNING|CHECK):' checkpatch.log | grep -v 'WARNING:ENOTSUPP:'; then exit 1; fi
+          # Accepted: ENOTSUPP, which the pinconf core requires from
+          # pin_config_get/set for unsupported parameters, and
+          # FILE_PATH_CHANGES, since the MIPS series' SoC entry covers the
+          # new files (N: sf19a2890).
+          if grep -E '^(ERROR|WARNING|CHECK):' checkpatch.log | grep -vE 'WARNING:(ENOTSUPP|FILE_PATH_CHANGES):'; then exit 1; fi
 
       - name: dt_binding_check (full)
         working-directory: linux
@@ -222,7 +219,7 @@ jobs:
           for s in 02-sysm 03-pinctrl 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts deps-leds deps-gsw; do
             # Each series adds its F: lines to series 1's entry on its own
             # tree; here they are merged in one go below, as a merge would
-            git am -q --exclude=MAINTAINERS $P/$s/*.patch || { git am --abort; echo "::error::$s does not apply to mainline"; exit 1; }
+            git am -q $P/$s/*.patch || { git am --abort; echo "::error::$s does not apply to mainline"; exit 1; }
           done
           python3 - $P <<'PY'
           import glob, sys

@@ -1,4 +1,4 @@
-From 1439da8b97f64d233e39a26cdbe75ee24597bc19 Mon Sep 17 00:00:00 2001
+From 8c6e3740d2b70d4727845ebb516e769defbaec99 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 2/4] MIPS: dts: sf19a2890: Describe the clocks and peripherals

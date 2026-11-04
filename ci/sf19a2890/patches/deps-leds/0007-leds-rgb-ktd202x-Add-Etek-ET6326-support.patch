@@ -26,7 +26,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  2 files changed, 58 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/leds/rgb/Kconfig b/drivers/leds/rgb/Kconfig
-index 6e9ab5f60..3a57e5819 100644
+index 6e9ab5f60714..3a57e5819eeb 100644
 --- a/drivers/leds/rgb/Kconfig
 +++ b/drivers/leds/rgb/Kconfig
 @@ -20,7 +20,8 @@ config LEDS_KTD202X
@@ -40,7 +40,7 @@ index 6e9ab5f60..3a57e5819 100644
  
  	  To compile this driver as a module, choose M here: the module
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 042de16c2..2650573b6 100644
+index 042de16c28bc..2650573b6c5a 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -5,6 +5,7 @@

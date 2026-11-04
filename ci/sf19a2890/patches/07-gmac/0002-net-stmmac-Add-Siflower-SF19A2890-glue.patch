@@ -1,4 +1,4 @@
-From 2c307817f9a307a4fb0bc1c7c8b714a5fedc6d41 Mon Sep 17 00:00:00 2001
+From 345cba0ddabc3c96567a53e84013bb210a34d863 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:03:34 -0500
 Subject: [PATCH 2/2] net: stmmac: Add Siflower SF19A2890 glue
@@ -23,25 +23,12 @@ for SGMII, and the flag is gone.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- MAINTAINERS                                   |   1 +
  drivers/net/ethernet/stmicro/stmmac/Kconfig   |  11 ++
  drivers/net/ethernet/stmicro/stmmac/Makefile  |   1 +
- .../ethernet/stmicro/stmmac/dwmac-sf19a2890.c | 159 ++++++++++++++++++
- 4 files changed, 172 insertions(+)
+ .../ethernet/stmicro/stmmac/dwmac-sf19a2890.c | 158 ++++++++++++++++++
+ 3 files changed, 170 insertions(+)
  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ee9d3b91c..38ee05a98 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -25663,6 +25663,7 @@ F:	Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
- F:	arch/mips/boot/dts/siflower/
- F:	arch/mips/configs/sf19a2890_defconfig
- F:	arch/mips/include/asm/mach-siflower/
-+F:	drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
- 
- SILEAD TOUCHSCREEN DRIVER
- M:	Hans de Goede <hansg@kernel.org>
 diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
 index c6559e749..78efe7859 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
@@ -78,10 +65,10 @@ index b16a456b7..9330de094 100644
  obj-$(CONFIG_DWMAC_SPACEMIT)	+= dwmac-spacemit.o
 diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
 new file mode 100644
-index 000000000..e2a72d82b
+index 000000000..41bfe7a4a
 --- /dev/null
 +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
-@@ -0,0 +1,159 @@
+@@ -0,0 +1,158 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Siflower SF19A2890 GMAC glue
@@ -125,13 +112,12 @@ index 000000000..e2a72d82b
 +static int sf19a2890_gmac_set_phy_intf_sel(void *bsp_priv, u8 phy_intf_sel)
 +{
 +	struct sf19a2890_gmac *gmac = bsp_priv;
++	u32 val;
 +
 +	if (phy_intf_sel != PHY_INTF_SEL_GMII_MII &&
 +	    phy_intf_sel != PHY_INTF_SEL_RGMII &&
 +	    phy_intf_sel != PHY_INTF_SEL_RMII)
 +		return -EINVAL;
-+
-+	u32 val;
 +
 +	val = readl(gmac->cfg + SF19A2890_GMAC_MISC);
 +	val &= ~SF19A2890_PHY_INTF_SEL;

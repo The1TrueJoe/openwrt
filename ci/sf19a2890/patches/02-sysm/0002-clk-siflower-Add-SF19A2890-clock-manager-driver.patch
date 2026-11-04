@@ -1,8 +1,7 @@
-From 9751dea0fa7ba533e0ab836ac7c264c39fd8a081 Mon Sep 17 00:00:00 2001
+From ad194ee9a017ed762cba1e0de0c61907f6b89fd5 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
-Subject: [PATCH 2/4] clk: add driver for the clock manager on Siflower
- SF19A2890
+Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver
 
 Add a driver for the clock manager of the Siflower SF19A2890: the CPU,
 DDR and common PLLs, and the muxes with dividers that derive the bus,
@@ -10,37 +9,24 @@ CPU and peripheral clocks from them. The GIC timer needs the CPU clock,
 so the driver registers early, from CLK_OF_DECLARE.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: from Chuanhong's siflower-7.1 branch; read the PLL power-down
- register at the PLL's offset instead of at offset 1, take the
- oscillators from the node's clocks and the PLLs by pointer instead of
- by global name, count the clocks in the driver instead of the binding
- header, free the context on errors, one Kconfig symbol without the
- menu, depend on MACH_SIFLOWER_MIPS, commit message, checkpatch --strict cleanups, MAINTAINERS line]
+[jt: from Chuanhong's siflower-7.1 branch; read the PLL power-down register
+ at the PLL's offset instead of at offset 1, take the oscillators from the
+ node's clocks and the PLLs by pointer instead of by global name, count the
+ clocks in the driver instead of the binding header, free the context on
+ errors, one Kconfig symbol without the menu, depend on MACH_SIFLOWER_MIPS,
+ commit message, checkpatch --strict cleanups, subject]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- MAINTAINERS                          |   1 +
  drivers/clk/Kconfig                  |   1 +
  drivers/clk/Makefile                 |   1 +
  drivers/clk/siflower/Kconfig         |  11 +
  drivers/clk/siflower/Makefile        |   1 +
  drivers/clk/siflower/clk-sf19a2890.c | 428 +++++++++++++++++++++++++++
- 6 files changed, 443 insertions(+)
+ 5 files changed, 442 insertions(+)
  create mode 100644 drivers/clk/siflower/Kconfig
  create mode 100644 drivers/clk/siflower/Makefile
  create mode 100644 drivers/clk/siflower/clk-sf19a2890.c
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index a3bf5bde6..55c575611 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -25707,6 +25707,7 @@ F:	Documentation/devicetree/bindings/mips/siflower.yaml
- F:	arch/mips/boot/dts/siflower/
- F:	arch/mips/configs/sf19a2890_defconfig
- F:	arch/mips/include/asm/mach-siflower/
-+F:	drivers/clk/siflower/clk-sf19a2890.c
- F:	include/dt-bindings/clock/siflower,sf19a2890-clk.h
- 
- SILEAD TOUCHSCREEN DRIVER
 diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
 index 37a8e35d4..8e73490cb 100644
 --- a/drivers/clk/Kconfig

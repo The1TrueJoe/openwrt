@@ -1,14 +1,15 @@
-From b482f759e774e05910ac1117a7663ce2d8c09e62 Mon Sep 17 00:00:00 2001
+From e658414fb21917fdaaa7c61af7f8fc9488f42fa2 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 9 Sep 2024 16:46:53 +0800
-Subject: [PATCH 2/3] usb: dwc2: add support for Siflower SF19A2890
+Subject: [PATCH 2/3] usb: dwc2: Add Siflower SF19A2890 support
 
 The Siflower SF19A2890 has a DWC OTG 3.30a controller. Limit its
 transfers to 65535 bytes and its AHB bursts to INCR4, the settings the
 OpenWrt port has run it with.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: from OpenWrt's siflower target, rebased on v7.4-rc1, commit message]
+[jt: from OpenWrt's siflower target, rebased on v7.4-rc1, commit message,
+ subject]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/usb/dwc2/params.c | 10 ++++++++++

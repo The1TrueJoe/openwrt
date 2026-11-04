@@ -20,7 +20,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  1 file changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 539cf425c..482af28e8 100644
+index 539cf425cdb7..482af28e8370 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -537,6 +537,7 @@ static int ktd202x_probe(struct i2c_client *client)

@@ -1,8 +1,8 @@
-From 9250644a63f4e3dcb4395490997adaf5dcf810e2 Mon Sep 17 00:00:00 2001
+From 7422b318f165aecae01e6361ecd2a702fd686554 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:18:45 -0500
 Subject: [PATCH 3/4] dt-bindings: clock: Add Siflower SF19A2890 peripheral
- clock and reset managers
+ clock/reset managers
 
 Each peripheral block of the Siflower SF19A2890 has a clock and reset
 manager of its own, with a reset register, a clock gate register and a
@@ -16,8 +16,7 @@ compatible and its bit layout in properties.
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../clock/siflower,sf19a2890-periph-crm.yaml  | 169 ++++++++++++++++++
- MAINTAINERS                                   |   1 +
- 2 files changed, 170 insertions(+)
+ 1 file changed, 169 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml
 
 diff --git a/Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml b/Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml
@@ -195,18 +194,6 @@ index 000000000..7f0bce603
 +        #clock-cells = <1>;
 +        #reset-cells = <1>;
 +    };
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 55c575611..f27765353 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
- L:	linux-mips@vger.kernel.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-clk.yaml
-+F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml
- F:	Documentation/devicetree/bindings/mips/siflower.yaml
- F:	arch/mips/boot/dts/siflower/
- F:	arch/mips/configs/sf19a2890_defconfig
 -- 
 2.50.1 (Apple Git-155)
 

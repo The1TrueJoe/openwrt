@@ -26,7 +26,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 8c890ea5a..feea33b7e 100644
+index 8c890ea5a754..feea33b7e885 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -9,10 +9,12 @@

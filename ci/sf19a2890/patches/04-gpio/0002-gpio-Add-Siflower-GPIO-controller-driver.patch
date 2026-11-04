@@ -1,7 +1,7 @@
-From 41a95d05978cd24c060350cc7026d07fcf841fe2 Mon Sep 17 00:00:00 2001
+From 84408d95f9e17687f9c9207d8beb245b397cf1f7 Mon Sep 17 00:00:00 2001
 From: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
-Subject: [PATCH 2/2] gpio: add support for GPIO controller on Siflower SoCs
+Subject: [PATCH 2/2] gpio: Add Siflower GPIO controller driver
 
 Add a driver for the GPIO controller on Siflower SoCs.
 This controller is found on all current Siflower MIPS and RISC-V
@@ -10,30 +10,17 @@ chips including SF19A2890, SF21A6826 and SF21H8898.
 Signed-off-by: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 [jt: from Chuanhong's siflower-7.1 branch; depend on MACH_SIFLOWER_MIPS,
- longer Kconfig help, assert the reset through a devm action instead of
- in .remove, which ran before the GPIO chip was removed, drop .owner and
- the unused drvdata, MAINTAINERS line]
+ longer Kconfig help, assert the reset through a devm action instead of in
+ .remove, which ran before the GPIO chip was removed, drop .owner and the
+ unused drvdata, subject]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- MAINTAINERS                  |   1 +
  drivers/gpio/Kconfig         |  11 ++
  drivers/gpio/Makefile        |   1 +
  drivers/gpio/gpio-siflower.c | 352 +++++++++++++++++++++++++++++++++++
- 4 files changed, 365 insertions(+)
+ 3 files changed, 364 insertions(+)
  create mode 100644 drivers/gpio/gpio-siflower.c
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ed97ad542..6c096f496 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -25715,6 +25715,7 @@ F:	Documentation/devicetree/bindings/mips/siflower.yaml
- F:	arch/mips/boot/dts/siflower/
- F:	arch/mips/configs/sf19a2890_defconfig
- F:	arch/mips/include/asm/mach-siflower/
-+F:	drivers/gpio/gpio-siflower.c
- 
- SILEAD TOUCHSCREEN DRIVER
- M:	Hans de Goede <hansg@kernel.org>
 diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
 index 55e428002..48873b939 100644
 --- a/drivers/gpio/Kconfig

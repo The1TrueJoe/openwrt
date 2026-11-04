@@ -1,4 +1,4 @@
-From 1d107fe532fde0d0a99b757d331d6051310b2d68 Mon Sep 17 00:00:00 2001
+From 74d13219f7e720eba3a4669cc3d7943a3f0740d4 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 3/4] MIPS: dts: sf19a2890: Add the GL.iNet GL-SFT1200
@@ -23,11 +23,11 @@ the TX FIFO size.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- .../siflower/sf19a2890-glinet-gl-sft1200.dts  | 223 ++++++++++++++++++
- 1 file changed, 223 insertions(+)
+ .../siflower/sf19a2890-glinet-gl-sft1200.dts  | 224 ++++++++++++++++++
+ 1 file changed, 224 insertions(+)
 
 diff --git a/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts b/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
-index 13e6a0c8b..6f10a02fa 100644
+index 13e6a0c8b..717aa2a0d 100644
 --- a/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
 +++ b/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
 @@ -2,6 +2,10 @@
@@ -41,7 +41,7 @@ index 13e6a0c8b..6f10a02fa 100644
  #include "sf19a2890.dtsi"
  
  / {
-@@ -20,8 +24,227 @@ memory@0 {
+@@ -20,8 +24,228 @@ memory@0 {
  		device_type = "memory";
  		reg = <0x0 0x8000000>;
  	};
@@ -154,12 +154,13 @@ index 13e6a0c8b..6f10a02fa 100644
 +				nvmem-cell-names = "mac-address";
 +			};
 +
-+			/* The GMAC adds both RGMII delays */
++			/*
++			 * The GMAC adds both RGMII delays, so the switch adds
++			 * none: for this port "rgmii-id" sets them to zero.
++			 */
 +			port@5 {
 +				reg = <5>;
 +				phy-mode = "rgmii-id";
-+				tx-internal-delay-ps = <0>;
-+				rx-internal-delay-ps = <0>;
 +				ethernet = <&gmac>;
 +
 +				fixed-link {

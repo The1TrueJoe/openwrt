@@ -1,12 +1,13 @@
-From 5c5f3be3811c45c00e34ad6cce9bb9ef0951ce4b Mon Sep 17 00:00:00 2001
+From 7813d530b1878187ad54427724a7d05fe59684ae Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Tue, 10 Sep 2024 09:10:27 +0800
-Subject: [PATCH 3/3] usb: dwc2: handle OTG interrupt regardless of GINTSTS
+Subject: [PATCH 3/3] usb: dwc2: Handle OTG interrupts that GINTSTS does not
+ flag
 
 The DWC OTG 3.30a found on Siflower SF19A2890 has battery charger
 support enabled. It triggers MultVallpChng interrupt (bit 20 of
 GOTGINT) but doesn't set OTGInt in GINTSTS. As a result, this
-interrupt is never handled, and linux disables USB interrupt
+interrupt is never handled, and Linux disables USB interrupt
 because "nobody cares".
 
 Handle OTG interrupt in IRQ handler regardless of whether the
@@ -18,8 +19,8 @@ last message with the same timestamp, until a power cycle.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 [jt: only on cores with the new otg_int_unflagged parameter, which
- SF19A2890 sets; the others still handle OTG interrupts only when
- GINTSTS flags them; what a GL-SFT1200 does without the patch]
+ SF19A2890 sets; the others still handle OTG interrupts only when GINTSTS
+ flags them; what a GL-SFT1200 does without the patch, subject]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/usb/dwc2/core.h      |  6 ++++++

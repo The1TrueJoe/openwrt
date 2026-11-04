@@ -1,29 +1,28 @@
-From 01f3d6b6e5f051efb76bce485053a417493ef61a Mon Sep 17 00:00:00 2001
+From 730e86beb0af065becf52bcbced2f3bb90ef03a5 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Wed, 25 Dec 2024 10:37:58 +0800
-Subject: [PATCH 1/2] dt-bindings: gpio: add binding doc for
- siflower,sf19a2890-gpio
+Subject: [PATCH 1/2] dt-bindings: gpio: Add Siflower SF19A2890 GPIO controller
 
-Add dt binding doc for the GPIO controller found on Siflower SF19A2890
-and various other Siflower MIPS and RISC-V SoCs.
+Document the GPIO controller found on the Siflower SF19A2890 and other
+Siflower MIPS and RISC-V SoCs.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: from Chuanhong's siflower-7.1 branch; Joseph Telaak as the
- binding's maintainer, MAINTAINERS line]
+[jt: from Chuanhong's siflower-7.1 branch; Joseph Telaak as the binding's
+ maintainer, GPL-2.0-only for the deprecated GPL-2.0 SPDX identifier,
+ example indented by four spaces, commit message, subject]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- .../gpio/siflower,sf19a2890-gpio.yaml         | 83 +++++++++++++++++++
- MAINTAINERS                                   |  1 +
- 2 files changed, 84 insertions(+)
+ .../gpio/siflower,sf19a2890-gpio.yaml         | 84 +++++++++++++++++++
+ 1 file changed, 84 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml
 
 diff --git a/Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml b/Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml
 new file mode 100644
-index 000000000..d288d16db
+index 000000000..6708d92fe
 --- /dev/null
 +++ b/Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml
-@@ -0,0 +1,83 @@
-+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+@@ -0,0 +1,84 @@
++# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 +%YAML 1.2
 +---
 +$id: http://devicetree.org/schemas/gpio/siflower,sf19a2890-gpio.yaml#
@@ -88,36 +87,25 @@ index 000000000..d288d16db
 +  - |
 +    #include <dt-bindings/interrupt-controller/irq.h>
 +    #include <dt-bindings/interrupt-controller/mips-gic.h>
++
 +    gpio@19d00000 {
-+      compatible = "siflower,sf19a2890-gpio";
-+      reg = <0x19d00000 0x100000>;
-+      interrupts = <GIC_SHARED 246 IRQ_TYPE_LEVEL_HIGH>,
-+        <GIC_SHARED 247 IRQ_TYPE_LEVEL_HIGH>,
-+        <GIC_SHARED 248 IRQ_TYPE_LEVEL_HIGH>,
-+        <GIC_SHARED 249 IRQ_TYPE_LEVEL_HIGH>;
-+      clocks = <&gpioclk 0>;
-+      resets = <&gpiorst 0>;
++        compatible = "siflower,sf19a2890-gpio";
++        reg = <0x19d00000 0x100000>;
++        interrupts = <GIC_SHARED 246 IRQ_TYPE_LEVEL_HIGH>,
++                     <GIC_SHARED 247 IRQ_TYPE_LEVEL_HIGH>,
++                     <GIC_SHARED 248 IRQ_TYPE_LEVEL_HIGH>,
++                     <GIC_SHARED 249 IRQ_TYPE_LEVEL_HIGH>;
++        clocks = <&gpioclk 0>;
++        resets = <&gpiorst 0>;
 +
-+      gpio-controller;
-+      #gpio-cells = <2>;
-+      ngpios = <49>;
-+      gpio-ranges = <&pinctrl 0 0 49>;
++        gpio-controller;
++        #gpio-cells = <2>;
++        ngpios = <49>;
++        gpio-ranges = <&pinctrl 0 0 49>;
 +
-+      interrupt-controller;
-+      #interrupt-cells = <2>;
++        interrupt-controller;
++        #interrupt-cells = <2>;
 +    };
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 754d3d7d4..ed97ad542 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -25710,6 +25710,7 @@ SIFLOWER SF19A2890 SOC SUPPORT
- M:	Joseph Telaak <joseph@telaak.dev>
- L:	linux-mips@vger.kernel.org
- S:	Maintained
-+F:	Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml
- F:	Documentation/devicetree/bindings/mips/siflower.yaml
- F:	arch/mips/boot/dts/siflower/
- F:	arch/mips/configs/sf19a2890_defconfig
 -- 
 2.50.1 (Apple Git-155)
 

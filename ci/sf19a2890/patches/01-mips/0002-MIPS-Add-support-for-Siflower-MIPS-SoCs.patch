@@ -1,20 +1,23 @@
-From 3f34718834c2ac677236444e13ee1792d03655cf Mon Sep 17 00:00:00 2001
+From 4b15345378141fff5e01960193a341cd3ede85d9 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 20 Jan 2025 09:52:52 +0800
 Subject: [PATCH 2/4] MIPS: Add support for Siflower MIPS SoCs
 
-Siflower MIPS SoCs like SF19A2890 uses dual-core MIPS InterAptiv
+Siflower MIPS SoCs like SF19A2890 use a dual-core MIPS InterAptiv
 processor, built-in GMAC, USB, dual-band WiFi and various other
 peripherals.
-Notably, it uses some ARM PLxxx peripherals, and ARM_AMBA is
+
+Notably, they use some ARM PLxxx peripherals, and ARM_AMBA is
 selected for the drivers.
+
 Most devices on the market with this chip come with 64M or less
 DRAM. A kmalloc.h with malloc alignment override is added to
 conserve memory, and a MACH_SIFLOWER_MIPS is created with reduced
 features instead of using the generic kernel.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: rebased on v7.4-rc1, "MIPS:" prefix, longer Kconfig help, MAINTAINERS line]
+[jt: rebased on v7.4-rc1, "MIPS:" prefix, longer Kconfig help, commit
+ message grammar and paragraphs, MAINTAINERS line]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  MAINTAINERS                                   |  1 +
@@ -25,7 +28,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  create mode 100644 arch/mips/include/asm/mach-siflower/kmalloc.h
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 3548d4d41..4d81ee7f3 100644
+index 2a7a083f2..9e715a168 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
 @@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
@@ -33,9 +36,9 @@ index 3548d4d41..4d81ee7f3 100644
  S:	Maintained
  F:	Documentation/devicetree/bindings/mips/siflower.yaml
 +F:	arch/mips/include/asm/mach-siflower/
+ F:	drivers/gpio/gpio-siflower.c
+ N:	sf19a2890
  
- SILEAD TOUCHSCREEN DRIVER
- M:	Hans de Goede <hansg@kernel.org>
 diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
 index ed17c9b16..e10145ede 100644
 --- a/arch/mips/Kconfig

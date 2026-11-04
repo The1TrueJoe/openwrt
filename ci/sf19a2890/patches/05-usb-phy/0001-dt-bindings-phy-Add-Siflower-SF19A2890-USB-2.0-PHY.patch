@@ -1,4 +1,4 @@
-From 89496f8130da97d42387bc46f560d01bd3a9caf7 Mon Sep 17 00:00:00 2001
+From 902bb8dd8a72e5e12226a67445394cac68720797 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:22:24 -0500
 Subject: [PATCH 1/2] dt-bindings: phy: Add Siflower SF19A2890 USB 2.0 PHY
@@ -10,8 +10,7 @@ USB block's clock and reset manager.
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../phy/siflower,sf19a2890-usb-phy.yaml       | 58 +++++++++++++++++++
- MAINTAINERS                                   |  1 +
- 2 files changed, 59 insertions(+)
+ 1 file changed, 58 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
 
 diff --git a/Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml b/Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
@@ -78,18 +77,6 @@ index 000000000..77b8e35d8
 +        reset-names = "por", "phy";
 +        #phy-cells = <0>;
 +    };
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6f1412c7e..50f236b74 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
- L:	linux-mips@vger.kernel.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/mips/siflower.yaml
-+F:	Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
- F:	arch/mips/boot/dts/siflower/
- F:	arch/mips/configs/sf19a2890_defconfig
- F:	arch/mips/include/asm/mach-siflower/
 -- 
 2.50.1 (Apple Git-155)
 

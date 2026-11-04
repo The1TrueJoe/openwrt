@@ -18,7 +18,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  1 file changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 482af28e8..8c890ea5a 100644
+index 482af28e8370..8c890ea5a754 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -304,8 +304,12 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,

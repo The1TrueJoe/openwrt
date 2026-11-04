@@ -1,4 +1,4 @@
-From fffeb5be7d45ec60d88fe99b7e58956dd871449f Mon Sep 17 00:00:00 2001
+From f22381bb297863ebc311854b66a670d3a6ea3976 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:58:30 -0500
 Subject: [PATCH 2/2] pinctrl: Add Siflower SF19A2890 pin controller driver
@@ -15,25 +15,12 @@ the BCM2835 pin controller driver.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- MAINTAINERS                         |   1 +
  drivers/pinctrl/Kconfig             |  14 +
  drivers/pinctrl/Makefile            |   1 +
  drivers/pinctrl/pinctrl-sf19a2890.c | 536 ++++++++++++++++++++++++++++
- 4 files changed, 552 insertions(+)
+ 3 files changed, 551 insertions(+)
  create mode 100644 drivers/pinctrl/pinctrl-sf19a2890.c
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index d37f753b9..fffd53964 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -25086,6 +25086,7 @@ F:	Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
- F:	arch/mips/boot/dts/siflower/
- F:	arch/mips/configs/sf19a2890_defconfig
- F:	arch/mips/include/asm/mach-siflower/
-+F:	drivers/pinctrl/pinctrl-sf19a2890.c
- 
- SILEAD TOUCHSCREEN DRIVER
- M:	Hans de Goede <hansg@kernel.org>
 diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
 index dc7138302..1321eb679 100644
 --- a/drivers/pinctrl/Kconfig

@@ -25,7 +25,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  create mode 100644 Documentation/leds/leds-ktd202x.rst
 
 diff --git a/Documentation/leds/index.rst b/Documentation/leds/index.rst
-index 23fa9ff7a..54d1c7368 100644
+index 23fa9ff7aaf4..54d1c73684ad 100644
 --- a/Documentation/leds/index.rst
 +++ b/Documentation/leds/index.rst
 @@ -19,6 +19,7 @@ LEDs
@@ -38,7 +38,7 @@ index 23fa9ff7a..54d1c7368 100644
     leds-lp5521
 diff --git a/Documentation/leds/leds-ktd202x.rst b/Documentation/leds/leds-ktd202x.rst
 new file mode 100644
-index 000000000..2ee537f57
+index 000000000000..2ee537f57783
 --- /dev/null
 +++ b/Documentation/leds/leds-ktd202x.rst
 @@ -0,0 +1,41 @@
@@ -84,7 +84,7 @@ index 000000000..2ee537f57
 +    echo pattern > /sys/class/leds/blue:status/trigger
 +    echo "0 1000 192 1000 192 1000 0 1000" > /sys/class/leds/blue:status/hw_pattern
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 2650573b6..daa04f8ec 100644
+index 2650573b6c5a..daa04f8ecefd 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -62,12 +62,20 @@

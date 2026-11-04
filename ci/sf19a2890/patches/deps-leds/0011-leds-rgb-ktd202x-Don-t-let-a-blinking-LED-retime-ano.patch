@@ -44,7 +44,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  2 files changed, 273 insertions(+), 139 deletions(-)
 
 diff --git a/Documentation/leds/leds-ktd202x.rst b/Documentation/leds/leds-ktd202x.rst
-index 2ee537f57..25673241a 100644
+index 2ee537f57783..25673241ac3b 100644
 --- a/Documentation/leds/leds-ktd202x.rst
 +++ b/Documentation/leds/leds-ktd202x.rst
 @@ -31,9 +31,19 @@ equal and not 0. ``repeat`` must be -1, its default.
@@ -71,7 +71,7 @@ index 2ee537f57..25673241a 100644
  For example, to breathe with a period of 4 seconds::
  
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 0cc2ec3f6..e2f389d88 100644
+index 0cc2ec3f6a7f..e2f389d8888c 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -128,6 +128,8 @@ struct ktd202x_led {
