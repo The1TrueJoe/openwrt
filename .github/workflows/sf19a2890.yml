@@ -188,6 +188,25 @@ jobs:
           done
           exit $fail
 
+      - name: x86_64 modules with modpost (SPARSE_IRQ, COMPILE_TEST)
+        if: matrix.objs
+        working-directory: linux
+        run: |
+          # The kernel test robot builds drivers as modules on configs like
+          # this; modpost then rejects symbols that aren't exported to them.
+          git checkout -q $TIP
+          out=../out-mod
+          make O=$out defconfig >/dev/null
+          ./scripts/config --file $out/.config -e COMPILE_TEST -e OF -e RESET_CONTROLLER -e MFD_SYSCON -e NET -e INET -e SPARSE_IRQ
+          for s in ${{ matrix.syms }}; do ./scripts/config --file $out/.config -m $s; done
+          make O=$out olddefconfig >/dev/null
+          grep -E "^CONFIG_($(echo ${{ matrix.syms }} | tr ' ' '|'))=" $out/.config
+          grep -q '^CONFIG_SPARSE_IRQ=y' $out/.config
+          make O=$out -j"$(nproc)" vmlinux modules > $out/mod.log 2>&1 || { grep -E 'error|ERROR' $out/mod.log | head -20; tail -30 $out/mod.log; exit 1; }
+          if grep -E 'ERROR: modpost|WARNING: modpost' $out/mod.log; then exit 1; fi
+          find $out/drivers -name '*siflower*.ko' -o -name '*sf19a2890*.ko' | sed 's#^../out-mod/##'
+          echo "modules and modpost: clean"
+
   combined:
     name: mainline + all series, dtbs_check and bench images
     runs-on: ubuntu-24.04

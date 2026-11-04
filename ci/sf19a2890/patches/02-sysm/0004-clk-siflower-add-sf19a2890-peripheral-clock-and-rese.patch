@@ -1,4 +1,4 @@
-From 333c2ffd7aa0d2a7bfa7792f942c7959b9d37b7b Mon Sep 17 00:00:00 2001
+From fb6bb6ddb86b5d8b2f4eb2ff0e659e8e496af9b2 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Wed, 8 Apr 2026 22:17:11 +0800
 Subject: [PATCH 4/4] clk: siflower: Add SF19A2890 peripheral clock and reset
@@ -23,13 +23,13 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
  the siflower,valid-gates, siflower,critical-gates, siflower,reset-masks
  and siflower,num-resets properties, gate N parented to input clock N by
  index instead of by global name, the gate updates under the spinlock too,
- Kconfig dependencies and help, subject]
+ no separator comments, Kconfig dependencies and help, subject]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/clk/siflower/Kconfig                  |  11 +
  drivers/clk/siflower/Makefile                 |   1 +
- .../clk/siflower/clk-sf19a2890-periphcrm.c    | 364 ++++++++++++++++++
- 3 files changed, 376 insertions(+)
+ .../clk/siflower/clk-sf19a2890-periphcrm.c    | 360 ++++++++++++++++++
+ 3 files changed, 372 insertions(+)
  create mode 100644 drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 
 diff --git a/drivers/clk/siflower/Kconfig b/drivers/clk/siflower/Kconfig
@@ -60,10 +60,10 @@ index 9f3df2e1e..a328317c4 100644
 +obj-$(CONFIG_CLK_SF19A2890_PERIPHCRM) += clk-sf19a2890-periphcrm.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890-periphcrm.c b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 new file mode 100644
-index 000000000..0154344f9
+index 000000000..95d4dd449
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
-@@ -0,0 +1,364 @@
+@@ -0,0 +1,360 @@
 +// SPDX-License-Identifier: GPL-2.0
 +
 +/*
@@ -217,8 +217,6 @@ index 000000000..0154344f9
 +	.status = sf19a2890_periphcrm_reset_status,
 +};
 +
-+/* ---------- per-block layouts ----------------------------------------- */
-+
 +#define GATE(_name, _bit, _flags) { .name = _name, .bit = _bit, .flags = _flags }
 +
 +#define CRM_DATA(_g, _r)						\
@@ -324,8 +322,6 @@ index 000000000..0154344f9
 +SINGLE_CRM(timer);
 +SINGLE_CRM(wdt);
 +SINGLE_CRM(gpio);
-+
-+/* ---------- platform driver ------------------------------------------- */
 +
 +static int sf19a2890_periphcrm_probe(struct platform_device *pdev)
 +{

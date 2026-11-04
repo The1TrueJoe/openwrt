@@ -1,4 +1,4 @@
-From 730e86beb0af065becf52bcbced2f3bb90ef03a5 Mon Sep 17 00:00:00 2001
+From 72e2c00da8ea34f72d700b40bc4a8529d9bec4e6 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Wed, 25 Dec 2024 10:37:58 +0800
 Subject: [PATCH 1/2] dt-bindings: gpio: Add Siflower SF19A2890 GPIO controller

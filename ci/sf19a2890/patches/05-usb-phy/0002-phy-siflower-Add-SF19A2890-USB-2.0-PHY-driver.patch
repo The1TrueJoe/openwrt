@@ -1,4 +1,4 @@
-From 54e8d4255b80469ea9ee5a06a9607fe66785fa7a Mon Sep 17 00:00:00 2001
+From 15f5113935b4675daf0878670b1686b6c035d013 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 9 Sep 2024 10:18:33 +0800
 Subject: [PATCH 2/2] phy: siflower: Add SF19A2890 USB 2.0 PHY driver
@@ -9,7 +9,8 @@ out of sleep.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 [jt: from Chuanhong's siflower-7.1 branch, the SF19A2890 PHY only; reset
- names "por" and "phy", Kconfig dependencies and help, commit message,
+ names "por" and "phy", dev_err_probe() for the resets, drop the unused
+ includes and drvdata, Kconfig dependencies and help, commit message,
  subject]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
@@ -17,8 +18,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  drivers/phy/Makefile                     |   1 +
  drivers/phy/siflower/Kconfig             |  12 ++
  drivers/phy/siflower/Makefile            |   2 +
- drivers/phy/siflower/phy-sf19a2890-usb.c | 145 +++++++++++++++++++++++
- 5 files changed, 161 insertions(+)
+ drivers/phy/siflower/phy-sf19a2890-usb.c | 143 +++++++++++++++++++++++
+ 5 files changed, 159 insertions(+)
  create mode 100644 drivers/phy/siflower/Kconfig
  create mode 100644 drivers/phy/siflower/Makefile
  create mode 100644 drivers/phy/siflower/phy-sf19a2890-usb.c
@@ -75,17 +76,14 @@ index 000000000..a12383193
 +obj-$(CONFIG_PHY_SF19A2890_USB)	+= phy-sf19a2890-usb.o
 diff --git a/drivers/phy/siflower/phy-sf19a2890-usb.c b/drivers/phy/siflower/phy-sf19a2890-usb.c
 new file mode 100644
-index 000000000..f6c2e27fd
+index 000000000..115e38b8c
 --- /dev/null
 +++ b/drivers/phy/siflower/phy-sf19a2890-usb.c
-@@ -0,0 +1,145 @@
+@@ -0,0 +1,143 @@
 +// SPDX-License-Identifier: GPL-2.0
 +
 +#include <linux/clk.h>
-+#include <linux/delay.h>
 +#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
 +#include <linux/module.h>
 +#include <linux/of.h>
 +#include <linux/phy/phy.h>
@@ -172,7 +170,8 @@ index 000000000..f6c2e27fd
 +	p_phy->power_on_rst =
 +		devm_reset_control_get_exclusive(&pdev->dev, "por");
 +	if (IS_ERR(p_phy->power_on_rst))
-+		return PTR_ERR(p_phy->power_on_rst);
++		return dev_err_probe(p_phy->dev, PTR_ERR(p_phy->power_on_rst),
++				     "failed to get power-on reset\n");
 +
 +	ret = reset_control_assert(p_phy->power_on_rst);
 +	if (ret)
@@ -181,7 +180,8 @@ index 000000000..f6c2e27fd
 +	p_phy->usb_phy_rst =
 +		devm_reset_control_get_exclusive(&pdev->dev, "phy");
 +	if (IS_ERR(p_phy->usb_phy_rst))
-+		return PTR_ERR(p_phy->usb_phy_rst);
++		return dev_err_probe(p_phy->dev, PTR_ERR(p_phy->usb_phy_rst),
++				     "failed to get PHY reset\n");
 +
 +	ret = reset_control_assert(p_phy->usb_phy_rst);
 +	if (ret)
@@ -200,7 +200,6 @@ index 000000000..f6c2e27fd
 +		return dev_err_probe(p_phy->dev, PTR_ERR(provider),
 +				     "Failed to register PHY provider\n");
 +
-+	platform_set_drvdata(pdev, p_phy);
 +	return 0;
 +}
 +
@@ -208,7 +207,7 @@ index 000000000..f6c2e27fd
 +	{
 +		.compatible = "siflower,sf19a2890-usb-phy",
 +	},
-+	{},
++	{ }
 +};
 +MODULE_DEVICE_TABLE(of, sf19a2890_usb_phy_of_match);
 +

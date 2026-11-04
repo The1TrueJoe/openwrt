@@ -1,4 +1,4 @@
-From ad194ee9a017ed762cba1e0de0c61907f6b89fd5 Mon Sep 17 00:00:00 2001
+From b4e526d8982a0661f8eab11371c13e44fa0e499f Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
 Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver
@@ -12,17 +12,20 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 [jt: from Chuanhong's siflower-7.1 branch; read the PLL power-down register
  at the PLL's offset instead of at offset 1, take the oscillators from the
  node's clocks and the PLLs by pointer instead of by global name, count the
- clocks in the driver instead of the binding header, free the context on
- errors, one Kconfig symbol without the menu, depend on MACH_SIFLOWER_MIPS,
- commit message, checkpatch --strict cleanups, subject]
+ clocks in the driver instead of the binding header, drop the spinlock and
+ sf_rmw(), which nothing used, unregister the clocks and unmap on errors,
+ return 0 for a zero divider and compute the VCO rate in 64 bits, pr_fmt,
+ u32 offsets, sorted includes, one Kconfig symbol without the menu, depend
+ on MACH_SIFLOWER_MIPS, commit message, checkpatch --strict cleanups,
+ subject]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/clk/Kconfig                  |   1 +
  drivers/clk/Makefile                 |   1 +
  drivers/clk/siflower/Kconfig         |  11 +
  drivers/clk/siflower/Makefile        |   1 +
- drivers/clk/siflower/clk-sf19a2890.c | 428 +++++++++++++++++++++++++++
- 5 files changed, 442 insertions(+)
+ drivers/clk/siflower/clk-sf19a2890.c | 406 +++++++++++++++++++++++++++
+ 5 files changed, 420 insertions(+)
  create mode 100644 drivers/clk/siflower/Kconfig
  create mode 100644 drivers/clk/siflower/Makefile
  create mode 100644 drivers/clk/siflower/clk-sf19a2890.c
@@ -77,21 +80,20 @@ index 000000000..9f3df2e1e
 +obj-$(CONFIG_CLK_SF19A2890) += clk-sf19a2890.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890.c b/drivers/clk/siflower/clk-sf19a2890.c
 new file mode 100644
-index 000000000..05a37b640
+index 000000000..f7553ac49
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890.c
-@@ -0,0 +1,428 @@
+@@ -0,0 +1,406 @@
 +// SPDX-License-Identifier: GPL-2.0
 +
-+#include <linux/kernel.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/compiler.h>
-+#include <linux/clk-provider.h>
++#define pr_fmt(fmt) "sf19a2890-clk: " fmt
++
 +#include <linux/bitfield.h>
++#include <linux/clk-provider.h>
 +#include <linux/io.h>
-+#include <linux/spinlock.h>
-+#include <linux/bug.h>
++#include <linux/math64.h>
++#include <linux/of_address.h>
++
 +#include <dt-bindings/clock/siflower,sf19a2890-clk.h>
 +
 +#define CLK_SF19A2890_NR_CLKS	(CLK_MUXDIV_NPU_PE_CLK + 1)
@@ -146,13 +148,12 @@ index 000000000..05a37b640
 +
 +struct sf_clk_common {
 +	void __iomem *base;
-+	spinlock_t *lock;	/* the controller's register lock */
 +	struct clk_hw hw;
 +};
 +
 +struct sf19a2890_clk {
 +	struct sf_clk_common common;
-+	ulong offset;
++	u32 offset;
 +};
 +
 +#define SF_CLK_COMMON(_name, _parents, _op, _flags)				\
@@ -178,16 +179,7 @@ index 000000000..05a37b640
 +
 +static inline void sf_writel(struct sf_clk_common *priv, u32 reg, u32 val)
 +{
-+	return writel(val, priv->base + reg);
-+}
-+
-+static inline void sf_rmw(struct sf_clk_common *priv, u32 reg, u32 clr, u32 set)
-+{
-+	u32 val = sf_readl(priv, reg);
-+
-+	val &= ~clr;
-+	val |= set;
-+	sf_writel(priv, reg, val);
++	writel(val, priv->base + reg);
 +}
 +
 +static u32 sf_pll_param_get(struct sf19a2890_clk *priv, u32 hi, u32 lo)
@@ -229,18 +221,20 @@ index 000000000..05a37b640
 +	u32 postdiv1 = sf_pll_param_get(priv, PLL_POSTDIV1_HI, PLL_POSTDIV1_LO);
 +	u32 postdiv2 = sf_pll_param_get(priv, PLL_POSTDIV2_HI, PLL_POSTDIV2_LO);
 +	u32 pll_pd = sf_readl(cmn_priv, priv->offset + REG_PLL_PD);
-+	u32 ref = parent_rate / refdiv;
-+	u32 rate = ref * fbdiv;
++	u64 rate;
 +	u32 frac;
-+	u64 frac_rate;
++
++	if (!refdiv || !postdiv1 || !postdiv2)
++		return 0;
++
++	rate = (u64)(parent_rate / refdiv) * fbdiv;
 +
 +	if (!(pll_pd & PLL_PD_DSM)) {
 +		frac = sf_pll_param_get(priv, PLL_FRAC_HI, PLL_FRAC_LO);
-+		frac_rate = ((u64)rate * frac) >> PLL_FRAC_BITS;
-+		rate += frac_rate;
++		rate += (rate * frac) >> PLL_FRAC_BITS;
 +	}
-+	rate = rate / postdiv1 / postdiv2;
-+	return rate;
++
++	return div_u64(rate, postdiv1 * postdiv2);
 +}
 +
 +static u8 sf19a28_pll_get_parent(struct clk_hw *hw)
@@ -458,38 +452,23 @@ index 000000000..05a37b640
 +	},
 +};
 +
-+struct sf19a2890_clk_ctrl {
-+	void __iomem *base;
-+	spinlock_t lock;	/* serializes register updates */
-+};
-+
 +static void __init sf19a2890_clk_init(struct device_node *node)
 +{
-+	struct sf19a2890_clk_ctrl *ctrl;
++	void __iomem *base;
 +	int i, ret;
 +
-+	ctrl = kzalloc_obj(*ctrl);
-+	if (!ctrl)
-+		return;
-+
-+	ctrl->base = of_iomap(node, 0);
-+	if (!ctrl->base) {
++	base = of_iomap(node, 0);
++	if (!base) {
 +		pr_err("failed to map resources.\n");
-+		kfree(ctrl);
 +		return;
 +	}
 +
-+	spin_lock_init(&ctrl->lock);
-+
 +	for (i = 0; i < sf19a2890_hw_clks.num; i++) {
 +		struct clk_hw *hw = sf19a2890_hw_clks.hws[i];
-+		struct sf_clk_common *common;
 +
 +		if (!hw)
 +			continue;
-+		common = hw_to_sf_clk_common(hw);
-+		common->base = ctrl->base;
-+		common->lock = &ctrl->lock;
++		hw_to_sf_clk_common(hw)->base = base;
 +		ret = of_clk_hw_register(node, hw);
 +		if (ret) {
 +			pr_err("Couldn't register clock %d: %d\n", i, ret);
@@ -504,8 +483,10 @@ index 000000000..05a37b640
 +	}
 +	return;
 +err:
-+	iounmap(ctrl->base);
-+	kfree(ctrl);
++	while (--i >= 0)
++		if (sf19a2890_hw_clks.hws[i])
++			clk_hw_unregister(sf19a2890_hw_clks.hws[i]);
++	iounmap(base);
 +}
 +
 +CLK_OF_DECLARE(sf19a2890_clk, "siflower,sf19a2890-clk", sf19a2890_clk_init);

@@ -1,4 +1,4 @@
-From 74d13219f7e720eba3a4669cc3d7943a3f0740d4 Mon Sep 17 00:00:00 2001
+From ebe71394c43283484f5c0aa529a39b309284311b Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 3/4] MIPS: dts: sf19a2890: Add the GL.iNet GL-SFT1200

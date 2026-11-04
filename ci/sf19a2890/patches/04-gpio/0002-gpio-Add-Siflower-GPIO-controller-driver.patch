@@ -1,4 +1,4 @@
-From 84408d95f9e17687f9c9207d8beb245b397cf1f7 Mon Sep 17 00:00:00 2001
+From d6111f4620693978592c820246192cfb112cd27c Mon Sep 17 00:00:00 2001
 From: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
 Subject: [PATCH 2/2] gpio: Add Siflower GPIO controller driver
@@ -12,17 +12,23 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 [jt: from Chuanhong's siflower-7.1 branch; depend on MACH_SIFLOWER_MIPS,
  longer Kconfig help, assert the reset through a devm action instead of in
  .remove, which ran before the GPIO chip was removed, drop .owner and the
- unused drvdata, subject]
+ unused drvdata, drop the irq_set_affinity callback, which reached the
+ parent through irq_to_desc() (not exported with SPARSE_IRQ), call
+ gpiochip_disable_irq() and gpiochip_enable_irq() from mask and unmask as
+ an immutable irqchip must, find the group by its parent IRQ instead of
+ assuming consecutive numbers, return 0 or 1 from .get, read ngpios with
+ device_property_read_u32(), linux/math64.h and sorted includes, "Siflower"
+ spelling, subject]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/gpio/Kconfig         |  11 ++
  drivers/gpio/Makefile        |   1 +
- drivers/gpio/gpio-siflower.c | 352 +++++++++++++++++++++++++++++++++++
- 3 files changed, 364 insertions(+)
+ drivers/gpio/gpio-siflower.c | 325 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 337 insertions(+)
  create mode 100644 drivers/gpio/gpio-siflower.c
 
 diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 55e428002..48873b939 100644
+index 55e428002..6125a8452 100644
 --- a/drivers/gpio/Kconfig
 +++ b/drivers/gpio/Kconfig
 @@ -721,6 +721,17 @@ config GPIO_SIFIVE
@@ -30,12 +36,12 @@ index 55e428002..48873b939 100644
  	  Say yes here to support the GPIO device on SiFive SoCs.
  
 +config GPIO_SIFLOWER
-+	tristate "SiFlower GPIO support"
++	tristate "Siflower GPIO support"
 +	depends on OF_GPIO
 +	depends on MACH_SIFLOWER_MIPS || COMPILE_TEST
 +	select GPIOLIB_IRQCHIP
 +	help
-+	  GPIO controller driver for SiFlower MIPS and RISC-V SoCs
++	  GPIO controller driver for Siflower MIPS and RISC-V SoCs
 +	  including SF19A2890, SF21A6826 and SF21H8898. Each line can be an
 +	  input or an output and raise an interrupt on either edge or level,
 +	  and inputs can be debounced in hardware.
@@ -57,10 +63,10 @@ index 88f748846..bde618108 100644
  obj-$(CONFIG_GPIO_SL28CPLD)		+= gpio-sl28cpld.o
 diff --git a/drivers/gpio/gpio-siflower.c b/drivers/gpio/gpio-siflower.c
 new file mode 100644
-index 000000000..309a3ae4f
+index 000000000..6eb560da7
 --- /dev/null
 +++ b/drivers/gpio/gpio-siflower.c
-@@ -0,0 +1,352 @@
+@@ -0,0 +1,325 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * GPIO controller driver for Siflower MIPS and RISC-V SoCs including:
@@ -69,13 +75,15 @@ index 000000000..309a3ae4f
 + *  Siflower SF21H8898
 + *
 + */
-+#include <linux/pinctrl/consumer.h>
 +#include <linux/clk.h>
 +#include <linux/gpio/driver.h>
++#include <linux/irqchip/chained_irq.h>
++#include <linux/math64.h>
 +#include <linux/module.h>
++#include <linux/pinctrl/consumer.h>
 +#include <linux/platform_device.h>
++#include <linux/property.h>
 +#include <linux/reset.h>
-+#include <asm/div64.h>
 +
 +#define GPIO_IR(n)	(0x40 * (n) + 0x00)
 +#define GPIO_OR(n)	(0x40 * (n) + 0x04)
@@ -115,7 +123,7 @@ index 000000000..309a3ae4f
 +{
 +	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +
-+	return sf_gpio_rd(priv, GPIO_IR(offset));
++	return !!sf_gpio_rd(priv, GPIO_IR(offset));
 +}
 +
 +static int sf_gpio_set_value(struct gpio_chip *gc, unsigned int offset,
@@ -203,6 +211,7 @@ index 000000000..309a3ae4f
 +
 +	sf_gpio_wr(priv, GPIO_IMR(offset), 1);
 +	sf_gpio_wr(priv, GPIO_GPIMR(offset), 1);
++	gpiochip_disable_irq(gc, offset);
 +}
 +
 +static void sf_gpio_irq_unmask(struct irq_data *data)
@@ -211,43 +220,9 @@ index 000000000..309a3ae4f
 +	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +	unsigned long offset = irqd_to_hwirq(data);
 +
++	gpiochip_enable_irq(gc, offset);
 +	sf_gpio_wr(priv, GPIO_IMR(offset), 0);
 +	sf_gpio_wr(priv, GPIO_GPIMR(offset), 0);
-+}
-+
-+/* We are actually setting the parents' affinity. */
-+static int sf_gpio_irq_set_affinity(struct irq_data *data,
-+				    const struct cpumask *dest, bool force)
-+{
-+	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-+	unsigned long offset = irqd_to_hwirq(data);
-+	const struct cpumask *pdest;
-+	struct irq_desc *pdesc;
-+	struct irq_data *pdata;
-+	unsigned int group;
-+	int ret;
-+
-+	/* Find the parent IRQ and call its irq_set_affinity */
-+	group = offset / GPIOS_PER_GROUP;
-+	if (group >= gc->irq.num_parents)
-+		return -EINVAL;
-+
-+	pdesc = irq_to_desc(gc->irq.parents[group]);
-+	if (!pdesc)
-+		return -EINVAL;
-+
-+	pdata = irq_desc_get_irq_data(pdesc);
-+	if (!pdata->chip->irq_set_affinity)
-+		return -EINVAL;
-+
-+	ret = pdata->chip->irq_set_affinity(pdata, dest, force);
-+	if (ret < 0)
-+		return ret;
-+
-+	/* Copy its effective_affinity back */
-+	pdest = irq_data_get_effective_affinity_mask(pdata);
-+	irq_data_update_effective_affinity(data, pdest);
-+	return ret;
 +}
 +
 +static int sf_gpio_irq_set_type(struct irq_data *data, unsigned int flow_type)
@@ -291,7 +266,6 @@ index 000000000..309a3ae4f
 +	.irq_ack		= sf_gpio_irq_ack,
 +	.irq_mask		= sf_gpio_irq_mask,
 +	.irq_unmask		= sf_gpio_irq_unmask,
-+	.irq_set_affinity	= sf_gpio_irq_set_affinity,
 +	.irq_set_type		= sf_gpio_irq_set_type,
 +	.flags			= IRQCHIP_IMMUTABLE,
 +	GPIOCHIP_IRQ_RESOURCE_HELPERS,
@@ -303,9 +277,14 @@ index 000000000..309a3ae4f
 +	struct irq_chip *ic = irq_desc_get_chip(desc);
 +	struct sf_gpio_priv *priv = to_sf_gpio(gc);
 +	unsigned int irq = irq_desc_get_irq(desc);
-+	unsigned int group = irq - priv->irq[0];
 +	unsigned long pending;
-+	unsigned int n;
++	unsigned int group, n;
++
++	for (group = 0; group < gc->irq.num_parents; group++)
++		if (priv->irq[group] == irq)
++			break;
++	if (WARN_ON_ONCE(group == gc->irq.num_parents))
++		return;
 +
 +	chained_irq_enter(ic, desc);
 +
@@ -332,7 +311,7 @@ index 000000000..309a3ae4f
 +	u32 ngpios, ngroups;
 +	int ret, i;
 +
-+	ret = of_property_read_u32(pdev->dev.of_node, "ngpios", &ngpios);
++	ret = device_property_read_u32(dev, "ngpios", &ngpios);
 +	if (ret)
 +		return ret;
 +
@@ -412,7 +391,7 @@ index 000000000..309a3ae4f
 +
 +MODULE_LICENSE("GPL");
 +MODULE_AUTHOR("Qingfang Deng <qingfang.deng@siflower.com.cn>");
-+MODULE_DESCRIPTION("GPIO driver for SiFlower SoCs");
++MODULE_DESCRIPTION("GPIO driver for Siflower SoCs");
 -- 
 2.50.1 (Apple Git-155)
 
