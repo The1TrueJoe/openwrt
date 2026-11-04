@@ -99,16 +99,12 @@ jobs:
           echo "TIP=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "NPATCHES=$(ls ../ci-src/ci/sf19a2890/patches/${{ matrix.series }}/*.patch | wc -l)" >> "$GITHUB_ENV"
 
-      - name: checkpatch --strict
+      - name: checkpatch --strict (linux-next's)
         working-directory: linux
         run: |
-          perl scripts/checkpatch.pl --strict --summary-file --show-types \
-            ../ci-src/ci/sf19a2890/patches/${{ matrix.series }}/*.patch | tee checkpatch.log
-          # Accepted: ENOTSUPP, which the pinconf core requires from
-          # pin_config_get/set for unsupported parameters, and
-          # FILE_PATH_CHANGES, since the MIPS series' SoC entry covers the
-          # new files (N: sf19a2890).
-          if grep -E '^(ERROR|WARNING|CHECK):' checkpatch.log | grep -vE 'WARNING:(ENOTSUPP|FILE_PATH_CHANGES):'; then exit 1; fi
+          # Never the target tree's own checkpatch: a tree that lags mainline
+          # misses newer rules. Fails on anything outside the allow-list.
+          ../ci-src/ci/sf19a2890/checkpatch.sh ../ci-src/ci/sf19a2890/patches/${{ matrix.series }}
 
       - name: dt_binding_check (full)
         working-directory: linux
