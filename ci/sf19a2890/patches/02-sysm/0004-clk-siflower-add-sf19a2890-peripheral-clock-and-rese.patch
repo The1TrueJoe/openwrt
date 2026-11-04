@@ -1,4 +1,4 @@
-From 3ba1bcf27626c4cb70db2916d31b329a734f9383 Mon Sep 17 00:00:00 2001
+From 6d540ba95231bb7b48ac5214d05b400e4bda1e27 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Wed, 8 Apr 2026 22:17:11 +0800
 Subject: [PATCH 4/4] clk: siflower: Add SF19A2890 peripheral clock and reset
@@ -16,6 +16,13 @@ The driver registers a clock gate controller and a reset controller from
 a single DT node. A shared spinlock protects all read-modify-write
 accesses across both. BOE is managed automatically: asserted when the
 first clock gate is enabled and deasserted when the last one is disabled.
+
+Some peripherals have more than one reset line, one for each clock
+domain of the same IP, like the separate UART and APB resets of a
+PL011. The driver exposes each such group as one reset, because the
+lines have to be asserted together: the GMAC's two lines are the two
+sides of an asynchronous AXI bridge, and asserting one alone locks up
+the bus.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 [Joseph Telaak:

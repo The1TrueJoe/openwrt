@@ -1,4 +1,4 @@
-From a91f2cbec272aa53a7728f409f2e22ce9ffff5c2 Mon Sep 17 00:00:00 2001
+From 3593ab494c85454c1bc21590a7ea80216e1e6805 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
 Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver
@@ -19,6 +19,9 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
   - drop the spinlock and sf_rmw(), which nothing used
   - unregister the clocks and unmap on errors
   - return 0 for a zero divider and compute the VCO rate in 64 bits
+  - scale the fractional part of the VCO rate by the reference, not
+    by the integer rate
+  - reject a rate of 0 in the mux dividers instead of dividing by it
   - pr_fmt, u32 offsets and sorted includes
   - one Kconfig symbol without the menu, depending on
     MACH_SIFLOWER_MIPS
@@ -31,8 +34,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  drivers/clk/Makefile                 |   1 +
  drivers/clk/siflower/Kconfig         |  11 +
  drivers/clk/siflower/Makefile        |   2 +
- drivers/clk/siflower/clk-sf19a2890.c | 406 +++++++++++++++++++++++++++
- 6 files changed, 422 insertions(+)
+ drivers/clk/siflower/clk-sf19a2890.c | 416 +++++++++++++++++++++++++++
+ 6 files changed, 432 insertions(+)
  create mode 100644 drivers/clk/siflower/Kconfig
  create mode 100644 drivers/clk/siflower/Makefile
  create mode 100644 drivers/clk/siflower/clk-sf19a2890.c
@@ -100,10 +103,10 @@ index 000000000..3f4d689f7
 +obj-$(CONFIG_CLK_SF19A2890) += clk-sf19a2890.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890.c b/drivers/clk/siflower/clk-sf19a2890.c
 new file mode 100644
-index 000000000..a5845f4a8
+index 000000000..5e6ded5c1
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890.c
-@@ -0,0 +1,406 @@
+@@ -0,0 +1,416 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +#define pr_fmt(fmt) "sf19a2890-clk: " fmt
@@ -241,17 +244,20 @@ index 000000000..a5845f4a8
 +	u32 postdiv1 = sf_pll_param_get(priv, PLL_POSTDIV1_HI, PLL_POSTDIV1_LO);
 +	u32 postdiv2 = sf_pll_param_get(priv, PLL_POSTDIV2_HI, PLL_POSTDIV2_LO);
 +	u32 pll_pd = sf_readl(cmn_priv, priv->offset + REG_PLL_PD);
++	unsigned long ref;
 +	u64 rate;
 +	u32 frac;
 +
 +	if (!refdiv || !postdiv1 || !postdiv2)
 +		return 0;
 +
-+	rate = (u64)(parent_rate / refdiv) * fbdiv;
++	ref = parent_rate / refdiv;
++	rate = (u64)ref * fbdiv;
 +
++	/* With the DSM on, the VCO runs at ref * (fbdiv + frac / 2^24) */
 +	if (!(pll_pd & PLL_PD_DSM)) {
 +		frac = sf_pll_param_get(priv, PLL_FRAC_HI, PLL_FRAC_LO);
-+		rate += (rate * frac) >> PLL_FRAC_BITS;
++		rate += ((u64)ref * frac) >> PLL_FRAC_BITS;
 +	}
 +
 +	return div_u64(rate, postdiv1 * postdiv2);
@@ -316,7 +322,11 @@ index 000000000..a5845f4a8
 +{
 +	unsigned int div;
 +
-+	div = DIV_ROUND_CLOSEST(req->best_parent_rate, req->rate);
++	if (!req->rate)
++		div = MUXDIV_RATIO_MAX + 1;
++	else
++		div = DIV_ROUND_CLOSEST(req->best_parent_rate, req->rate);
++
 +	if (!div)
 +		div = 1;
 +	else if (div > MUXDIV_RATIO_MAX + 1)
@@ -332,6 +342,9 @@ index 000000000..a5845f4a8
 +	struct sf_clk_common *cmn_priv = hw_to_sf_clk_common(hw);
 +	struct sf19a2890_clk *priv = cmn_to_clk(cmn_priv);
 +	unsigned int div;
++
++	if (!rate)
++		return -EINVAL;
 +
 +	div = DIV_ROUND_CLOSEST(parent_rate, rate);
 +	if (div < 1)
