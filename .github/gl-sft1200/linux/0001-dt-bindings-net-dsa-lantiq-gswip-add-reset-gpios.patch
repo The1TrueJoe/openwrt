@@ -1,7 +1,7 @@
-From 69cc2a64db78f49d60752e4702866df20db821a4 Mon Sep 17 00:00:00 2001
+From 9d8e582b78281dc07ce95c456e4ffc857a2db7f4 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Tue, 27 Oct 2026 22:00:16 -0400
-Subject: [PATCH net-next 1/2] dt-bindings: net: dsa: lantiq,gswip: add
+Subject: [PATCH net-next v2 1/2] dt-bindings: net: dsa: lantiq,gswip: add
  reset-gpios
 
 The standalone GSW1xx switches have a hardware reset input, and boards
@@ -14,7 +14,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  1 file changed, 6 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml b/Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml
-index 49af557..9a74ea2 100644
+index 49af5573e4..9a74ea2a6d 100644
 --- a/Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml
 +++ b/Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml
 @@ -40,6 +40,11 @@ properties:

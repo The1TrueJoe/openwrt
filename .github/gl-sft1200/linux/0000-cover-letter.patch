@@ -1,7 +1,7 @@
-From 52dac3212c31f517a893ff4556f5a165d24c598b Mon Sep 17 00:00:00 2001
+From 77db35a524be8ddbaa1a57dfd3dae3beb54b2c7f Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
-Date: Tue, 27 Oct 2026 22:01:01 -0400
-Subject: [PATCH net-next 0/2] net: dsa: mxl-gsw1xx: reset the switch through reset-gpios
+Date: Wed, 4 Nov 2026 03:17:32 -0500
+Subject: [PATCH net-next v2 0/2] net: dsa: mxl-gsw1xx: reset the switch through reset-gpios
 
 The GSW1xx driver never resets the switch, and the MDIO core does not
 handle reset-gpios for non-PHY devices, so the driver works with whatever
@@ -26,14 +26,19 @@ patch, port 0 fails with -ENODEV after every boot.
 
 The board's device tree goes to OpenWrt; there is no in-tree user yet.
 
+Changes in v2:
+- Use the reset controller API, so reset-gpios goes through reset-gpio,
+  instead of driving the GPIO from the driver (Daniel).
+- Link to v1: https://patch.msgid.link/20261104-mxl-gsw1xx-reset-v1-0-53839bf5c88e@telaak.dev
+
 Joseph Telaak (2):
   dt-bindings: net: dsa: lantiq,gswip: add reset-gpios
   net: dsa: mxl-gsw1xx: reset the switch through reset-gpios
 
- .../bindings/net/dsa/lantiq,gswip.yaml           |  6 ++++++
- drivers/net/dsa/lantiq/mxl-gsw1xx.c              | 16 ++++++++++++++++
- drivers/net/dsa/lantiq/mxl-gsw1xx.h              |  4 ++++
- 3 files changed, 26 insertions(+)
+ .../bindings/net/dsa/lantiq,gswip.yaml        |  6 +++++
+ drivers/net/dsa/lantiq/mxl-gsw1xx.c           | 25 +++++++++++++++++++
+ drivers/net/dsa/lantiq/mxl-gsw1xx.h           |  4 +++
+ 3 files changed, 35 insertions(+)
 
 -- 
 2.50.1 (Apple Git-155)

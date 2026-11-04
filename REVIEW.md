@@ -58,8 +58,20 @@ nothing else differs from v2. v2 adds fix 881-05 (unlit colors of a
 blinking LED), so the commit 7 and 11 messages were updated. v1 (posted
 2026-11-01) had bugs and is not in the series.
 
-761-02 carries the final net-next text (b4/mxl-gsw1xx-reset 176d0f15a):
-only the PHY paragraph is reworded; the code is unchanged.
+761-02 is net-next v2 (b4/mxl-gsw1xx-reset 77db35a524, 2026-11-04). After
+Daniel Golle's review of v1 it gets the reset through the reset controller
+API (devm_reset_control_get_optional_exclusive(), assert, 2 ms, deassert,
+100 ms) instead of driving the GPIO. The 6.18 reset core hands a node's
+reset-gpios to the reset-gpio driver only with CONFIG_RESET_GPIO, which
+generic config-6.18 leaves unset, so commit 6 sets it for sf19a2890. The
+binding (761-01) is unchanged. The 0000-0002 files in .github/gl-sft1200/linux
+are now v2.
+
+The sf19a2890 stmmac glue (patches-6.18/009 and dwmac-sf19a2890.c) is
+Chuanhong Guo's code in main, not part of this series apart from commit 2,
+so the stmmac v2 changes at linux-mainline b4/sf19a2890-gmac are not
+carried here. 6.18 has no has_internal_tx/rx_delay in plat_stmmac_enet_data
+in any case.
 
 Commit 13 also adds board.d/01_leds (2026-11-03): white:wan-online gets a
 netdev trigger on wan. Without it white had no default trigger and stayed
