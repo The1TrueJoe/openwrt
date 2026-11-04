@@ -20,6 +20,21 @@ allowed="
 03-pinctrl/0002/WARNING:ENOTSUPP/2
 09-leds/0008/WARNING:FILE_PATH_CHANGES/1
 "
+# checkpatch looks up every commit id the patches cite; deepen a shallow
+# clone until each one is there
+ids=$(grep -hoE '^(Fixes: |.*\<commit )[0-9a-f]{12,40}( \(|$)' "$dir"/*.patch |
+	grep -oE '[0-9a-f]{12,40}' | sort -u)
+for id in $ids; do
+	d=500
+	until git rev-parse -q --verify "$id^{commit}" >/dev/null; do
+		[ "$(git rev-parse --is-shallow-repository)" = true ] && [ $d -le 64000 ] ||
+			{ echo "::error::commit $id is not in this tree"; exit 1; }
+		git fetch -q --deepen=$d origin
+		d=$((d * 2))
+	done
+	echo "cited: $(git log -1 --format='%h ("%s")' "$id")"
+done
+
 fail=0
 for p in "$dir"/*.patch; do
 	n=$(basename "$p" | cut -c1-4)

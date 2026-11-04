@@ -79,9 +79,6 @@ jobs:
             syms: NEW_LEDS LEDS_CLASS LEDS_CLASS_MULTICOLOR I2C LEDS_KTD202X
             objs: drivers/leds/rgb/leds-ktd202x.o
             mods: LEDS_KTD202X
-            # commits (no trees) back to the driver's Fixes: target, so
-            # checkpatch can check the commit ids
-            since: 2023-10-01
     steps:
       - uses: actions/checkout@v4
         with:
@@ -94,16 +91,12 @@ jobs:
             gcc-mipsel-linux-gnu clang lld llvm sparse u-boot-tools \
             python3-venv swig libyaml-dev python3-ply
           python3 -m venv ~/venv
-          ~/venv/bin/pip install -q dtschema yamllint ply
+          ~/venv/bin/pip install -q dtschema yamllint ply GitPython
           echo "$HOME/venv/bin" >> "$GITHUB_PATH"
 
       - name: Fetch the tree and apply the series
         run: |
-          if [ -n "${{ matrix.since }}" ]; then
-            git clone -q --filter=tree:0 --shallow-since=${{ matrix.since }} --branch "${{ matrix.branch }}" "$KORG/${{ matrix.tree }}" linux
-          else
-            git clone -q --depth 1 --branch "${{ matrix.branch }}" "$KORG/${{ matrix.tree }}" linux
-          fi
+          git clone -q --depth 1 --branch "${{ matrix.branch }}" "$KORG/${{ matrix.tree }}" linux
           cd linux
           echo "base: ${{ matrix.tree }} ${{ matrix.branch }} $(git rev-parse --short=12 HEAD) $(git log -1 --format=%s)"
           git config user.name ci
@@ -131,11 +124,11 @@ jobs:
           echo "full dt_binding_check exit $st; lines with warning/error in the tree: $(grep -ciE 'warning|error' dt.log), none from this series' bindings:"
           grep -iE "(warning|error)" dt.log | grep -v '^  ' | head -20 || true
 
-      - name: dt-check-style --mode=strict (new bindings)
+      - name: dt-check-style --mode=strict, linux-next's (new bindings)
         working-directory: linux
         run: |
-          s=scripts/dtc/dt-check-style
-          [ -f $s ] || { s=../dt-check-style; curl -fsSL "$KORG/torvalds/linux.git/plain/scripts/dtc/dt-check-style" -o $s; }
+          # linux-next's, like checkpatch: a tree's own copy may predate rule changes
+          s=../dt-check-style; curl -fsSL "$KORG/next/linux-next.git/plain/scripts/dtc/dt-check-style" -o $s
           new=$(git diff --name-only --diff-filter=A HEAD~$NPATCHES HEAD -- 'Documentation/devicetree/bindings/*.yaml')
           [ -n "$new" ] || { echo "no new bindings"; exit 0; }
           python3 $s --mode=strict $new
@@ -337,7 +330,8 @@ jobs:
           perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/pinctrl/pinctrl-sf19a2890.c
           perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/phy/siflower/phy-sf19a2890-usb.c
           new=$(git diff --name-only --diff-filter=A $MAINLINE HEAD -- 'Documentation/devicetree/bindings/*.yaml')
-          python3 scripts/dtc/dt-check-style --mode=strict $new
+          curl -fsSL "$KORG/next/linux-next.git/plain/scripts/dtc/dt-check-style" -o ../dt-check-style
+          python3 ../dt-check-style --mode=strict $new
           echo "dt-check-style --mode=strict: clean on" $new
 
       - name: Build the initramfs userland
