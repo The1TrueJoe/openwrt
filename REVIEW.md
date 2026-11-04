@@ -5,7 +5,7 @@ only on the `siflower-gl-sft1200-ci` branch and are never sent upstream.
 Both branches are pushed to The1TrueJoe/openwrt. Nothing has been submitted
 upstream: no openwrt/openwrt PR, no patch mail.
 
-Series, on openwrt/openwrt `main` c1bd42c934 (Linux 6.18.60):
+Series, on openwrt/openwrt `main` dfb167123f (Linux 6.18.60):
 
 1. `kernel: 6.18: backport MaxLinear GSW1xx DSA switch support`
 2. `siflower: sf19a2890: terminate the RGMII delay string before parsing`
@@ -29,6 +29,23 @@ with no conflicts. On 554f401d6b, rockchip 184-03..05 (new in main since
 6.18.55) needed their MAINTAINERS hunk headers moved by one line for
 commit 1; that is folded in (all-target run 41356577085 found it, run
 41367090492 was green after).
+
+Onto dfb167123f on 2026-11-03. Main had gained the Motorcomm YT92xx DSA
+backport (generic 967-xx), which overlaps commit 1 twice:
+- its 967-01 is the same upstream commit as our 723-01
+  (dsa_xmit_port_mask()), so 723-01 is dropped and 723-30, which needs the
+  helper, moves after it as 967-01b;
+- it numbers the tag ids its own way (MXL862 30, MXL862_8021Q 31, YT921X
+  32, YT922X 33, YT922X_4B 34, out-of-tree 35), so mainline's MXL_GSW1XX
+  31 / MXL862 32 no longer fit. MXL_GSW1XX takes 35, the out-of-tree ids
+  of ipq40xx, qualcommax, ramips and realtek move to 36, and our earlier
+  renumbering of 762 and 760-09 is gone.
+The dsa.h hunks of 762, 967-02, 760-09, 967-27, 967-40, 701, 0955, 761 and
+721 were rewritten from the exact pre-patch file state: the 6.18.60 dsa.h,
+net/dsa and drivers/net/dsa Kconfig/Makefile, tag.h, if_ether.h and
+MAINTAINERS, patched in OpenWrt order with fuzz 0, for siflower and eleven
+other targets. All-target run 41743156488 then supplied the remaining hunk
+headers (39 files, headers only), folded into commit 1.
 
 Commits 7-13 are the et6326-led session's (pending-6.18/881-01..11 and
 kmod-leds-ktd202x, then the board's I2C and LED nodes); its own notes hold
