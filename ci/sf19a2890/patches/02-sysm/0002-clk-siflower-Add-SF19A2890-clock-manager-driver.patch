@@ -1,4 +1,4 @@
-From 01c6874968c96f2a39a9ddc1bf25059432ae0651 Mon Sep 17 00:00:00 2001
+From 33fcb65986e805b528ed8dd062a7474034643b58 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
 Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver
@@ -26,16 +26,29 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 Co-developed-by: Joseph Telaak <joseph@telaak.dev>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
+ MAINTAINERS                          |   1 +
  drivers/clk/Kconfig                  |   1 +
  drivers/clk/Makefile                 |   1 +
  drivers/clk/siflower/Kconfig         |  11 +
  drivers/clk/siflower/Makefile        |   1 +
  drivers/clk/siflower/clk-sf19a2890.c | 406 +++++++++++++++++++++++++++
- 5 files changed, 420 insertions(+)
+ 6 files changed, 421 insertions(+)
  create mode 100644 drivers/clk/siflower/Kconfig
  create mode 100644 drivers/clk/siflower/Makefile
  create mode 100644 drivers/clk/siflower/clk-sf19a2890.c
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ce8d05969..b55aa37a7 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
+ L:	linux-clk@vger.kernel.org
+ S:	Maintained
+ F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-clk.yaml
++F:	drivers/clk/siflower/
+ F:	include/dt-bindings/clock/siflower,sf19a2890-clk.h
+ 
+ SILEAD TOUCHSCREEN DRIVER
 diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
 index 37a8e35d4..8e73490cb 100644
 --- a/drivers/clk/Kconfig

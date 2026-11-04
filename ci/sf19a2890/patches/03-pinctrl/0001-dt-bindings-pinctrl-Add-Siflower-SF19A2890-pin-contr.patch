@@ -1,4 +1,4 @@
-From e8960d60a1f305ce04e1475af1f76abbab3c16ba Mon Sep 17 00:00:00 2001
+From 0d8c87ff81e979fc4e5a02292866b50e219bbd19 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:58:29 -0500
 Subject: [PATCH 1/2] dt-bindings: pinctrl: Add Siflower SF19A2890 pin
@@ -12,12 +12,13 @@ pin state node holds subnodes that set some of its pins.
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../pinctrl/siflower,sf19a2890-pinctrl.yaml   | 113 ++++++++++++++++++
- 1 file changed, 113 insertions(+)
+ MAINTAINERS                                   |   6 +
+ 2 files changed, 119 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
 
 diff --git a/Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml b/Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
 new file mode 100644
-index 000000000..8b52d3175
+index 000000000..3537f36cf
 --- /dev/null
 +++ b/Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
 @@ -0,0 +1,113 @@
@@ -120,20 +121,37 @@ index 000000000..8b52d3175
 +        reg = <0x19e3fc00 0x400>;
 +
 +        uart0-pins {
-+            pins-tx {
-+                pins = "UART_TX";
-+                function = "uart0";
-+                bias-pull-up;
-+            };
-+
 +            pins-rx {
 +                pins = "UART_RX";
 +                function = "uart0";
 +                input-enable;
 +                bias-pull-up;
 +            };
++
++            pins-tx {
++                pins = "UART_TX";
++                function = "uart0";
++                bias-pull-up;
++            };
 +        };
 +    };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9270abea0..9a31712fe 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25077,6 +25077,12 @@ N:	sifive
+ K:	fu[57]40
+ K:	[^@]sifive
+ 
++SIFLOWER SF19A2890 PINCTRL DRIVER
++M:	Joseph Telaak <joseph@telaak.dev>
++L:	linux-gpio@vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
++
+ SILEAD TOUCHSCREEN DRIVER
+ M:	Hans de Goede <hansg@kernel.org>
+ L:	linux-input@vger.kernel.org
 -- 
 2.50.1 (Apple Git-155)
 

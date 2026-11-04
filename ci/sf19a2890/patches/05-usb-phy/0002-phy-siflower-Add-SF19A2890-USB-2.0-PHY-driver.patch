@@ -1,4 +1,4 @@
-From 6efc59c3852ea1878fa9d1a5085d4c2e313687c5 Mon Sep 17 00:00:00 2001
+From c1ff8685f96c27f3a27fd6124e1a7865612b66e1 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 9 Sep 2024 10:18:33 +0800
 Subject: [PATCH 2/2] phy: siflower: Add SF19A2890 USB 2.0 PHY driver
@@ -16,16 +16,29 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
   - Kconfig dependencies and help, commit message and subject]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
+ MAINTAINERS                              |   1 +
  drivers/phy/Kconfig                      |   1 +
  drivers/phy/Makefile                     |   1 +
  drivers/phy/siflower/Kconfig             |  12 ++
  drivers/phy/siflower/Makefile            |   2 +
  drivers/phy/siflower/phy-sf19a2890-usb.c | 143 +++++++++++++++++++++++
- 5 files changed, 159 insertions(+)
+ 6 files changed, 160 insertions(+)
  create mode 100644 drivers/phy/siflower/Kconfig
  create mode 100644 drivers/phy/siflower/Makefile
  create mode 100644 drivers/phy/siflower/phy-sf19a2890-usb.c
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7033d9b61..57f9bb1e3 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
+ L:	linux-phy@lists.infradead.org
+ S:	Maintained
+ F:	Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
++F:	drivers/phy/siflower/
+ 
+ SILEAD TOUCHSCREEN DRIVER
+ M:	Hans de Goede <hansg@kernel.org>
 diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
 index 105fbe408..8ba351e23 100644
 --- a/drivers/phy/Kconfig

@@ -94,11 +94,6 @@ jobs:
           echo "base: ${{ matrix.tree }} ${{ matrix.branch }} $(git rev-parse --short=12 HEAD) $(git log -1 --format=%s)"
           git config user.name ci
           git config user.email ci@example.invalid
-          # A prerequisite series (series 1, which adds the MAINTAINERS entry)
-          # goes in first; only this series' own patches are checked below
-          if [ -n "${{ matrix.prereq }}" ]; then
-            git am -q ../ci-src/ci/sf19a2890/patches/${{ matrix.prereq }}/*.patch
-          fi
           git am -q ../ci-src/ci/sf19a2890/patches/${{ matrix.series }}/*.patch
           git log --oneline -12
           echo "TIP=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
@@ -125,6 +120,16 @@ jobs:
           if grep -iE "(warning|error)" dt.log | grep -E "${f#|}"; then exit 1; fi
           echo "full dt_binding_check exit $st; lines with warning/error in the tree: $(grep -ciE 'warning|error' dt.log), none from this series' bindings:"
           grep -iE "(warning|error)" dt.log | grep -v '^  ' | head -20 || true
+
+      - name: dt-check-style --mode=strict (new bindings)
+        working-directory: linux
+        run: |
+          s=scripts/dtc/dt-check-style
+          [ -f $s ] || { s=../dt-check-style; curl -fsSL "$KORG/torvalds/linux.git/plain/scripts/dtc/dt-check-style" -o $s; }
+          new=$(git diff --name-only --diff-filter=A HEAD~$NPATCHES HEAD -- 'Documentation/devicetree/bindings/*.yaml')
+          [ -n "$new" ] || { echo "no new bindings"; exit 0; }
+          python3 $s --mode=strict $new
+          echo "dt-check-style --mode=strict: clean on" $new
 
       - name: MIPS W=1, every commit
         if: matrix.mips_defconfig
@@ -248,6 +253,7 @@ jobs:
           git config user.email ci@example.invalid
           P=$(realpath ../ci-src/ci/sf19a2890/patches)
           base=$(git rev-parse HEAD)
+          echo "MAINLINE=$base" >> "$GITHUB_ENV"
           git am -q $P/01-mips/*.patch
           git branch s1
           for s in 02-sysm 03-pinctrl 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts deps-leds deps-gsw; do
@@ -297,19 +303,32 @@ jobs:
       - name: MAINTAINERS checks
         working-directory: linux
         run: |
+          # Combined, the series add these entries; each must be in
+          # canonical order, and so must they among themselves
+          want="SIFLOWER GPIO DRIVER
+          SIFLOWER SF19A2890 CLOCK DRIVERS
+          SIFLOWER SF19A2890 DWMAC GLUE LAYER
+          SIFLOWER SF19A2890 PINCTRL DRIVER
+          SIFLOWER SF19A2890 SOC SUPPORT
+          SIFLOWER SF19A2890 USB PHY DRIVER"
+          diff <(echo "$want" | sed 's/^ *//') <(grep '^SIFLOWER ' MAINTAINERS)
           awk '/^SIFLOWER /,/^$/' MAINTAINERS
           perl scripts/get_maintainer.pl --self-test=patterns,sections 2>&1 | tee selftest.log | grep -i siflower && exit 1
           echo "get_maintainer --self-test: nothing about the SIFLOWER entries ($(wc -l < selftest.log) lines in all)"
           perl scripts/parse-maintainers.pl --input=MAINTAINERS --output=M.sorted --order
-          for e in "SIFLOWER GPIO DRIVER" "SIFLOWER SF19A2890 DWMAC GLUE LAYER" "SIFLOWER SF19A2890 SOC SUPPORT"; do
-            grep -qx "$e" MAINTAINERS || { echo "::error::no $e entry"; exit 1; }
-            diff <(awk -v e="$e" '$0 == e, /^$/' MAINTAINERS) <(awk -v e="$e" '$0 == e, /^$/' M.sorted)
+          grep '^SIFLOWER ' MAINTAINERS | while read -r e; do
+            diff <(awk -v e="$e" '$0 == e, /^$/' MAINTAINERS) <(awk -v e="$e" '$0 == e, /^$/' M.sorted) || exit 1
           done
           diff <(grep '^SIFLOWER ' MAINTAINERS) <(grep '^SIFLOWER ' M.sorted)
           echo "parse-maintainers: the SIFLOWER entries are already in canonical order"
           perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/clk/siflower/clk-sf19a2890.c
           perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
           perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/gpio/gpio-siflower.c
+          perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/pinctrl/pinctrl-sf19a2890.c
+          perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/phy/siflower/phy-sf19a2890-usb.c
+          new=$(git diff --name-only --diff-filter=A $MAINLINE HEAD -- 'Documentation/devicetree/bindings/*.yaml')
+          python3 scripts/dtc/dt-check-style --mode=strict $new
+          echo "dt-check-style --mode=strict: clean on" $new
 
       - name: Build the initramfs userland
         run: |

@@ -1,4 +1,4 @@
-From 3143bf2d0e4495d307ecfd8688b0ea8a769fb8bb Mon Sep 17 00:00:00 2001
+From a7d13d833dc5c9c097faaa357b501eba82c4b2a8 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:18:45 -0500
 Subject: [PATCH 3/4] dt-bindings: clock: Add Siflower SF19A2890 peripheral
@@ -16,7 +16,8 @@ compatible and its bit layout in properties.
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../clock/siflower,sf19a2890-periph-crm.yaml  | 169 ++++++++++++++++++
- 1 file changed, 169 insertions(+)
+ MAINTAINERS                                   |   1 +
+ 2 files changed, 170 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml
 
 diff --git a/Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml b/Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml
@@ -194,6 +195,18 @@ index 000000000..7f0bce603
 +        #clock-cells = <1>;
 +        #reset-cells = <1>;
 +    };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b55aa37a7..81577e147 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
+ L:	linux-clk@vger.kernel.org
+ S:	Maintained
+ F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-clk.yaml
++F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml
+ F:	drivers/clk/siflower/
+ F:	include/dt-bindings/clock/siflower,sf19a2890-clk.h
+ 
 -- 
 2.50.1 (Apple Git-155)
 

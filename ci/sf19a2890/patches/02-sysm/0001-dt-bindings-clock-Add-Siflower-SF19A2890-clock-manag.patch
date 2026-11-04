@@ -1,4 +1,4 @@
-From 49886d6754f1189000e714d4b0a15f583d70b199 Mon Sep 17 00:00:00 2001
+From 6ccfc2991272fec912db59a8fb59e636293c48b5 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:17:23 -0500
 Subject: [PATCH 1/4] dt-bindings: clock: Add Siflower SF19A2890 clock manager
@@ -14,8 +14,9 @@ count at its end.
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../clock/siflower,sf19a2890-clk.yaml         | 57 +++++++++++++++++++
+ MAINTAINERS                                   |  7 +++
  .../clock/siflower,sf19a2890-clk.h            | 27 +++++++++
- 2 files changed, 84 insertions(+)
+ 3 files changed, 91 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/siflower,sf19a2890-clk.yaml
  create mode 100644 include/dt-bindings/clock/siflower,sf19a2890-clk.h
 
@@ -82,13 +83,31 @@ index 000000000..9b72f14c2
 +        clock-names = "osc12m", "osc40m";
 +        #clock-cells = <1>;
 +    };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 93abbb315..ce8d05969 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25698,6 +25698,13 @@ N:	sifive
+ K:	fu[57]40
+ K:	[^@]sifive
+ 
++SIFLOWER SF19A2890 CLOCK DRIVERS
++M:	Joseph Telaak <joseph@telaak.dev>
++L:	linux-clk@vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-clk.yaml
++F:	include/dt-bindings/clock/siflower,sf19a2890-clk.h
++
+ SILEAD TOUCHSCREEN DRIVER
+ M:	Hans de Goede <hansg@kernel.org>
+ L:	linux-input@vger.kernel.org
 diff --git a/include/dt-bindings/clock/siflower,sf19a2890-clk.h b/include/dt-bindings/clock/siflower,sf19a2890-clk.h
 new file mode 100644
-index 000000000..74b9d67ea
+index 000000000..a9fc9ecf4
 --- /dev/null
 +++ b/include/dt-bindings/clock/siflower,sf19a2890-clk.h
 @@ -0,0 +1,27 @@
-+/* SPDX-License-Identifier: (GPL-2.0 OR MIT) */
++/* SPDX-License-Identifier: (GPL-2.0-only OR MIT) */
 +#ifndef __DT_BINDINGS_CLOCK_SIFLOWER_SF19A2890_CLK_H
 +#define __DT_BINDINGS_CLOCK_SIFLOWER_SF19A2890_CLK_H
 +
