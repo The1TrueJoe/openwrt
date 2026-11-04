@@ -1,4 +1,4 @@
-From cc1e1955ff219d078109f02951c5d747f316ba46 Mon Sep 17 00:00:00 2001
+From 1f423a8bf59003e7bf899209baa3dffc2f007a0d Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:51:28 -0500
 Subject: [PATCH 4/4] MIPS: configs: Add sf19a2890_defconfig

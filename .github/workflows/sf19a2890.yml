@@ -72,6 +72,16 @@ jobs:
             syms: NETDEVICES STMMAC_ETH STMMAC_PLATFORM DWMAC_SF19A2890
             objs: drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.o
             mods: STMMAC_ETH STMMAC_PLATFORM DWMAC_SF19A2890
+          - series: 09-leds
+            tree: lee/leds.git
+            branch: for-leds-next
+            bindings: leds/kinetic,ktd202x.yaml
+            syms: NEW_LEDS LEDS_CLASS LEDS_CLASS_MULTICOLOR I2C LEDS_KTD202X
+            objs: drivers/leds/rgb/leds-ktd202x.o
+            mods: LEDS_KTD202X
+            # commits (no trees) back to the driver's Fixes: target, so
+            # checkpatch can check the commit ids
+            since: 2023-10-01
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,7 +99,11 @@ jobs:
 
       - name: Fetch the tree and apply the series
         run: |
-          git clone -q --depth 1 --branch "${{ matrix.branch }}" "$KORG/${{ matrix.tree }}" linux
+          if [ -n "${{ matrix.since }}" ]; then
+            git clone -q --filter=tree:0 --shallow-since=${{ matrix.since }} --branch "${{ matrix.branch }}" "$KORG/${{ matrix.tree }}" linux
+          else
+            git clone -q --depth 1 --branch "${{ matrix.branch }}" "$KORG/${{ matrix.tree }}" linux
+          fi
           cd linux
           echo "base: ${{ matrix.tree }} ${{ matrix.branch }} $(git rev-parse --short=12 HEAD) $(git log -1 --format=%s)"
           git config user.name ci
@@ -252,7 +266,7 @@ jobs:
           echo "MAINLINE=$base" >> "$GITHUB_ENV"
           git am -q $P/01-mips/*.patch
           git branch s1
-          for s in 02-sysm 03-pinctrl 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts deps-leds deps-gsw; do
+          for s in 02-sysm 03-pinctrl 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts 09-leds deps-gsw; do
             git am -q $P/$s/*.patch && continue
             git am --abort
             # Series for different trees may add MAINTAINERS entries at the

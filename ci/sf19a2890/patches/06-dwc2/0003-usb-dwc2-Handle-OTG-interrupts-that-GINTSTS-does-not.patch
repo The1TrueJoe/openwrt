@@ -1,21 +1,22 @@
-From 8e3c5776d2a911b60811329e59dd9818fffbed32 Mon Sep 17 00:00:00 2001
+From 704d69ed00a6929d5d8d676965e2d5a3901a0b53 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Tue, 10 Sep 2024 09:10:27 +0800
 Subject: [PATCH 3/3] usb: dwc2: Handle OTG interrupts that GINTSTS does not
  flag
 
-The DWC OTG 3.30a found on Siflower SF19A2890 has battery charger
-support enabled. It triggers MultVallpChng interrupt (bit 20 of
-GOTGINT) but doesn't set OTGInt in GINTSTS. As a result, this
-interrupt is never handled, and Linux disables USB interrupt
-because "nobody cares".
-
-Handle OTG interrupt in IRQ handler regardless of whether the
-OTGInt bit in GINTSTS is set or not.
+The DWC OTG 3.30a of the Siflower SF19A2890 has battery charger support
+enabled. It raises the MultVallpChng interrupt (bit 20 of GOTGINT)
+without setting OTGInt in GINTSTS, so the interrupt is never handled
+and the kernel disables the USB interrupt because nobody cared.
 
 On a GL.iNet GL-SFT1200 it shows differently: after a few replugs of a
 USB stick the system stops making progress, the console repeating its
 last message with the same timestamp, until a power cycle.
+
+Add an otg_int_unflagged parameter for such cores. With it set, the
+common interrupt handler also reads GOTGINT on every interrupt and
+handles any OTG interrupt it finds there, as it does when OTGInt is
+set. The SF19A2890 sets it; other cores are unchanged.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 [Joseph Telaak:
@@ -23,7 +24,8 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
     otg_int_unflagged parameter, which the SF19A2890 sets
   - do it in the one place that already handles flagged OTG
     interrupts, and return IRQ_HANDLED
-  - describe what a GL-SFT1200 does without the patch
+  - describe what a GL-SFT1200 does without the patch, and the fix as
+    it is now
   - subject]
 Co-developed-by: Joseph Telaak <joseph@telaak.dev>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
@@ -75,7 +77,7 @@ index 9565e6a52..e7bb9709c 100644
  		dwc2_handle_conn_id_status_change_intr(hsotg);
  	if (gintsts & GINTSTS_DISCONNINT)
 diff --git a/drivers/usb/dwc2/params.c b/drivers/usb/dwc2/params.c
-index f6379e616..22ab9ce13 100644
+index b31fa1f5a..8e814a925 100644
 --- a/drivers/usb/dwc2/params.c
 +++ b/drivers/usb/dwc2/params.c
 @@ -243,6 +243,7 @@ static void dwc2_set_sf19a2890_params(struct dwc2_hsotg *hsotg)

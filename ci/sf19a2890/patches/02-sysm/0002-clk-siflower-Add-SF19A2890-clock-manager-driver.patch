@@ -1,4 +1,4 @@
-From 3c8cd85fc193f2021ecf7eabf678fceb889ab848 Mon Sep 17 00:00:00 2001
+From a91f2cbec272aa53a7728f409f2e22ce9ffff5c2 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
 Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver
@@ -30,9 +30,9 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  drivers/clk/Kconfig                  |   1 +
  drivers/clk/Makefile                 |   1 +
  drivers/clk/siflower/Kconfig         |  11 +
- drivers/clk/siflower/Makefile        |   1 +
+ drivers/clk/siflower/Makefile        |   2 +
  drivers/clk/siflower/clk-sf19a2890.c | 406 +++++++++++++++++++++++++++
- 6 files changed, 421 insertions(+)
+ 6 files changed, 422 insertions(+)
  create mode 100644 drivers/clk/siflower/Kconfig
  create mode 100644 drivers/clk/siflower/Makefile
  create mode 100644 drivers/clk/siflower/clk-sf19a2890.c
@@ -75,11 +75,11 @@ index 52d138d4f..d2f075847 100644
  obj-y					+= spacemit/
 diff --git a/drivers/clk/siflower/Kconfig b/drivers/clk/siflower/Kconfig
 new file mode 100644
-index 000000000..a8812fab2
+index 000000000..ad1b04b4b
 --- /dev/null
 +++ b/drivers/clk/siflower/Kconfig
 @@ -0,0 +1,11 @@
-+# SPDX-License-Identifier: GPL-2.0
++# SPDX-License-Identifier: GPL-2.0-only
 +
 +config CLK_SF19A2890
 +	bool "Clock driver for Siflower SF19A2890"
@@ -92,18 +92,19 @@ index 000000000..a8812fab2
 +	  for this SoC needs it built in.
 diff --git a/drivers/clk/siflower/Makefile b/drivers/clk/siflower/Makefile
 new file mode 100644
-index 000000000..9f3df2e1e
+index 000000000..3f4d689f7
 --- /dev/null
 +++ b/drivers/clk/siflower/Makefile
-@@ -0,0 +1 @@
+@@ -0,0 +1,2 @@
++# SPDX-License-Identifier: GPL-2.0-only
 +obj-$(CONFIG_CLK_SF19A2890) += clk-sf19a2890.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890.c b/drivers/clk/siflower/clk-sf19a2890.c
 new file mode 100644
-index 000000000..375561761
+index 000000000..a5845f4a8
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890.c
 @@ -0,0 +1,406 @@
-+// SPDX-License-Identifier: GPL-2.0
++// SPDX-License-Identifier: GPL-2.0-only
 +
 +#define pr_fmt(fmt) "sf19a2890-clk: " fmt
 +

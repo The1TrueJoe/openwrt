@@ -1,4 +1,4 @@
-From 650f422e7d2127797d7696e4a721e7a8b093dae5 Mon Sep 17 00:00:00 2001
+From 620e3fd35d9eee21a0b7148e378887c08cdb2a11 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:51:28 -0500
 Subject: [PATCH 3/4] MIPS: dts: Add Siflower SF19A2890 and GL.iNet GL-SFT1200
@@ -49,11 +49,11 @@ index 36c5e4c6e..d33cf7f61 100644
  subdir-y	+= xilfpga
 diff --git a/arch/mips/boot/dts/siflower/Makefile b/arch/mips/boot/dts/siflower/Makefile
 new file mode 100644
-index 000000000..6f5e90aab
+index 000000000..b5986850a
 --- /dev/null
 +++ b/arch/mips/boot/dts/siflower/Makefile
 @@ -0,0 +1,2 @@
-+# SPDX-License-Identifier: GPL-2.0
++# SPDX-License-Identifier: GPL-2.0-only
 +dtb-$(CONFIG_MACH_SIFLOWER_MIPS)	+= sf19a2890-glinet-gl-sft1200.dtb
 diff --git a/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts b/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
 new file mode 100644

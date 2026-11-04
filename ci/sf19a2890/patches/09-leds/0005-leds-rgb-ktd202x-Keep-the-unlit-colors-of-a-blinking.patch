@@ -1,4 +1,4 @@
-From d384f8cb6e2ff493074ca0cbc2e585d8564f45fb Mon Sep 17 00:00:00 2001
+From 10132e6e7e809e670cd32fb6cd761780e0bd50c8 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Sun, 1 Nov 2026 21:38:31 -0500
 Subject: [PATCH 05/11] leds: rgb: ktd202x: Keep the unlit colors of a blinking

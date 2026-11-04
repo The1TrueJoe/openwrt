@@ -1,4 +1,4 @@
-From baf01ea848c3c41e7fbeda4409a840f6c9431c87 Mon Sep 17 00:00:00 2001
+From 0a94e29e94e16108fcf2270e1381e2ec4fc4172b Mon Sep 17 00:00:00 2001
 From: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
 Subject: [PATCH 2/2] gpio: Add Siflower GPIO controller driver
@@ -87,11 +87,11 @@ index 88f748846..bde618108 100644
  obj-$(CONFIG_GPIO_SL28CPLD)		+= gpio-sl28cpld.o
 diff --git a/drivers/gpio/gpio-siflower.c b/drivers/gpio/gpio-siflower.c
 new file mode 100644
-index 000000000..e84e03387
+index 000000000..2313cfaf3
 --- /dev/null
 +++ b/drivers/gpio/gpio-siflower.c
 @@ -0,0 +1,322 @@
-+// SPDX-License-Identifier: GPL-2.0+
++// SPDX-License-Identifier: GPL-2.0-or-later
 +/*
 + * GPIO controller driver for Siflower MIPS and RISC-V SoCs including:
 + *  Siflower SF19A2890

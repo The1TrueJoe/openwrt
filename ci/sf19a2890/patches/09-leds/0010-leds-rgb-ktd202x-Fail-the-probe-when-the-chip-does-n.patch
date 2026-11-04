@@ -1,4 +1,4 @@
-From e119308fb972ff471436d2380cf2ed78cc9270bb Mon Sep 17 00:00:00 2001
+From 4ce647b6a6e3018eac48938799078d214fce1976 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 10/11] leds: rgb: ktd202x: Fail the probe when the chip does

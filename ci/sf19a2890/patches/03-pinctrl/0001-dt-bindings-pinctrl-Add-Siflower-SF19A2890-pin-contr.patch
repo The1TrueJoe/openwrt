@@ -1,4 +1,4 @@
-From 0d8c87ff81e979fc4e5a02292866b50e219bbd19 Mon Sep 17 00:00:00 2001
+From 47db8f654d71eec76d23351db24569cc25422006 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:58:29 -0500
 Subject: [PATCH 1/2] dt-bindings: pinctrl: Add Siflower SF19A2890 pin

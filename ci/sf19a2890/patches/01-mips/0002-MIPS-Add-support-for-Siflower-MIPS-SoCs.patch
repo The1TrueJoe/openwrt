@@ -1,4 +1,4 @@
-From 7f07b8573d749c7bb1f7f373155d815f1e7a1bb2 Mon Sep 17 00:00:00 2001
+From 3803c12715375cbb5d5b142f9f14838112a66b1c Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 20 Jan 2025 09:52:52 +0800
 Subject: [PATCH 2/4] MIPS: Add support for Siflower MIPS SoCs
@@ -99,11 +99,11 @@ index 0c03623f3..c09a8484d 100644
  load-$(CONFIG_MIPS_GENERIC)	+= 0xffffffff80100000
 diff --git a/arch/mips/include/asm/mach-siflower/kmalloc.h b/arch/mips/include/asm/mach-siflower/kmalloc.h
 new file mode 100644
-index 000000000..d0b270e2e
+index 000000000..0887ae357
 --- /dev/null
 +++ b/arch/mips/include/asm/mach-siflower/kmalloc.h
 @@ -0,0 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
++/* SPDX-License-Identifier: GPL-2.0-only */
 +#ifndef __ASM_MACH_SIFLOWER_KMALLOC_H
 +#define __ASM_MACH_SIFLOWER_KMALLOC_H
 +
