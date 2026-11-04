@@ -5,7 +5,7 @@ only on the `siflower-gl-sft1200-ci` branch and are never sent upstream.
 Both branches are pushed to The1TrueJoe/openwrt. Nothing has been submitted
 upstream: no openwrt/openwrt PR, no patch mail.
 
-Series, on openwrt/openwrt `main` dfb167123f (Linux 6.18.60):
+Series, on openwrt/openwrt `main` d13ba979b0 (Linux 6.18.60):
 
 1. `kernel: 6.18: backport MaxLinear GSW1xx DSA switch support`
 2. `siflower: sf19a2890: terminate the RGMII delay string before parsing`
@@ -46,6 +46,8 @@ net/dsa and drivers/net/dsa Kconfig/Makefile, tag.h, if_ether.h and
 MAINTAINERS, patched in OpenWrt order with fuzz 0, for siflower and eleven
 other targets. All-target run 41743156488 then supplied the remaining hunk
 headers (39 files, headers only), folded into commit 1.
+Then onto d13ba979b0 on 2026-11-04 (3 commits: SECURITY.md, libubox,
+osafeloader; no kernel files), with no conflicts and every commit unchanged.
 
 Commits 7-13 are the et6326-led session's (pending-6.18/881-01..11 and
 kmod-leds-ktd202x, then the board's I2C and LED nodes); its own notes hold
