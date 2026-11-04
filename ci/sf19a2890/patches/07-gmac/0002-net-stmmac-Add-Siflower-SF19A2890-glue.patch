@@ -1,4 +1,4 @@
-From 170b75e3bb1757afe0243bda5e22051659a9f1c5 Mon Sep 17 00:00:00 2001
+From 3bd5e863f5a97123bbc70cca9fdc85f56f3bf1a4 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:03:34 -0500
 Subject: [PATCH 2/2] net: stmmac: Add Siflower SF19A2890 glue
@@ -28,8 +28,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  MAINTAINERS                                   |   1 +
  drivers/net/ethernet/stmicro/stmmac/Kconfig   |  11 ++
  drivers/net/ethernet/stmicro/stmmac/Makefile  |   1 +
- .../ethernet/stmicro/stmmac/dwmac-sf19a2890.c | 162 ++++++++++++++++++
- 4 files changed, 175 insertions(+)
+ .../ethernet/stmicro/stmmac/dwmac-sf19a2890.c | 163 ++++++++++++++++++
+ 4 files changed, 176 insertions(+)
  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
@@ -80,10 +80,10 @@ index b16a456b7..9330de094 100644
  obj-$(CONFIG_DWMAC_SPACEMIT)	+= dwmac-spacemit.o
 diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
 new file mode 100644
-index 000000000..8cb44c538
+index 000000000..efe8fdfdf
 --- /dev/null
 +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,163 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Siflower SF19A2890 GMAC glue
@@ -179,6 +179,7 @@ index 000000000..8cb44c538
 +
 +	writel(tx, gmac->cfg + SF19A2890_GMAC_TX_DELAY);
 +	writel(rx, gmac->cfg + SF19A2890_GMAC_RX_DELAY);
++	/* With RX_DELAY_EN clear, the RX delay line is bypassed */
 +	writel(!!rx, gmac->cfg + SF19A2890_GMAC_RX_DELAY_EN);
 +
 +	plat_dat->has_internal_tx_delay = !!tx;

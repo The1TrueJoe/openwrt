@@ -1,4 +1,4 @@
-From f053f3009c8cb6357bac79131da76ac92594a810 Mon Sep 17 00:00:00 2001
+From d06600b32c4ee7c302d89435c8b26c73860e6022 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:03:33 -0500
 Subject: [PATCH 1/2] dt-bindings: net: Add Siflower SF19A2890 GMAC
@@ -10,18 +10,18 @@ RGMII transmit reference.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- .../bindings/net/siflower,sf19a2890-gmac.yaml | 110 ++++++++++++++++++
+ .../bindings/net/siflower,sf19a2890-gmac.yaml | 116 ++++++++++++++++++
  .../devicetree/bindings/net/snps,dwmac.yaml   |   1 +
  MAINTAINERS                                   |   6 +
- 3 files changed, 117 insertions(+)
+ 3 files changed, 123 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
 
 diff --git a/Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml b/Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
 new file mode 100644
-index 000000000..377f24a65
+index 000000000..fd12a1f8e
 --- /dev/null
 +++ b/Documentation/devicetree/bindings/net/siflower,sf19a2890-gmac.yaml
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,116 @@
 +# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 +%YAML 1.2
 +---
@@ -83,13 +83,19 @@ index 000000000..377f24a65
 +
 +  rx-internal-delay-ps:
 +    description:
-+      Applied in steps of about 55 ps, rounded to the nearest step.
++      The delay line has 256 steps of about 55 ps each.
++    minimum: 0
 +    maximum: 14025
++    multipleOf: 55
++    default: 0
 +
 +  tx-internal-delay-ps:
 +    description:
-+      Applied in steps of about 55 ps, rounded to the nearest step.
++      The delay line has 256 steps of about 55 ps each.
++    minimum: 0
 +    maximum: 14025
++    multipleOf: 55
++    default: 0
 +
 +required:
 +  - compatible

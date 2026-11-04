@@ -1,4 +1,4 @@
-From 9d8e582b78281dc07ce95c456e4ffc857a2db7f4 Mon Sep 17 00:00:00 2001
+From 0eaa40da998c645874fa543449635d556a31bd2d Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Tue, 27 Oct 2026 22:00:16 -0400
 Subject: [PATCH 1/2] dt-bindings: net: dsa: lantiq,gswip: add reset-gpios
@@ -7,6 +7,7 @@ The standalone GSW1xx switches have a hardware reset input, and boards
 wire it to a SoC GPIO. Allow describing it. The SoC-integrated GSWIP
 variants have no such pin.
 
+Acked-by: Rob Herring (Arm) <robh@kernel.org>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  Documentation/devicetree/bindings/net/dsa/lantiq,gswip.yaml | 6 ++++++

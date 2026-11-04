@@ -1,4 +1,4 @@
-From 77db35a524be8ddbaa1a57dfd3dae3beb54b2c7f Mon Sep 17 00:00:00 2001
+From c09b98c1dd6267850e8d63f6fc7d970e56fe053f Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Tue, 27 Oct 2026 22:01:01 -0400
 Subject: [PATCH 2/2] net: dsa: mxl-gsw1xx: reset the switch through
@@ -12,7 +12,7 @@ no effect either.
 On the GL.iNet GL-SFT1200 the bootloader leaves each internal PHY of
 the GSW150 one MDIO address above its port. Port 0 then fails with
 "failed to connect to PHY: -ENODEV", and the PHY that answers at a
-port's address belongs to the neighbouring port. After a hardware reset
+port's address belongs to the neighboring port. After a hardware reset
 every PHY is back at its port's address and all ports work.
 
 Get the reset through the reset controller API and pulse it before the
