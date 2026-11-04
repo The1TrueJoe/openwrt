@@ -1,4 +1,4 @@
-From 174bdb71a040aed5553300641d14db19cc7f50a7 Mon Sep 17 00:00:00 2001
+From 76d6b06006c2245003f657760dacd8fad25ff2ea Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:58:30 -0500
 Subject: [PATCH 2/2] pinctrl: Add Siflower SF19A2890 pin controller driver
@@ -73,7 +73,7 @@ index ce0825f4f..2cb2c229c 100644
  obj-$(CONFIG_PINCTRL_STMFX) 	+= pinctrl-stmfx.o
 diff --git a/drivers/pinctrl/pinctrl-sf19a2890.c b/drivers/pinctrl/pinctrl-sf19a2890.c
 new file mode 100644
-index 000000000..dbc8ac34b
+index 000000000..90253bf33
 --- /dev/null
 +++ b/drivers/pinctrl/pinctrl-sf19a2890.c
 @@ -0,0 +1,536 @@
@@ -89,8 +89,8 @@ index 000000000..dbc8ac34b
 +#include <linux/array_size.h>
 +#include <linux/bitfield.h>
 +#include <linux/bits.h>
++#include <linux/device-id/of.h>
 +#include <linux/io.h>
-+#include <linux/mod_devicetable.h>
 +#include <linux/module.h>
 +#include <linux/platform_device.h>
 +#include <linux/seq_file.h>

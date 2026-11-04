@@ -1,4 +1,4 @@
-From 286a92fa5ce43193eb964c550d3ae5015fb2fc85 Mon Sep 17 00:00:00 2001
+From 42ff981620a0abe800d0f3b8adf5435de7432b40 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Wed, 8 Apr 2026 22:17:11 +0800
 Subject: [PATCH 4/4] clk: siflower: Add SF19A2890 peripheral clock and reset
@@ -65,7 +65,7 @@ index 9f3df2e1e..a328317c4 100644
 +obj-$(CONFIG_CLK_SF19A2890_PERIPHCRM) += clk-sf19a2890-periphcrm.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890-periphcrm.c b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 new file mode 100644
-index 000000000..95d4dd449
+index 000000000..e52985bd4
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 @@ -0,0 +1,360 @@
@@ -82,8 +82,8 @@ index 000000000..95d4dd449
 + */
 +
 +#include <linux/clk-provider.h>
++#include <linux/device-id/of.h>
 +#include <linux/io.h>
-+#include <linux/mod_devicetable.h>
 +#include <linux/platform_device.h>
 +#include <linux/reset-controller.h>
 +#include <linux/slab.h>

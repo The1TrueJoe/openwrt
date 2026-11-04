@@ -1,4 +1,4 @@
-From 7d33e960aed6694d82a9e33724df538f82df9945 Mon Sep 17 00:00:00 2001
+From 1a807b0b8b2f52c0ce0cb6778430466dd71a32d1 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 2/4] MIPS: dts: sf19a2890: Describe the clocks and peripherals
@@ -18,11 +18,11 @@ watchdog running, and left unfed it does not reset the board.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- arch/mips/boot/dts/siflower/sf19a2890.dtsi | 395 ++++++++++++++++++++-
- 1 file changed, 379 insertions(+), 16 deletions(-)
+ arch/mips/boot/dts/siflower/sf19a2890.dtsi | 394 ++++++++++++++++++++-
+ 1 file changed, 378 insertions(+), 16 deletions(-)
 
 diff --git a/arch/mips/boot/dts/siflower/sf19a2890.dtsi b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
-index 3a4b39971..ac983d5c3 100644
+index 3a4b39971..e13332ff5 100644
 --- a/arch/mips/boot/dts/siflower/sf19a2890.dtsi
 +++ b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
 @@ -1,5 +1,6 @@
@@ -94,7 +94,7 @@ index 3a4b39971..ac983d5c3 100644
  	};
  
  	soc {
-@@ -70,15 +67,381 @@ soc {
+@@ -70,15 +67,380 @@ soc {
  		ranges;
  		interrupt-parent = <&gic>;
  
@@ -222,7 +222,6 @@ index 3a4b39971..ac983d5c3 100644
 +			resets = <&gpio_crm 0>;
 +			gpio-controller;
 +			#gpio-cells = <2>;
-+			ngpios = <49>;
 +			gpio-ranges = <&pinctrl 0 0 49>;
 +			interrupt-controller;
 +			#interrupt-cells = <2>;
@@ -477,7 +476,7 @@ index 3a4b39971..ac983d5c3 100644
  		gic: interrupt-controller@1bdc0000 {
  			compatible = "mti,gic";
  			reg = <0x1bdc0000 0x20000>;
-@@ -89,7 +452,7 @@ gic: interrupt-controller@1bdc0000 {
+@@ -89,7 +451,7 @@ gic: interrupt-controller@1bdc0000 {
  			timer {
  				compatible = "mti,gic-timer";
  				interrupts = <GIC_LOCAL 1 IRQ_TYPE_NONE>;

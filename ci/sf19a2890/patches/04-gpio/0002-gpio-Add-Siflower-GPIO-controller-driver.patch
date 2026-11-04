@@ -1,4 +1,4 @@
-From 79536094b4f77db67b5a0411108d408c5f8a7d11 Mon Sep 17 00:00:00 2001
+From baf01ea848c3c41e7fbeda4409a840f6c9431c87 Mon Sep 17 00:00:00 2001
 From: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
 Subject: [PATCH 2/2] gpio: Add Siflower GPIO controller driver
@@ -24,7 +24,8 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
   - find the group by its parent IRQ instead of assuming consecutive
     numbers
   - return 0 or 1 from .get
-  - read ngpios with device_property_read_u32()
+  - take the number of lines from the match data, not from an
+    ngpios property
   - include linux/math64.h, sort the includes, spell it "Siflower"
   - subject]
 Co-developed-by: Joseph Telaak <joseph@telaak.dev>
@@ -33,8 +34,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  MAINTAINERS                  |   1 +
  drivers/gpio/Kconfig         |  12 ++
  drivers/gpio/Makefile        |   1 +
- drivers/gpio/gpio-siflower.c | 312 +++++++++++++++++++++++++++++++++++
- 4 files changed, 326 insertions(+)
+ drivers/gpio/gpio-siflower.c | 322 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 336 insertions(+)
  create mode 100644 drivers/gpio/gpio-siflower.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
@@ -86,10 +87,10 @@ index 88f748846..bde618108 100644
  obj-$(CONFIG_GPIO_SL28CPLD)		+= gpio-sl28cpld.o
 diff --git a/drivers/gpio/gpio-siflower.c b/drivers/gpio/gpio-siflower.c
 new file mode 100644
-index 000000000..43a2f39c1
+index 000000000..e84e03387
 --- /dev/null
 +++ b/drivers/gpio/gpio-siflower.c
-@@ -0,0 +1,312 @@
+@@ -0,0 +1,322 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * GPIO controller driver for Siflower MIPS and RISC-V SoCs including:
@@ -120,6 +121,10 @@ index 000000000..43a2f39c1
 +#define GPIO_GPxIR(n)	(0x4 * (n) + 0x4000)
 +
 +#define GPIOS_PER_GROUP	16
++
++struct sf_gpio_soc_data {
++	unsigned int ngpios;
++};
 +
 +struct sf_gpio_priv {
 +	struct gpio_chip gc;
@@ -322,6 +327,7 @@ index 000000000..43a2f39c1
 +static int sf_gpio_probe(struct platform_device *pdev)
 +{
 +	struct device *dev = &pdev->dev;
++	const struct sf_gpio_soc_data *soc;
 +	struct reset_control *rstc;
 +	struct sf_gpio_priv *priv;
 +	struct gpio_irq_chip *girq;
@@ -329,10 +335,11 @@ index 000000000..43a2f39c1
 +	u32 ngpios, ngroups;
 +	int ret, i;
 +
-+	ret = device_property_read_u32(dev, "ngpios", &ngpios);
-+	if (ret)
-+		return ret;
++	soc = device_get_match_data(dev);
++	if (!soc)
++		return -ENODEV;
 +
++	ngpios = soc->ngpios;
 +	ngroups = DIV_ROUND_UP(ngpios, GPIOS_PER_GROUP);
 +	priv = devm_kzalloc(dev, struct_size(priv, irq, ngroups), GFP_KERNEL);
 +	if (!priv)
@@ -384,8 +391,12 @@ index 000000000..43a2f39c1
 +	return devm_gpiochip_add_data(dev, gc, priv);
 +}
 +
++static const struct sf_gpio_soc_data sf19a2890_gpio_data = {
++	.ngpios = 49,
++};
++
 +static const struct of_device_id sf_gpio_ids[] = {
-+	{ .compatible = "siflower,sf19a2890-gpio" },
++	{ .compatible = "siflower,sf19a2890-gpio", .data = &sf19a2890_gpio_data },
 +	{},
 +};
 +MODULE_DEVICE_TABLE(of, sf_gpio_ids);

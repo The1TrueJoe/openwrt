@@ -1,4 +1,4 @@
-From 08a27d0e1cb910dfc4deb9f2839a0423d182008c Mon Sep 17 00:00:00 2001
+From 170b75e3bb1757afe0243bda5e22051659a9f1c5 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:03:34 -0500
 Subject: [PATCH 2/2] net: stmmac: Add Siflower SF19A2890 glue

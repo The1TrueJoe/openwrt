@@ -1,4 +1,4 @@
-From 33fcb65986e805b528ed8dd062a7474034643b58 Mon Sep 17 00:00:00 2001
+From 3c8cd85fc193f2021ecf7eabf678fceb889ab848 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
 Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver
@@ -99,7 +99,7 @@ index 000000000..9f3df2e1e
 +obj-$(CONFIG_CLK_SF19A2890) += clk-sf19a2890.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890.c b/drivers/clk/siflower/clk-sf19a2890.c
 new file mode 100644
-index 000000000..f7553ac49
+index 000000000..375561761
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890.c
 @@ -0,0 +1,406 @@
@@ -478,7 +478,7 @@ index 000000000..f7553ac49
 +
 +	base = of_iomap(node, 0);
 +	if (!base) {
-+		pr_err("failed to map resources.\n");
++		pr_err("failed to map the registers\n");
 +		return;
 +	}
 +
@@ -490,14 +490,14 @@ index 000000000..f7553ac49
 +		hw_to_sf_clk_common(hw)->base = base;
 +		ret = of_clk_hw_register(node, hw);
 +		if (ret) {
-+			pr_err("Couldn't register clock %d: %d\n", i, ret);
++			pr_err("failed to register clock %d: %d\n", i, ret);
 +			goto err;
 +		}
 +	}
 +
 +	ret = of_clk_add_hw_provider(node, of_clk_hw_onecell_get, &sf19a2890_hw_clks);
 +	if (ret) {
-+		pr_err("failed to add hw provider.\n");
++		pr_err("failed to add the clock provider: %d\n", ret);
 +		goto err;
 +	}
 +	return;
