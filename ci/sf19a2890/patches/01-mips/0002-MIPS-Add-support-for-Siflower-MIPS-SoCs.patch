@@ -1,4 +1,4 @@
-From 0404b1dac4e49e905d9e9e0de1c3571154ff4a1d Mon Sep 17 00:00:00 2001
+From 7f07b8573d749c7bb1f7f373155d815f1e7a1bb2 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 20 Jan 2025 09:52:52 +0800
 Subject: [PATCH 2/4] MIPS: Add support for Siflower MIPS SoCs
@@ -31,7 +31,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  create mode 100644 arch/mips/include/asm/mach-siflower/kmalloc.h
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 2a7a083f2..9e715a168 100644
+index 7fb18c2d6..3aa80a8dd 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
 @@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
@@ -39,9 +39,9 @@ index 2a7a083f2..9e715a168 100644
  S:	Maintained
  F:	Documentation/devicetree/bindings/mips/siflower.yaml
 +F:	arch/mips/include/asm/mach-siflower/
- F:	drivers/gpio/gpio-siflower.c
  N:	sf19a2890
  
+ SILEAD TOUCHSCREEN DRIVER
 diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
 index ed17c9b16..e10145ede 100644
 --- a/arch/mips/Kconfig

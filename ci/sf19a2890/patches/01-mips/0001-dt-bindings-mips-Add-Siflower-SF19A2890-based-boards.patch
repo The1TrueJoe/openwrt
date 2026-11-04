@@ -1,4 +1,4 @@
-From 9aeb83fef5e39b528a96cfa4b322901332ee71e3 Mon Sep 17 00:00:00 2001
+From c9776dedf2540c5c85ded5bf88c341b0182bfa9b Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:49:40 -0500
 Subject: [PATCH 1/4] dt-bindings: mips: Add Siflower SF19A2890 based boards
@@ -10,8 +10,8 @@ board using it, the GL.iNet GL-SFT1200 ("Opal") travel router.
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../devicetree/bindings/mips/siflower.yaml    | 26 +++++++++++++++++++
- MAINTAINERS                                   |  8 ++++++
- 2 files changed, 34 insertions(+)
+ MAINTAINERS                                   |  7 +++++
+ 2 files changed, 33 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mips/siflower.yaml
 
 diff --git a/Documentation/devicetree/bindings/mips/siflower.yaml b/Documentation/devicetree/bindings/mips/siflower.yaml
@@ -47,10 +47,10 @@ index 000000000..33110f742
 +
 +...
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 93abbb315..2a7a083f2 100644
+index 93abbb315..7fb18c2d6 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -25698,6 +25698,14 @@ N:	sifive
+@@ -25698,6 +25698,13 @@ N:	sifive
  K:	fu[57]40
  K:	[^@]sifive
  
@@ -59,7 +59,6 @@ index 93abbb315..2a7a083f2 100644
 +L:	linux-mips@vger.kernel.org
 +S:	Maintained
 +F:	Documentation/devicetree/bindings/mips/siflower.yaml
-+F:	drivers/gpio/gpio-siflower.c
 +N:	sf19a2890
 +
  SILEAD TOUCHSCREEN DRIVER

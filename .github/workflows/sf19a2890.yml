@@ -301,7 +301,7 @@ jobs:
           perl scripts/get_maintainer.pl --self-test=patterns,sections 2>&1 | tee selftest.log | grep -i siflower && exit 1
           echo "get_maintainer --self-test: nothing about the SIFLOWER entries ($(wc -l < selftest.log) lines in all)"
           perl scripts/parse-maintainers.pl --input=MAINTAINERS --output=M.sorted --order
-          for e in "SIFLOWER SF19A2890 DWMAC GLUE LAYER" "SIFLOWER SF19A2890 SOC SUPPORT"; do
+          for e in "SIFLOWER GPIO DRIVER" "SIFLOWER SF19A2890 DWMAC GLUE LAYER" "SIFLOWER SF19A2890 SOC SUPPORT"; do
             grep -qx "$e" MAINTAINERS || { echo "::error::no $e entry"; exit 1; }
             diff <(awk -v e="$e" '$0 == e, /^$/' MAINTAINERS) <(awk -v e="$e" '$0 == e, /^$/' M.sorted)
           done
@@ -309,6 +309,7 @@ jobs:
           echo "parse-maintainers: the SIFLOWER entries are already in canonical order"
           perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/clk/siflower/clk-sf19a2890.c
           perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/net/ethernet/stmicro/stmmac/dwmac-sf19a2890.c
+          perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/gpio/gpio-siflower.c
 
       - name: Build the initramfs userland
         run: |
