@@ -129,6 +129,7 @@ jobs:
         run: |
           # linux-next's, like checkpatch: a tree's own copy may predate rule changes
           s=../dt-check-style; curl -fsSL "$KORG/next/linux-next.git/plain/scripts/dtc/dt-check-style" -o $s
+          echo "dt-check-style from linux$(curl -fsSL "$KORG/next/linux-next.git/plain/localversion-next")"
           new=$(git diff --name-only --diff-filter=A HEAD~$NPATCHES HEAD -- 'Documentation/devicetree/bindings/*.yaml')
           [ -n "$new" ] || { echo "no new bindings"; exit 0; }
           python3 $s --mode=strict $new
@@ -331,6 +332,7 @@ jobs:
           perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/phy/siflower/phy-sf19a2890-usb.c
           new=$(git diff --name-only --diff-filter=A $MAINLINE HEAD -- 'Documentation/devicetree/bindings/*.yaml')
           curl -fsSL "$KORG/next/linux-next.git/plain/scripts/dtc/dt-check-style" -o ../dt-check-style
+          echo "dt-check-style from linux$(curl -fsSL "$KORG/next/linux-next.git/plain/localversion-next")"
           python3 ../dt-check-style --mode=strict $new
           echo "dt-check-style --mode=strict: clean on" $new
 

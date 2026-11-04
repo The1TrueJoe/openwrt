@@ -1,4 +1,4 @@
-From 47db8f654d71eec76d23351db24569cc25422006 Mon Sep 17 00:00:00 2001
+From 18fafa7e116ae3e438190031c14f46f9a0ac6895 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:58:29 -0500
 Subject: [PATCH 1/2] dt-bindings: pinctrl: Add Siflower SF19A2890 pin
@@ -18,7 +18,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 
 diff --git a/Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml b/Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
 new file mode 100644
-index 000000000..3537f36cf
+index 000000000..dfa41db60
 --- /dev/null
 +++ b/Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
 @@ -0,0 +1,113 @@
@@ -122,16 +122,16 @@ index 000000000..3537f36cf
 +
 +        uart0-pins {
 +            pins-rx {
-+                pins = "UART_RX";
++                bias-pull-up;
 +                function = "uart0";
 +                input-enable;
-+                bias-pull-up;
++                pins = "UART_RX";
 +            };
 +
 +            pins-tx {
-+                pins = "UART_TX";
-+                function = "uart0";
 +                bias-pull-up;
++                function = "uart0";
++                pins = "UART_TX";
 +            };
 +        };
 +    };
