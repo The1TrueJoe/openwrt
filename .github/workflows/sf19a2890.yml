@@ -198,8 +198,17 @@ jobs:
           out=../out-mod
           make O=$out defconfig >/dev/null
           ./scripts/config --file $out/.config -e COMPILE_TEST -e OF -e RESET_CONTROLLER -e MFD_SYSCON -e NET -e INET -e SPARSE_IRQ
-          for s in ${{ matrix.syms }}; do ./scripts/config --file $out/.config -m $s; done
+          for s in ${{ matrix.syms }}; do ./scripts/config --file $out/.config -e $s; done
           make O=$out olddefconfig >/dev/null
+          # Tristate symbols as modules; bool ones stay built in
+          for s in ${{ matrix.syms }}; do
+            ./scripts/config --file $out/.config -m $s
+            make O=$out olddefconfig >/dev/null 2>&1
+            grep -qE "^CONFIG_$s=[ym]" $out/.config || {
+              ./scripts/config --file $out/.config -e $s
+              make O=$out olddefconfig >/dev/null 2>&1
+            }
+          done
           grep -E "^CONFIG_($(echo ${{ matrix.syms }} | tr ' ' '|'))=" $out/.config
           grep -q '^CONFIG_SPARSE_IRQ=y' $out/.config
           make O=$out -j"$(nproc)" vmlinux modules > $out/mod.log 2>&1 || { grep -E 'error|ERROR' $out/mod.log | head -20; tail -30 $out/mod.log; exit 1; }
@@ -236,24 +245,8 @@ jobs:
           git am -q $P/01-mips/*.patch
           git branch s1
           for s in 02-sysm 03-pinctrl 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts deps-leds deps-gsw; do
-            # Each series adds its F: lines to series 1's entry on its own
-            # tree; here they are merged in one go below, as a merge would
             git am -q $P/$s/*.patch || { git am --abort; echo "::error::$s does not apply to mainline"; exit 1; }
           done
-          python3 - $P <<'PY'
-          import glob, sys
-          f = set()
-          for p in glob.glob(sys.argv[1] + '/0[2-8]*/*.patch'):
-              f |= {l[3:].strip() for l in open(p) if l.startswith('+F:\t')}
-          lines = open('MAINTAINERS').read().split('\n')
-          i = lines.index('SIFLOWER SF19A2890 SOC SUPPORT'); j = i + 1
-          while lines[j]: j += 1
-          head = [l for l in lines[i+1:j] if not l.startswith('F:')]
-          fs = sorted({l for l in lines[i+1:j] if l.startswith('F:')} | {'F:\t' + x for x in f}, key=lambda l: l[3:])
-          lines[i+1:j] = head + fs
-          open('MAINTAINERS', 'w').write('\n'.join(lines))
-          PY
-          git commit -q -a -m "MAINTAINERS: merge the SIFLOWER F: lines of all series"
           git log --oneline -40
 
       - name: dtbs_check W=1 (GL-SFT1200)
