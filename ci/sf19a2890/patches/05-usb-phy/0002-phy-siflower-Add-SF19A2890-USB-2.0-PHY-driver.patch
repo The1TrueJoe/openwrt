@@ -1,4 +1,4 @@
-From 15f5113935b4675daf0878670b1686b6c035d013 Mon Sep 17 00:00:00 2001
+From 6efc59c3852ea1878fa9d1a5085d4c2e313687c5 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 9 Sep 2024 10:18:33 +0800
 Subject: [PATCH 2/2] phy: siflower: Add SF19A2890 USB 2.0 PHY driver
@@ -8,10 +8,12 @@ on enables its reference clock, releases its two resets and takes it
 out of sleep.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: from Chuanhong's siflower-7.1 branch, the SF19A2890 PHY only; reset
- names "por" and "phy", dev_err_probe() for the resets, drop the unused
- includes and drvdata, Kconfig dependencies and help, commit message,
- subject]
+[Joseph Telaak:
+  - take the SF19A2890 PHY only, from Chuanhong's siflower-7.1 branch
+  - name the resets "por" and "phy"
+  - dev_err_probe() for the resets
+  - drop the unused includes and drvdata
+  - Kconfig dependencies and help, commit message and subject]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/phy/Kconfig                      |   1 +

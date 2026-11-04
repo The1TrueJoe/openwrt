@@ -1,4 +1,4 @@
-From 4b15345378141fff5e01960193a341cd3ede85d9 Mon Sep 17 00:00:00 2001
+From 0404b1dac4e49e905d9e9e0de1c3571154ff4a1d Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 20 Jan 2025 09:52:52 +0800
 Subject: [PATCH 2/4] MIPS: Add support for Siflower MIPS SoCs
@@ -16,8 +16,11 @@ conserve memory, and a MACH_SIFLOWER_MIPS is created with reduced
 features instead of using the generic kernel.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: rebased on v7.4-rc1, "MIPS:" prefix, longer Kconfig help, commit
- message grammar and paragraphs, MAINTAINERS line]
+[Joseph Telaak:
+  - rebase on v7.4-rc1 and use the "MIPS:" prefix
+  - longer Kconfig help
+  - commit message grammar and paragraphs
+  - add the MAINTAINERS entry]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  MAINTAINERS                                   |  1 +

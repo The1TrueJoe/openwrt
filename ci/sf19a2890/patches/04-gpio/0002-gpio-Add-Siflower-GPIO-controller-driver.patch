@@ -1,4 +1,4 @@
-From d6111f4620693978592c820246192cfb112cd27c Mon Sep 17 00:00:00 2001
+From eef496812567a96a2b5682ddd2859d3904ee01d4 Mon Sep 17 00:00:00 2001
 From: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
 Subject: [PATCH 2/2] gpio: Add Siflower GPIO controller driver
@@ -9,16 +9,23 @@ chips including SF19A2890, SF21A6826 and SF21H8898.
 
 Signed-off-by: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: from Chuanhong's siflower-7.1 branch; depend on MACH_SIFLOWER_MIPS,
- longer Kconfig help, assert the reset through a devm action instead of in
- .remove, which ran before the GPIO chip was removed, drop .owner and the
- unused drvdata, drop the irq_set_affinity callback, which reached the
- parent through irq_to_desc() (not exported with SPARSE_IRQ), call
- gpiochip_disable_irq() and gpiochip_enable_irq() from mask and unmask as
- an immutable irqchip must, find the group by its parent IRQ instead of
- assuming consecutive numbers, return 0 or 1 from .get, read ngpios with
- device_property_read_u32(), linux/math64.h and sorted includes, "Siflower"
- spelling, subject]
+[Joseph Telaak:
+  - take it from Chuanhong's siflower-7.1 branch
+  - depend on MACH_SIFLOWER_MIPS, longer Kconfig help
+  - assert the reset through a devm action instead of in .remove,
+    which ran before the GPIO chip was removed
+  - drop .owner and the unused drvdata
+  - drop the irq_set_affinity callback, which reached the parent
+    through irq_to_desc(), not exported with SPARSE_IRQ
+  - call gpiochip_disable_irq() and gpiochip_enable_irq() from mask
+    and unmask, as an immutable irqchip must
+  - find the group by its parent IRQ instead of assuming consecutive
+    numbers
+  - return 0 or 1 from .get
+  - read ngpios with device_property_read_u32()
+  - include linux/math64.h, sort the includes, spell it "Siflower"
+  - subject]
+Co-developed-by: Joseph Telaak <joseph@telaak.dev>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/gpio/Kconfig         |  11 ++

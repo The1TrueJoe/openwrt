@@ -1,4 +1,4 @@
-From 595b62f6d3d4abd256bce56e1180fc7e23e60602 Mon Sep 17 00:00:00 2001
+From 0b8dbd5c5648d57c1617573ee405127299844bdd Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:58:30 -0500
 Subject: [PATCH 2/2] pinctrl: Add Siflower SF19A2890 pin controller driver

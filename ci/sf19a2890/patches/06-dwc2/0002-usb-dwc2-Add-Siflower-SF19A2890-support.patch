@@ -1,4 +1,4 @@
-From e658414fb21917fdaaa7c61af7f8fc9488f42fa2 Mon Sep 17 00:00:00 2001
+From 29cc315bf7f93c6377b0a22d7434d668e27806d2 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 9 Sep 2024 16:46:53 +0800
 Subject: [PATCH 2/3] usb: dwc2: Add Siflower SF19A2890 support
@@ -8,8 +8,9 @@ transfers to 65535 bytes and its AHB bursts to INCR4, the settings the
 OpenWrt port has run it with.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: from OpenWrt's siflower target, rebased on v7.4-rc1, commit message,
- subject]
+[Joseph Telaak:
+  - take it from OpenWrt's siflower target and rebase on v7.4-rc1
+  - commit message and subject]
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/usb/dwc2/params.c | 10 ++++++++++

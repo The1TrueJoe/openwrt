@@ -1,4 +1,4 @@
-From fb6bb6ddb86b5d8b2f4eb2ff0e659e8e496af9b2 Mon Sep 17 00:00:00 2001
+From e20b77e83552f21b696422b428e37f4510224081 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Wed, 8 Apr 2026 22:17:11 +0800
 Subject: [PATCH 4/4] clk: siflower: Add SF19A2890 peripheral clock and reset
@@ -18,12 +18,17 @@ accesses across both. BOE is managed automatically: asserted when the
 first clock gate is enabled and deasserted when the last one is disabled.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: from Chuanhong's siflower-7.1 branch; one compatible per block with
- its gate bits, critical gates and reset masks in tables here instead of
- the siflower,valid-gates, siflower,critical-gates, siflower,reset-masks
- and siflower,num-resets properties, gate N parented to input clock N by
- index instead of by global name, the gate updates under the spinlock too,
- no separator comments, Kconfig dependencies and help, subject]
+[Joseph Telaak:
+  - take it from Chuanhong's siflower-7.1 branch
+  - one compatible per block, with its gate bits, critical gates and
+    reset masks in tables in the driver instead of the
+    siflower,valid-gates, siflower,critical-gates,
+    siflower,reset-masks and siflower,num-resets properties
+  - parent gate N to input clock N by index, not by global name
+  - update the gates under the spinlock too
+  - drop the separator comments
+  - Kconfig dependencies and help, subject]
+Co-developed-by: Joseph Telaak <joseph@telaak.dev>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/clk/siflower/Kconfig                  |  11 +

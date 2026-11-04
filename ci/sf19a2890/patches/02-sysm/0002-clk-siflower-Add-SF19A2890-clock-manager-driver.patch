@@ -1,4 +1,4 @@
-From b4e526d8982a0661f8eab11371c13e44fa0e499f Mon Sep 17 00:00:00 2001
+From 01c6874968c96f2a39a9ddc1bf25059432ae0651 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
 Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver
@@ -9,15 +9,21 @@ CPU and peripheral clocks from them. The GIC timer needs the CPU clock,
 so the driver registers early, from CLK_OF_DECLARE.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[jt: from Chuanhong's siflower-7.1 branch; read the PLL power-down register
- at the PLL's offset instead of at offset 1, take the oscillators from the
- node's clocks and the PLLs by pointer instead of by global name, count the
- clocks in the driver instead of the binding header, drop the spinlock and
- sf_rmw(), which nothing used, unregister the clocks and unmap on errors,
- return 0 for a zero divider and compute the VCO rate in 64 bits, pr_fmt,
- u32 offsets, sorted includes, one Kconfig symbol without the menu, depend
- on MACH_SIFLOWER_MIPS, commit message, checkpatch --strict cleanups,
- subject]
+[Joseph Telaak:
+  - take it from Chuanhong's siflower-7.1 branch
+  - read the PLL power-down register at the PLL's offset, not at
+    offset 1
+  - take the oscillators from the node's clocks and the PLLs by
+    pointer, not by global name
+  - count the clocks in the driver, not in the binding header
+  - drop the spinlock and sf_rmw(), which nothing used
+  - unregister the clocks and unmap on errors
+  - return 0 for a zero divider and compute the VCO rate in 64 bits
+  - pr_fmt, u32 offsets and sorted includes
+  - one Kconfig symbol without the menu, depending on
+    MACH_SIFLOWER_MIPS
+  - checkpatch --strict cleanups, commit message and subject]
+Co-developed-by: Joseph Telaak <joseph@telaak.dev>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/clk/Kconfig                  |   1 +
