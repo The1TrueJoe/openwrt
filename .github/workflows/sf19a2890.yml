@@ -365,7 +365,8 @@ jobs:
           bench_cfg; image full
 
           # The same without the dwc2 OTG interrupt patch, to show it is needed
-          c=$(git log --format=%H -1 --grep='handle OTG interrupt regardless of GINTSTS')
+          c=$(git log --format=%H -1 --grep='^usb: dwc2: Handle OTG interrupts that GINTSTS does not flag$')
+          [ -n "$c" ] || { echo "::error::OTG quirk commit not found"; exit 1; }
           git revert --no-edit "$c" >/dev/null
           bench_cfg; image full-no-otg-quirk
           git reset -q --hard HEAD~1
