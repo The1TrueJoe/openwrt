@@ -1,4 +1,4 @@
-From 445cae1fe8fe881cdbfc65c89c722690c544766d Mon Sep 17 00:00:00 2001
+From 1c66d675d1529a5a3abc6dee9bad3cbb4cd5b7b6 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:58:30 -0500
 Subject: [PATCH 2/2] pinctrl: Add Siflower SF19A2890 pin controller driver
@@ -18,8 +18,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  MAINTAINERS                         |   1 +
  drivers/pinctrl/Kconfig             |  14 +
  drivers/pinctrl/Makefile            |   1 +
- drivers/pinctrl/pinctrl-sf19a2890.c | 536 ++++++++++++++++++++++++++++
- 4 files changed, 552 insertions(+)
+ drivers/pinctrl/pinctrl-sf19a2890.c | 549 ++++++++++++++++++++++++++++
+ 4 files changed, 565 insertions(+)
  create mode 100644 drivers/pinctrl/pinctrl-sf19a2890.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
@@ -73,10 +73,10 @@ index ce0825f4f..2cb2c229c 100644
  obj-$(CONFIG_PINCTRL_STMFX) 	+= pinctrl-stmfx.o
 diff --git a/drivers/pinctrl/pinctrl-sf19a2890.c b/drivers/pinctrl/pinctrl-sf19a2890.c
 new file mode 100644
-index 000000000..90253bf33
+index 000000000..5873a73ad
 --- /dev/null
 +++ b/drivers/pinctrl/pinctrl-sf19a2890.c
-@@ -0,0 +1,536 @@
+@@ -0,0 +1,549 @@
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +/*
 + * Siflower SF19A2890 pin controller
@@ -103,26 +103,26 @@ index 000000000..90253bf33
 +#define SF19A2890_NUM_PINS	49
 +
 +/* Pad configuration */
-+#define REG_PC(pin)		((pin) * 0x8)
-+#define  PC_OEN			BIT(7)
-+#define  PC_ST			BIT(6)
-+#define  PC_IE			BIT(5)
-+#define  PC_PD			BIT(4)
-+#define  PC_PU			BIT(3)
-+#define  PC_DS			GENMASK(2, 0)
++#define SF19A2890_PC(pin)		((pin) * 0x8)
++#define  SF19A2890_PC_OEN		BIT(7)
++#define  SF19A2890_PC_ST		BIT(6)
++#define  SF19A2890_PC_IE		BIT(5)
++#define  SF19A2890_PC_PD		BIT(4)
++#define  SF19A2890_PC_PU		BIT(3)
++#define  SF19A2890_PC_DS		GENMASK(2, 0)
 +
-+#define DRIVE_MIN_MA		6
-+#define DRIVE_STEP_MA		3
++#define SF19A2890_DRIVE_MIN_MA		6
++#define SF19A2890_DRIVE_STEP_MA		3
 +
 +/*
 + * Pin mux. With FUNC_SW clear, the pad's output enable is forced by
 + * PC_OEN; with it set, the GPIO or the function drives it. FMUX_SEL picks
 + * the GPIO, and MODE the function, when FMUX_SEL is clear.
 + */
-+#define REG_PMX(pin)		((pin) * 0x8 + 0x4)
-+#define  PMX_FUNC_SW		BIT(3)
-+#define  PMX_FMUX_SEL		BIT(2)
-+#define  PMX_MODE		GENMASK(1, 0)
++#define SF19A2890_PMX(pin)		((pin) * 0x8 + 0x4)
++#define  SF19A2890_PMX_FUNC_SW		BIT(3)
++#define  SF19A2890_PMX_FMUX_SEL		BIT(2)
++#define  SF19A2890_PMX_MODE		GENMASK(1, 0)
 +
 +struct sf19a2890_pinctrl {
 +	struct device *dev;
@@ -315,6 +315,12 @@ index 000000000..90253bf33
 +	sf19a2890_pinctrl_write(pc, reg, (val & ~clr) | set);
 +}
 +
++static unsigned int sf19a2890_drive_ma(u32 conf)
++{
++	return SF19A2890_DRIVE_MIN_MA +
++	       FIELD_GET(SF19A2890_PC_DS, conf) * SF19A2890_DRIVE_STEP_MA;
++}
++
 +static int sf19a2890_get_groups_count(struct pinctrl_dev *pctldev)
 +{
 +	return SF19A2890_NUM_PINS;
@@ -341,22 +347,23 @@ index 000000000..90253bf33
 +				   struct seq_file *s, unsigned int offset)
 +{
 +	struct sf19a2890_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
-+	u32 conf = sf19a2890_pinctrl_read(pc, REG_PC(offset));
-+	u32 mux = sf19a2890_pinctrl_read(pc, REG_PMX(offset));
++	u32 conf = sf19a2890_pinctrl_read(pc, SF19A2890_PC(offset));
++	u32 mux = sf19a2890_pinctrl_read(pc, SF19A2890_PMX(offset));
 +
-+	if (!(mux & PMX_FUNC_SW))
-+		seq_printf(s, "forced %s", conf & PC_OEN ? "input" : "output");
-+	else if (mux & PMX_FMUX_SEL)
++	if (!(mux & SF19A2890_PMX_FUNC_SW))
++		seq_printf(s, "forced %s",
++			   conf & SF19A2890_PC_OEN ? "input" : "output");
++	else if (mux & SF19A2890_PMX_FMUX_SEL)
 +		seq_puts(s, "gpio");
 +	else
-+		seq_printf(s, "mode %lu", FIELD_GET(PMX_MODE, mux));
++		seq_printf(s, "mode %lu", FIELD_GET(SF19A2890_PMX_MODE, mux));
 +
-+	seq_printf(s, "%s%s%s%s drive %lu mA",
-+		   conf & PC_IE ? " input" : "",
-+		   conf & PC_ST ? " schmitt" : "",
-+		   conf & PC_PU ? " pull-up" : "",
-+		   conf & PC_PD ? " pull-down" : "",
-+		   DRIVE_MIN_MA + FIELD_GET(PC_DS, conf) * DRIVE_STEP_MA);
++	seq_printf(s, "%s%s%s%s drive %u mA",
++		   conf & SF19A2890_PC_IE ? " input" : "",
++		   conf & SF19A2890_PC_ST ? " schmitt" : "",
++		   conf & SF19A2890_PC_PU ? " pull-up" : "",
++		   conf & SF19A2890_PC_PD ? " pull-down" : "",
++		   sf19a2890_drive_ma(conf));
 +}
 +
 +static const struct pinctrl_ops sf19a2890_pctl_ops = {
@@ -373,8 +380,9 @@ index 000000000..90253bf33
 +	struct sf19a2890_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
 +
 +	/* Back to a forced input with the input buffer off */
-+	sf19a2890_pinctrl_rmw(pc, REG_PC(pin), PC_IE, PC_OEN);
-+	sf19a2890_pinctrl_rmw(pc, REG_PMX(pin), PMX_FUNC_SW, 0);
++	sf19a2890_pinctrl_rmw(pc, SF19A2890_PC(pin), SF19A2890_PC_IE,
++			      SF19A2890_PC_OEN);
++	sf19a2890_pinctrl_rmw(pc, SF19A2890_PMX(pin), SF19A2890_PMX_FUNC_SW, 0);
 +
 +	return 0;
 +}
@@ -415,9 +423,10 @@ index 000000000..90253bf33
 +		if (func->pins[i].pin != pin)
 +			continue;
 +
-+		sf19a2890_pinctrl_write(pc, REG_PMX(pin),
-+					PMX_FUNC_SW |
-+					FIELD_PREP(PMX_MODE, func->pins[i].mode));
++		sf19a2890_pinctrl_write(pc, SF19A2890_PMX(pin),
++					SF19A2890_PMX_FUNC_SW |
++					FIELD_PREP(SF19A2890_PMX_MODE,
++						   func->pins[i].mode));
 +		return 0;
 +	}
 +
@@ -430,9 +439,10 @@ index 000000000..90253bf33
 +{
 +	struct sf19a2890_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
 +
-+	sf19a2890_pinctrl_write(pc, REG_PMX(pin), PMX_FUNC_SW | PMX_FMUX_SEL);
++	sf19a2890_pinctrl_write(pc, SF19A2890_PMX(pin),
++				SF19A2890_PMX_FUNC_SW | SF19A2890_PMX_FMUX_SEL);
 +	/* The GPIO block reads the pad back through the input buffer */
-+	sf19a2890_pinctrl_rmw(pc, REG_PC(pin), 0, PC_IE);
++	sf19a2890_pinctrl_rmw(pc, SF19A2890_PC(pin), 0, SF19A2890_PC_IE);
 +
 +	return 0;
 +}
@@ -460,37 +470,37 @@ index 000000000..90253bf33
 +{
 +	struct sf19a2890_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
 +	enum pin_config_param param = pinconf_to_config_param(*config);
-+	u32 val = sf19a2890_pinctrl_read(pc, REG_PC(pin));
++	u32 val = sf19a2890_pinctrl_read(pc, SF19A2890_PC(pin));
 +	u32 arg;
 +
 +	switch (param) {
 +	case PIN_CONFIG_BIAS_DISABLE:
-+		if (val & (PC_PU | PC_PD))
++		if (val & (SF19A2890_PC_PU | SF19A2890_PC_PD))
 +			return -EINVAL;
 +		arg = 1;
 +		break;
 +	case PIN_CONFIG_BIAS_PULL_UP:
-+		if (!(val & PC_PU))
++		if (!(val & SF19A2890_PC_PU))
 +			return -EINVAL;
 +		arg = 1;
 +		break;
 +	case PIN_CONFIG_BIAS_PULL_DOWN:
-+		if (!(val & PC_PD))
++		if (!(val & SF19A2890_PC_PD))
 +			return -EINVAL;
 +		arg = 1;
 +		break;
 +	case PIN_CONFIG_INPUT_ENABLE:
-+		if (!(val & PC_IE))
++		if (!(val & SF19A2890_PC_IE))
 +			return -EINVAL;
 +		arg = 1;
 +		break;
 +	case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
-+		if (!(val & PC_ST))
++		if (!(val & SF19A2890_PC_ST))
 +			return -EINVAL;
 +		arg = 1;
 +		break;
 +	case PIN_CONFIG_DRIVE_STRENGTH:
-+		arg = DRIVE_MIN_MA + FIELD_GET(PC_DS, val) * DRIVE_STEP_MA;
++		arg = sf19a2890_drive_ma(val);
 +		break;
 +	default:
 +		return -ENOTSUPP;
@@ -506,7 +516,7 @@ index 000000000..90253bf33
 +				 unsigned int num_configs)
 +{
 +	struct sf19a2890_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
-+	u32 val = sf19a2890_pinctrl_read(pc, REG_PC(pin));
++	u32 val = sf19a2890_pinctrl_read(pc, SF19A2890_PC(pin));
 +	unsigned int i;
 +	u32 arg;
 +
@@ -515,43 +525,46 @@ index 000000000..90253bf33
 +
 +		switch (pinconf_to_config_param(configs[i])) {
 +		case PIN_CONFIG_BIAS_DISABLE:
-+			val &= ~(PC_PU | PC_PD);
++			val &= ~(SF19A2890_PC_PU | SF19A2890_PC_PD);
 +			break;
 +		case PIN_CONFIG_BIAS_PULL_UP:
-+			val &= ~PC_PD;
-+			val |= PC_PU;
++			val &= ~SF19A2890_PC_PD;
++			val |= SF19A2890_PC_PU;
 +			break;
 +		case PIN_CONFIG_BIAS_PULL_DOWN:
-+			val &= ~PC_PU;
-+			val |= PC_PD;
++			val &= ~SF19A2890_PC_PU;
++			val |= SF19A2890_PC_PD;
 +			break;
 +		case PIN_CONFIG_INPUT_ENABLE:
 +			if (arg)
-+				val |= PC_IE;
++				val |= SF19A2890_PC_IE;
 +			else
-+				val &= ~PC_IE;
++				val &= ~SF19A2890_PC_IE;
 +			break;
 +		case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
 +			if (arg)
-+				val |= PC_ST;
++				val |= SF19A2890_PC_ST;
 +			else
-+				val &= ~PC_ST;
++				val &= ~SF19A2890_PC_ST;
 +			break;
 +		case PIN_CONFIG_DRIVE_STRENGTH:
-+			if (arg < DRIVE_MIN_MA ||
-+			    arg > DRIVE_MIN_MA + DRIVE_STEP_MA * FIELD_MAX(PC_DS) ||
-+			    (arg - DRIVE_MIN_MA) % DRIVE_STEP_MA)
++			if (arg < SF19A2890_DRIVE_MIN_MA)
 +				return -EINVAL;
-+			val &= ~PC_DS;
-+			val |= FIELD_PREP(PC_DS,
-+					  (arg - DRIVE_MIN_MA) / DRIVE_STEP_MA);
++			arg -= SF19A2890_DRIVE_MIN_MA;
++			if (arg % SF19A2890_DRIVE_STEP_MA)
++				return -EINVAL;
++			arg /= SF19A2890_DRIVE_STEP_MA;
++			if (arg > FIELD_MAX(SF19A2890_PC_DS))
++				return -EINVAL;
++			val &= ~SF19A2890_PC_DS;
++			val |= FIELD_PREP(SF19A2890_PC_DS, arg);
 +			break;
 +		default:
 +			return -ENOTSUPP;
 +		}
 +	}
 +
-+	sf19a2890_pinctrl_write(pc, REG_PC(pin), val);
++	sf19a2890_pinctrl_write(pc, SF19A2890_PC(pin), val);
 +
 +	return 0;
 +}
