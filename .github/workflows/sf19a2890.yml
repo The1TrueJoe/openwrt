@@ -383,7 +383,7 @@ jobs:
               for a in $(cat $U/busybox-1.37.0/busybox.links); do
                 case "$a" in /bin/busybox) ;; *) echo "slink $a /bin/busybox 777 0 0";; esac
               done
-            } | grep -vE '^slink /(bin/(mem-report|net-up|rgmii-sweep))' > $r.list
+            } | grep -vE '^slink /(bin/(mem-report|net-up|rgmii-sweep|rgmii-grid))' > $r.list
             echo $(realpath $r.list)
           }
           image() { # id
@@ -410,6 +410,12 @@ jobs:
           bench_cfg; image full
           # mxl-gsw1xx takes the switch's reset-gpios through the reset framework
           grep -q '^CONFIG_RESET_GPIO=y' ../images/full.config || { echo "::error::RESET_GPIO is not built in"; exit 1; }
+
+          # The same with regmap debugfs writes, for rgmii-grid's switch delays
+          sed -i 's/^#undef REGMAP_ALLOW_WRITE_DEBUGFS$/#define REGMAP_ALLOW_WRITE_DEBUGFS/' drivers/base/regmap/regmap-debugfs.c
+          grep -q '^#define REGMAP_ALLOW_WRITE_DEBUGFS$' drivers/base/regmap/regmap-debugfs.c || { echo "::error::regmap debugfs writes not enabled"; exit 1; }
+          bench_cfg; image full-regw
+          git checkout -q -- drivers/base/regmap
 
           # The same without the dwc2 OTG interrupt patch, to show it is needed
           c=$(git log --format=%H -1 --grep='^usb: dwc2: Handle OTG interrupts that GINTSTS does not flag$')

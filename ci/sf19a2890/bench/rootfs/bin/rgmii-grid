@@ -1,0 +1,51 @@
+#!/bin/sh
+# Sweep the switch's RGMII delays on its CPU port against the GMAC's, and
+# count ping replies for each setting.
+# The GSW150's PCDU register for port 5 (mii regmap, register 1) holds the
+# switch's TX delay in bits 2:0 and its RX delay in bits 9:7, in the 500 ps
+# steps the mainline driver programs. Writing it needs regmap debugfs
+# writes, which only the full-regw bench image has.
+# Usage: rgmii-grid HOST
+host=$1
+[ -n "$host" ] || { echo "usage: rgmii-grid HOST"; exit 1; }
+R=$(echo /sys/kernel/debug/regmap/*-mii/registers)
+[ -w "$R" ] || { echo "no writable mii regmap: $R"; exit 1; }
+TX=0x19e04444; RX=0x19e04448; RXEN=0x19e0444c
+
+pcdu() { sed -n 's/^0*1: *//p' "$R" | head -1; }
+swset() { # SW_TX SW_RX, in 500 ps steps
+	cur=$((0x$(pcdu)))
+	new=$(( (cur & ~0x387) | ($1 & 7) | (($2 & 7) << 7) ))
+	echo "1 $(printf %x $new)" > "$R"
+}
+macset() { devmem $TX 32 "$1"; devmem $RX 32 "$2"; devmem $RXEN 32 "$3"; }
+probe() { # phase sw_tx sw_rx mac_tx mac_rx rx_en
+	swset "$2" "$3"; macset "$4" "$5" "$6"
+	sleep 1
+	r=$(ping -q -c 50 -s 1400 -w 4 "$host" 2>/dev/null | sed -n 's/.* \([0-9]*\) packets received.*/\1/p')
+	echo "$1,$2,$3,$4,$5,$6,${r:-0}"
+}
+
+opcdu=$(pcdu); otx=$(devmem $TX 32); orx=$(devmem $RX 32); orxen=$(devmem $RXEN 32)
+echo "# start: pcdu=0x$opcdu tx=$otx rx=$orx rx_en=$orxen"
+echo "phase,sw_tx,sw_rx,mac_tx,mac_rx,rx_en,replies"
+
+# MAC to switch, with the other direction at known-good values: the
+# switch's RX delay alone, then the MAC's TX delay at three switch delays
+for d in 0 1 2 3 4 5 6 7; do probe A1 0 $d 0 10 1; done
+for d in 0 2 4; do
+	v=0; while [ $v -le 80 ]; do probe A2 0 $d $v 10 1; v=$((v + 1)); done
+done
+
+# Switch to MAC: the switch's TX delay with the MAC's RX delay line
+# bypassed, then the MAC's RX delay line at four switch delays
+for d in 0 1 2 3 4 5 6 7; do probe B1 $d 0 17 0 0; done
+for d in 0 1 2 3; do
+	v=0; while [ $v -le 60 ]; do probe B2 $d 0 17 $v 1; v=$((v + 1)); done
+done
+
+# Every MAC delay off, the switch adding 0, 1, 1.5 and 2 ns both ways
+for d in 0 2 3 4; do probe C1 $d $d 0 0 0; done
+
+echo "1 $opcdu" > "$R"; macset "$otx" "$orx" "$orxen"
+echo "# restored: pcdu=0x$(pcdu) tx=$(devmem $TX 32) rx=$(devmem $RX 32) rx_en=$(devmem $RXEN 32)"
