@@ -1,4 +1,4 @@
-From 473a970c7d36f7785493393f9f0e67d295674108 Mon Sep 17 00:00:00 2001
+From 3dff0a7b99da2428e7cb15e30438077f40a9d420 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 9 Sep 2024 16:46:53 +0800
 Subject: [PATCH 2/3] usb: dwc2: Add Siflower SF19A2890 support

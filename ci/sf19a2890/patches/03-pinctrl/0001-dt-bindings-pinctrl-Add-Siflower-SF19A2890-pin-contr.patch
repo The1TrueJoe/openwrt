@@ -1,4 +1,4 @@
-From 18fafa7e116ae3e438190031c14f46f9a0ac6895 Mon Sep 17 00:00:00 2001
+From 369bc28756137e8ce2435862782c212a4bac125f Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:58:29 -0500
 Subject: [PATCH 1/2] dt-bindings: pinctrl: Add Siflower SF19A2890 pin
@@ -18,7 +18,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 
 diff --git a/Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml b/Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
 new file mode 100644
-index 000000000..dfa41db60
+index 000000000..0bb7c896f
 --- /dev/null
 +++ b/Documentation/devicetree/bindings/pinctrl/siflower,sf19a2890-pinctrl.yaml
 @@ -0,0 +1,113 @@
@@ -56,8 +56,8 @@ index 000000000..dfa41db60
 +    patternProperties:
 +      '^pins(-[a-z0-9]+)*$':
 +        type: object
-+        $ref: /schemas/pinctrl/pincfg-node.yaml#
 +        allOf:
++          - $ref: /schemas/pinctrl/pincfg-node.yaml#
 +          - $ref: /schemas/pinctrl/pinmux-node.yaml#
 +
 +        properties:

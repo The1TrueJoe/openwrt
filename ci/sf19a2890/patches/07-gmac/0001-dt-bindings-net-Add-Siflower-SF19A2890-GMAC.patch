@@ -1,4 +1,4 @@
-From d06600b32c4ee7c302d89435c8b26c73860e6022 Mon Sep 17 00:00:00 2001
+From ae74bb17dcab62f7ebc5eb194e492d40228ed7b8 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:03:33 -0500
 Subject: [PATCH 1/2] dt-bindings: net: Add Siflower SF19A2890 GMAC
