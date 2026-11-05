@@ -1,4 +1,4 @@
-From c2683506168bce5134229d3b65136675595d3da7 Mon Sep 17 00:00:00 2001
+From 221cdf1735c3f0e19432831c0a89094b0eb0956e Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:26:43 -0500
 Subject: [PATCH 1/4] dt-bindings: soc: siflower: Add SF19A2890 system

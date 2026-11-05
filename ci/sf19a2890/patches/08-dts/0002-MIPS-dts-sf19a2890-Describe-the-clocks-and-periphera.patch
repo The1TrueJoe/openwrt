@@ -1,4 +1,4 @@
-From 1a655fb42727bee51f77524e088b1ff32d108454 Mon Sep 17 00:00:00 2001
+From 460d01f712b428be9471ab22823503983e47fa9d Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 2/4] MIPS: dts: sf19a2890: Describe the clocks and peripherals
@@ -18,11 +18,11 @@ watchdog running, and left unfed it does not reset the board.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- arch/mips/boot/dts/siflower/sf19a2890.dtsi | 394 ++++++++++++++++++++-
- 1 file changed, 378 insertions(+), 16 deletions(-)
+ arch/mips/boot/dts/siflower/sf19a2890.dtsi | 402 ++++++++++++++++++++-
+ 1 file changed, 386 insertions(+), 16 deletions(-)
 
 diff --git a/arch/mips/boot/dts/siflower/sf19a2890.dtsi b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
-index 1c342cbaa..1b77952de 100644
+index 1c342cbaa..72d0dc24e 100644
 --- a/arch/mips/boot/dts/siflower/sf19a2890.dtsi
 +++ b/arch/mips/boot/dts/siflower/sf19a2890.dtsi
 @@ -1,5 +1,6 @@
@@ -41,19 +41,19 @@ index 1c342cbaa..1b77952de 100644
 -	 * clock controller until it has a driver.
 -	 */
 -	pbus_clk: clock-100000000 {
-+	osc12m: clock-12000000 {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
--		clock-frequency = <100000000>;
-+		clock-frequency = <12000000>;
- 	};
- 
--	uart_clk: clock-125000000 {
 +	osc32k: clock-32768 {
  		compatible = "fixed-clock";
  		#clock-cells = <0>;
--		clock-frequency = <125000000>;
+-		clock-frequency = <100000000>;
 +		clock-frequency = <32768>;
+ 	};
+ 
+-	uart_clk: clock-125000000 {
++	osc12m: clock-12000000 {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-		clock-frequency = <125000000>;
++		clock-frequency = <12000000>;
  	};
  
 -	cpu_clk: clock-800000000 {
@@ -98,7 +98,7 @@ index 1c342cbaa..1b77952de 100644
  		};
  	};
  
-@@ -70,16 +67,381 @@ soc {
+@@ -70,16 +67,389 @@ soc {
  		#size-cells = <1>;
  		interrupt-parent = <&gic>;
  
@@ -113,8 +113,9 @@ index 1c342cbaa..1b77952de 100644
 +			clock-names = "stmmaceth", "pclk", "ptp_ref", "byp_ref";
 +			resets = <&gmac_crm 0>;
 +			reset-names = "stmmaceth";
-+			pinctrl-names = "default";
 +			pinctrl-0 = <&rgmii_pins>, <&mdio_pins>;
++			pinctrl-names = "default";
++
 +			status = "disabled";
 +
 +			mdio: mdio {
@@ -135,6 +136,7 @@ index 1c342cbaa..1b77952de 100644
 +			phys = <&usb_phy>;
 +			phy-names = "usb2-phy";
 +			g-np-tx-fifo-size = <768>;
++
 +			status = "disabled";
 +		};
 +
@@ -144,10 +146,11 @@ index 1c342cbaa..1b77952de 100644
 +			interrupts = <GIC_SHARED 217 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&i2c_crm 0>;
 +			resets = <&i2c_crm 0>;
-+			pinctrl-names = "default";
 +			pinctrl-0 = <&i2c0_pins>;
++			pinctrl-names = "default";
 +			#address-cells = <1>;
 +			#size-cells = <0>;
++
 +			status = "disabled";
 +		};
 +
@@ -158,10 +161,11 @@ index 1c342cbaa..1b77952de 100644
 +			clocks = <&spi_crm 1>, <&spi_crm 0>;
 +			clock-names = "sspclk", "apb_pclk";
 +			resets = <&spi_crm 0>;
-+			pinctrl-names = "default";
 +			pinctrl-0 = <&spi_pins>;
++			pinctrl-names = "default";
 +			#address-cells = <1>;
 +			#size-cells = <0>;
++
 +			status = "disabled";
 +		};
 +
@@ -171,10 +175,10 @@ index 1c342cbaa..1b77952de 100644
  			interrupts = <GIC_SHARED 226 IRQ_TYPE_LEVEL_HIGH>;
 -			clocks = <&uart_clk>, <&pbus_clk>;
 +			clocks = <&uart_crm 3>, <&uart_crm 0>;
- 			clock-names = "uartclk", "apb_pclk";
++			clock-names = "uartclk", "apb_pclk";
 +			resets = <&uart_crm 0>;
-+			pinctrl-names = "default";
 +			pinctrl-0 = <&uart0_pins>;
++			pinctrl-names = "default";
 +
 +			status = "disabled";
 +		};
@@ -184,10 +188,11 @@ index 1c342cbaa..1b77952de 100644
 +			reg = <0x18301000 0x1000>;
 +			interrupts = <GIC_SHARED 227 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&uart_crm 4>, <&uart_crm 1>;
-+			clock-names = "uartclk", "apb_pclk";
+ 			clock-names = "uartclk", "apb_pclk";
 +			resets = <&uart_crm 1>;
-+			pinctrl-names = "default";
 +			pinctrl-0 = <&uart1_pins>;
++			pinctrl-names = "default";
++
 +			status = "disabled";
 +		};
 +
@@ -198,8 +203,9 @@ index 1c342cbaa..1b77952de 100644
 +			clocks = <&uart_crm 5>, <&uart_crm 2>;
 +			clock-names = "uartclk", "apb_pclk";
 +			resets = <&uart_crm 2>;
-+			pinctrl-names = "default";
 +			pinctrl-0 = <&uart2_pins>;
++			pinctrl-names = "default";
++
 +			status = "disabled";
 +		};
 +
@@ -213,6 +219,7 @@ index 1c342cbaa..1b77952de 100644
 +			interrupts = <GIC_SHARED 238 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&wdt_crm 0>;
 +			resets = <&wdt_crm 0>;
++
 +			status = "disabled";
 +		};
 +
@@ -268,7 +275,7 @@ index 1c342cbaa..1b77952de 100644
 +			#clock-cells = <1>;
 +			#reset-cells = <1>;
 +		};
- 
++
 +		rf_crm: clock-controller@19e08800 {
 +			compatible = "siflower,sf19a2890-rf-crm";
 +			reg = <0x19e08800 0x10>;
@@ -294,6 +301,7 @@ index 1c342cbaa..1b77952de 100644
 +			resets = <&usb_crm 1>, <&usb_crm 2>;
 +			reset-names = "por", "phy";
 +			#phy-cells = <0>;
+ 
  			status = "disabled";
  		};
  
@@ -387,20 +395,20 @@ index 1c342cbaa..1b77952de 100644
 +			};
 +
 +			rgmii_pins: rgmii-pins {
-+				pins-tx {
-+					pins = "RGMII_TXCLK", "RGMII_TXD0",
-+					       "RGMII_TXD1", "RGMII_TXD2",
-+					       "RGMII_TXD3", "RGMII_TXCTL";
-+					function = "rgmii";
-+					bias-disable;
-+				};
-+
 +				pins-rx {
 +					pins = "RGMII_RXCLK", "RGMII_RXD0",
 +					       "RGMII_RXD1", "RGMII_RXD2",
 +					       "RGMII_RXD3", "RGMII_RXCTL";
 +					function = "rgmii";
 +					input-enable;
++					bias-disable;
++				};
++
++				pins-tx {
++					pins = "RGMII_TXCLK", "RGMII_TXD0",
++					       "RGMII_TXD1", "RGMII_TXD2",
++					       "RGMII_TXD3", "RGMII_TXCTL";
++					function = "rgmii";
 +					bias-disable;
 +				};
 +			};
@@ -412,10 +420,10 @@ index 1c342cbaa..1b77952de 100644
 +					bias-disable;
 +				};
 +
-+				pins-mosi {
-+					pins = "SPI_TXD";
-+					function = "spi";
-+					bias-pull-down;
++				/* Driven as a GPIO through cs-gpios */
++				pins-cs {
++					pins = "SPI_CSN";
++					bias-pull-up;
 +				};
 +
 +				pins-miso {
@@ -425,54 +433,54 @@ index 1c342cbaa..1b77952de 100644
 +					bias-pull-down;
 +				};
 +
-+				/* Driven as a GPIO through cs-gpios */
-+				pins-cs {
-+					pins = "SPI_CSN";
-+					bias-pull-up;
++				pins-mosi {
++					pins = "SPI_TXD";
++					function = "spi";
++					bias-pull-down;
 +				};
 +			};
 +
 +			uart0_pins: uart0-pins {
-+				pins-tx {
-+					pins = "UART_TX";
-+					function = "uart0";
-+					bias-pull-up;
-+				};
-+
 +				pins-rx {
 +					pins = "UART_RX";
 +					function = "uart0";
 +					input-enable;
 +					bias-pull-up;
 +				};
++
++				pins-tx {
++					pins = "UART_TX";
++					function = "uart0";
++					bias-pull-up;
++				};
 +			};
 +
 +			uart1_pins: uart1-pins {
-+				pins-tx {
-+					pins = "JTAG_TDO";
-+					function = "uart1";
-+					bias-pull-up;
-+				};
-+
 +				pins-rx {
 +					pins = "JTAG_TDI";
 +					function = "uart1";
 +					input-enable;
 +					bias-pull-up;
 +				};
++
++				pins-tx {
++					pins = "JTAG_TDO";
++					function = "uart1";
++					bias-pull-up;
++				};
 +			};
 +
 +			uart2_pins: uart2-pins {
-+				pins-tx {
-+					pins = "I2C_DAT";
-+					function = "uart2";
-+					bias-pull-up;
-+				};
-+
 +				pins-rx {
 +					pins = "I2C_CLK";
 +					function = "uart2";
 +					input-enable;
++					bias-pull-up;
++				};
++
++				pins-tx {
++					pins = "I2C_DAT";
++					function = "uart2";
 +					bias-pull-up;
 +				};
 +			};
@@ -481,7 +489,7 @@ index 1c342cbaa..1b77952de 100644
  		gic: interrupt-controller@1bdc0000 {
  			compatible = "mti,gic";
  			reg = <0x1bdc0000 0x20000>;
-@@ -90,7 +452,7 @@ gic: interrupt-controller@1bdc0000 {
+@@ -90,7 +460,7 @@ gic: interrupt-controller@1bdc0000 {
  			timer {
  				compatible = "mti,gic-timer";
  				interrupts = <GIC_LOCAL 1 IRQ_TYPE_NONE>;

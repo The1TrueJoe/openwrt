@@ -1,4 +1,4 @@
-From b4566747ac80ce7d22de444055ec7a55faad173c Mon Sep 17 00:00:00 2001
+From 186b17cf67a701ae4f13d84b0584a4897a93a22b Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 18:05:42 -0500
 Subject: [PATCH 3/4] MIPS: dts: sf19a2890: Add the GL.iNet GL-SFT1200
@@ -23,11 +23,11 @@ the TX FIFO size.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- .../siflower/sf19a2890-glinet-gl-sft1200.dts  | 224 ++++++++++++++++++
- 1 file changed, 224 insertions(+)
+ .../siflower/sf19a2890-glinet-gl-sft1200.dts  | 228 ++++++++++++++++++
+ 1 file changed, 228 insertions(+)
 
 diff --git a/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts b/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
-index 13e6a0c8b..717aa2a0d 100644
+index 13e6a0c8b..9c0f7e920 100644
 --- a/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
 +++ b/arch/mips/boot/dts/siflower/sf19a2890-glinet-gl-sft1200.dts
 @@ -2,6 +2,10 @@
@@ -41,11 +41,10 @@ index 13e6a0c8b..717aa2a0d 100644
  #include "sf19a2890.dtsi"
  
  / {
-@@ -20,8 +24,228 @@ memory@0 {
- 		device_type = "memory";
- 		reg = <0x0 0x8000000>;
+@@ -16,12 +20,236 @@ chosen {
+ 		stdout-path = "serial0:115200n8";
  	};
-+
+ 
 +	keys {
 +		compatible = "gpio-keys";
 +
@@ -62,8 +61,13 @@ index 13e6a0c8b..717aa2a0d 100644
 +			linux,code = <BTN_0>;
 +		};
 +	};
-+};
 +
+ 	memory@0 {
+ 		device_type = "memory";
+ 		reg = <0x0 0x8000000>;
+ 	};
+ };
+ 
 +&gmac {
 +	phy-mode = "rgmii-id";
 +	tx-internal-delay-ps = <935>;
@@ -81,6 +85,7 @@ index 13e6a0c8b..717aa2a0d 100644
 +	 */
 +	tx-fifo-depth = <2048>;
 +	rx-fifo-depth = <2048>;
++
 +	status = "okay";
 +
 +	fixed-link {
@@ -92,6 +97,7 @@ index 13e6a0c8b..717aa2a0d 100644
 +
 +&i2c0 {
 +	clock-frequency = <400000>;
++
 +	status = "okay";
 +
 +	led-controller@30 {
@@ -122,6 +128,23 @@ index 13e6a0c8b..717aa2a0d 100644
 +		compatible = "intel,gsw150";
 +		reg = <0x1f>;
 +		reset-gpios = <&gpio 0 GPIO_ACTIVE_LOW>;
++
++		mdio {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			switchphy0: ethernet-phy@0 {
++				reg = <0>;
++			};
++
++			switchphy1: ethernet-phy@1 {
++				reg = <1>;
++			};
++
++			switchphy2: ethernet-phy@2 {
++				reg = <2>;
++			};
++		};
 +
 +		ports {
 +			#address-cells = <1>;
@@ -169,28 +192,12 @@ index 13e6a0c8b..717aa2a0d 100644
 +				};
 +			};
 +		};
-+
-+		mdio {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			switchphy0: ethernet-phy@0 {
-+				reg = <0>;
-+			};
-+
-+			switchphy1: ethernet-phy@1 {
-+				reg = <1>;
-+			};
-+
-+			switchphy2: ethernet-phy@2 {
-+				reg = <2>;
-+			};
-+		};
 +	};
 +};
 +
 +&spi {
 +	cs-gpios = <&gpio 8 GPIO_ACTIVE_LOW>;
++
 +	status = "okay";
 +
 +	flash@0 {
@@ -204,26 +211,26 @@ index 13e6a0c8b..717aa2a0d 100644
 +			#size-cells = <1>;
 +
 +			partition@0 {
-+				label = "spl-loader";
 +				reg = <0x0 0x20000>;
++				label = "spl-loader";
 +				read-only;
 +			};
 +
 +			partition@20000 {
-+				label = "u-boot";
 +				reg = <0x20000 0x60000>;
++				label = "u-boot";
 +				read-only;
 +			};
 +
 +			partition@80000 {
-+				label = "u-boot-env";
 +				reg = <0x80000 0x20000>;
++				label = "u-boot-env";
 +				read-only;
 +			};
 +
 +			partition@a0000 {
-+				label = "factory";
 +				reg = <0xa0000 0x20000>;
++				label = "factory";
 +				read-only;
 +
 +				nvmem-layout {
@@ -241,29 +248,30 @@ index 13e6a0c8b..717aa2a0d 100644
 +
 +			/* U-Boot loads only the first 3 MiB of this partition */
 +			partition@c0000 {
-+				label = "kernel";
 +				reg = <0xc0000 0x400000>;
++				label = "kernel";
 +			};
 +
 +			partition@4c0000 {
-+				label = "ubi";
 +				reg = <0x4c0000 0x7940000>;
++				label = "ubi";
 +			};
 +
 +			partition@7e00000 {
-+				label = "log";
 +				reg = <0x7e00000 0x40000>;
++				label = "log";
 +			};
 +		};
 +	};
- };
- 
++};
++
  &uart0 {
  	status = "okay";
  };
 +
 +&usb {
 +	dr_mode = "host";
++
 +	status = "okay";
 +};
 +
