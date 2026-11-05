@@ -1,4 +1,4 @@
-From 0a94e29e94e16108fcf2270e1381e2ec4fc4172b Mon Sep 17 00:00:00 2001
+From 0cc87293c84ab6de63755111c15379de08a3ca78 Mon Sep 17 00:00:00 2001
 From: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
 Subject: [PATCH 2/2] gpio: Add Siflower GPIO controller driver
@@ -24,6 +24,7 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
   - find the group by its parent IRQ instead of assuming consecutive
     numbers
   - return 0 or 1 from .get
+  - use readl() and writel() directly, without wrapper functions
   - take the number of lines from the match data, not from an
     ngpios property
   - include linux/math64.h, sort the includes, spell it "Siflower"
@@ -34,8 +35,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  MAINTAINERS                  |   1 +
  drivers/gpio/Kconfig         |  12 ++
  drivers/gpio/Makefile        |   1 +
- drivers/gpio/gpio-siflower.c | 322 +++++++++++++++++++++++++++++++++++
- 4 files changed, 336 insertions(+)
+ drivers/gpio/gpio-siflower.c | 311 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 325 insertions(+)
  create mode 100644 drivers/gpio/gpio-siflower.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
@@ -87,10 +88,10 @@ index 88f748846..bde618108 100644
  obj-$(CONFIG_GPIO_SL28CPLD)		+= gpio-sl28cpld.o
 diff --git a/drivers/gpio/gpio-siflower.c b/drivers/gpio/gpio-siflower.c
 new file mode 100644
-index 000000000..2313cfaf3
+index 000000000..acb2add6a
 --- /dev/null
 +++ b/drivers/gpio/gpio-siflower.c
-@@ -0,0 +1,322 @@
+@@ -0,0 +1,311 @@
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +/*
 + * GPIO controller driver for Siflower MIPS and RISC-V SoCs including:
@@ -133,22 +134,11 @@ index 000000000..2313cfaf3
 +	unsigned int irq[];
 +};
 +
-+static u32 sf_gpio_rd(struct sf_gpio_priv *priv, unsigned long reg)
-+{
-+	return readl_relaxed(priv->base + reg);
-+}
-+
-+static void sf_gpio_wr(struct sf_gpio_priv *priv, unsigned long reg,
-+		       u32 val)
-+{
-+	writel_relaxed(val, priv->base + reg);
-+}
-+
 +static int sf_gpio_get_value(struct gpio_chip *gc, unsigned int offset)
 +{
 +	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
 +
-+	return !!sf_gpio_rd(priv, GPIO_IR(offset));
++	return !!readl(priv->base + GPIO_IR(offset));
 +}
 +
 +static int sf_gpio_set_value(struct gpio_chip *gc, unsigned int offset,
@@ -156,7 +146,7 @@ index 000000000..2313cfaf3
 +{
 +	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
 +
-+	sf_gpio_wr(priv, GPIO_OR(offset), value);
++	writel(value, priv->base + GPIO_OR(offset));
 +	return 0;
 +}
 +
@@ -164,7 +154,7 @@ index 000000000..2313cfaf3
 +{
 +	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
 +
-+	if (sf_gpio_rd(priv, GPIO_OEN(offset)))
++	if (readl(priv->base + GPIO_OEN(offset)))
 +		return GPIO_LINE_DIRECTION_IN;
 +
 +	return GPIO_LINE_DIRECTION_OUT;
@@ -174,7 +164,7 @@ index 000000000..2313cfaf3
 +{
 +	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
 +
-+	sf_gpio_wr(priv, GPIO_OEN(offset), 1);
++	writel(1, priv->base + GPIO_OEN(offset));
 +	return 0;
 +}
 +
@@ -183,8 +173,8 @@ index 000000000..2313cfaf3
 +{
 +	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
 +
-+	sf_gpio_wr(priv, GPIO_OR(offset), value);
-+	sf_gpio_wr(priv, GPIO_OEN(offset), 0);
++	writel(value, priv->base + GPIO_OR(offset));
++	writel(0, priv->base + GPIO_OEN(offset));
 +	return 0;
 +}
 +
@@ -201,8 +191,8 @@ index 000000000..2313cfaf3
 +	if (mul > 0xff00)
 +		return -EINVAL;
 +
-+	sf_gpio_wr(priv, GPIO_ICR(offset), 0xff);
-+	sf_gpio_wr(priv, GPIO_IFR(offset), DIV_ROUND_UP(mul, 0x100));
++	writel(0xff, priv->base + GPIO_ICR(offset));
++	writel(DIV_ROUND_UP(mul, 0x100), priv->base + GPIO_IFR(offset));
 +
 +	return 0;
 +}
@@ -225,7 +215,7 @@ index 000000000..2313cfaf3
 +	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
 +	unsigned long offset = irqd_to_hwirq(data);
 +
-+	sf_gpio_wr(priv, GPIO_PIR(offset), 0);
++	writel(0, priv->base + GPIO_PIR(offset));
 +}
 +
 +static void sf_gpio_irq_mask(struct irq_data *data)
@@ -234,8 +224,8 @@ index 000000000..2313cfaf3
 +	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
 +	unsigned long offset = irqd_to_hwirq(data);
 +
-+	sf_gpio_wr(priv, GPIO_IMR(offset), 1);
-+	sf_gpio_wr(priv, GPIO_GPIMR(offset), 1);
++	writel(1, priv->base + GPIO_IMR(offset));
++	writel(1, priv->base + GPIO_GPIMR(offset));
 +	gpiochip_disable_irq(gc, offset);
 +}
 +
@@ -246,8 +236,8 @@ index 000000000..2313cfaf3
 +	unsigned long offset = irqd_to_hwirq(data);
 +
 +	gpiochip_enable_irq(gc, offset);
-+	sf_gpio_wr(priv, GPIO_IMR(offset), 0);
-+	sf_gpio_wr(priv, GPIO_GPIMR(offset), 0);
++	writel(0, priv->base + GPIO_IMR(offset));
++	writel(0, priv->base + GPIO_GPIMR(offset));
 +}
 +
 +static int sf_gpio_irq_set_type(struct irq_data *data, unsigned int flow_type)
@@ -276,7 +266,7 @@ index 000000000..2313cfaf3
 +	default:
 +		return -EINVAL;
 +	}
-+	sf_gpio_wr(priv, GPIO_ITR(offset), val);
++	writel(val, priv->base + GPIO_ITR(offset));
 +
 +	if (flow_type & IRQ_TYPE_LEVEL_MASK) {
 +		irq_set_handler_locked(data, handle_level_irq);
@@ -315,7 +305,7 @@ index 000000000..2313cfaf3
 +
 +	chained_irq_enter(ic, desc);
 +
-+	pending = sf_gpio_rd(priv, GPIO_GPxIR(group));
++	pending = readl(priv->base + GPIO_GPxIR(group));
 +	for_each_set_bit(n, &pending, GPIOS_PER_GROUP) {
 +		generic_handle_domain_irq(gc->irq.domain,
 +					  n + group * GPIOS_PER_GROUP);
