@@ -1,4 +1,4 @@
-From 3c09c3c769f9d0e7d6559eb66bf60596a0aaa7d4 Mon Sep 17 00:00:00 2001
+From 6ab3d69367093981455decd4b9713ee9a122503f Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 9 Sep 2024 10:18:33 +0800
 Subject: [PATCH 2/2] phy: siflower: Add SF19A2890 USB 2.0 PHY driver

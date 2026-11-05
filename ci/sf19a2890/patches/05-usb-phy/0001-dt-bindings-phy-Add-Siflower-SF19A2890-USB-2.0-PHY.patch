@@ -1,4 +1,4 @@
-From c4ee567a1b031edc717a5194dcfd645c8ba811c1 Mon Sep 17 00:00:00 2001
+From c3b6b3fdbea6055150d43ed4d669c2a26fe907f8 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:22:24 -0500
 Subject: [PATCH 1/2] dt-bindings: phy: Add Siflower SF19A2890 USB 2.0 PHY
@@ -7,6 +7,7 @@ The USB 2.0 PHY of the Siflower SF19A2890 serves its DWC2 controller.
 It takes a reference clock and two resets, power-on and PHY, from the
 USB block's clock and reset manager.
 
+Acked-by: Conor Dooley <conor.dooley@microchip.com>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../phy/siflower,sf19a2890-usb-phy.yaml       | 58 +++++++++++++++++++
