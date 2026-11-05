@@ -1,4 +1,4 @@
-From 171b3f771ddba97a7c2e18470afe86e3e95765d5 Mon Sep 17 00:00:00 2001
+From 62008e335e01d4d24d4b33dc08110c1ab416cba1 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:17:23 -0500
 Subject: [PATCH 1/4] dt-bindings: clock: Add Siflower SF19A2890 clock manager
@@ -11,6 +11,7 @@ blocks.
 The header is Chuanhong Guo's, from his SF19A2890 branch, without the
 count at its end.
 
+Acked-by: Conor Dooley <conor.dooley@microchip.com>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../clock/siflower,sf19a2890-clk.yaml         | 57 +++++++++++++++++++

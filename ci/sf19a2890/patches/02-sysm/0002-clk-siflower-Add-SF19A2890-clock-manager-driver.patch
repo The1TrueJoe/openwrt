@@ -1,4 +1,4 @@
-From 3593ab494c85454c1bc21590a7ea80216e1e6805 Mon Sep 17 00:00:00 2001
+From 9ba26af138772ce13b21221d50e6fdd1323ced69 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
 Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver

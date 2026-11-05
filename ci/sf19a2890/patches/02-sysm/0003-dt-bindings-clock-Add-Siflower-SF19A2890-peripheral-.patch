@@ -1,4 +1,4 @@
-From 03d2d6f97f10f5d7d27fc5ff16edbb8703cf9414 Mon Sep 17 00:00:00 2001
+From bd6f5aec3101f54e4a227f265b1e7bdee48a101b Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:18:45 -0500
 Subject: [PATCH 3/4] dt-bindings: clock: Add Siflower SF19A2890 peripheral

@@ -1,4 +1,4 @@
-From 6d540ba95231bb7b48ac5214d05b400e4bda1e27 Mon Sep 17 00:00:00 2001
+From b67bea09185bbb2436748a43c8eaa4091c386658 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Wed, 8 Apr 2026 22:17:11 +0800
 Subject: [PATCH 4/4] clk: siflower: Add SF19A2890 peripheral clock and reset
