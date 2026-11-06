@@ -1,4 +1,4 @@
-From b67bea09185bbb2436748a43c8eaa4091c386658 Mon Sep 17 00:00:00 2001
+From 00c6ec3eadd00c6e1549a7c0650859fd15d19e94 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Wed, 8 Apr 2026 22:17:11 +0800
 Subject: [PATCH 4/4] clk: siflower: Add SF19A2890 peripheral clock and reset
@@ -40,8 +40,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  drivers/clk/siflower/Kconfig                  |  11 +
  drivers/clk/siflower/Makefile                 |   1 +
- .../clk/siflower/clk-sf19a2890-periphcrm.c    | 360 ++++++++++++++++++
- 3 files changed, 372 insertions(+)
+ .../clk/siflower/clk-sf19a2890-periphcrm.c    | 368 ++++++++++++++++++
+ 3 files changed, 380 insertions(+)
  create mode 100644 drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 
 diff --git a/drivers/clk/siflower/Kconfig b/drivers/clk/siflower/Kconfig
@@ -73,10 +73,10 @@ index 3f4d689f7..c4f4e0b88 100644
 +obj-$(CONFIG_CLK_SF19A2890_PERIPHCRM) += clk-sf19a2890-periphcrm.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890-periphcrm.c b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 new file mode 100644
-index 000000000..3cafcf4dc
+index 000000000..f26470e42
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
-@@ -0,0 +1,360 @@
+@@ -0,0 +1,368 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +/*
@@ -96,6 +96,8 @@ index 000000000..3cafcf4dc
 +#include <linux/reset-controller.h>
 +#include <linux/slab.h>
 +#include <linux/spinlock.h>
++
++#include <dt-bindings/clock/siflower,sf19a2890-periph-crm.h>
 +
 +#define REG_RESET	0x0
 +#define REG_CLK_GATE	0x4
@@ -243,27 +245,27 @@ index 000000000..3cafcf4dc
 +static const u32 sf19a2890_single_resets[] = { BIT(0) };
 +
 +static const struct sf19a2890_periphcrm_gate sf19a2890_gmac_gates[] = {
-+	GATE("gmac", 0, 0),
-+	GATE("gmac_pclk", 1, 0),
-+	GATE("gmac_byp_ref", 2, 0),
-+	GATE("ethtsu", 3, 0),
++	[CLK_GMAC_BUS] = GATE("gmac", 0, 0),
++	[CLK_GMAC_REG] = GATE("gmac_pclk", 1, 0),
++	[CLK_GMAC_TX_REF] = GATE("gmac_byp_ref", 2, 0),
++	[CLK_GMAC_TSU] = GATE("ethtsu", 3, 0),
 +};
 +
-+static const u32 sf19a2890_gmac_resets[] = { GENMASK(1, 0) };
++static const u32 sf19a2890_gmac_resets[] = { [RST_GMAC] = GENMASK(1, 0) };
 +
 +static const struct sf19a2890_periphcrm_data sf19a2890_gmac_crm =
 +	CRM_DATA(gmac, gmac);
 +
 +static const struct sf19a2890_periphcrm_gate sf19a2890_wlan24_gates[] = {
-+	GATE("wlan24_axis", 0, 0),
-+	GATE("wlan24_axim", 1, 0),
-+	GATE("wlan24_plf", 2, 0),
++	[CLK_WLAN24_AXIS] = GATE("wlan24_axis", 0, 0),
++	[CLK_WLAN24_AXIM] = GATE("wlan24_axim", 1, 0),
++	[CLK_WLAN24_PLF] = GATE("wlan24_plf", 2, 0),
 +};
 +
 +static const struct sf19a2890_periphcrm_gate sf19a2890_wlan5_gates[] = {
-+	GATE("wlan5_axis", 0, 0),
-+	GATE("wlan5_axim", 1, 0),
-+	GATE("wlan5_plf", 2, 0),
++	[CLK_WLAN5_AXIS] = GATE("wlan5_axis", 0, 0),
++	[CLK_WLAN5_AXIM] = GATE("wlan5_axim", 1, 0),
++	[CLK_WLAN5_PLF] = GATE("wlan5_plf", 2, 0),
 +};
 +
 +static const u32 sf19a2890_wlan_resets[] = { GENMASK(2, 0) };
@@ -275,10 +277,10 @@ index 000000000..3cafcf4dc
 +	CRM_DATA(wlan5, wlan);
 +
 +static const struct sf19a2890_periphcrm_gate sf19a2890_rf_gates[] = {
-+	GATE("rf_dft", 0, 0),
-+	GATE("rf_axis", 1, 0),
-+	GATE("rf_boot", 2, 0),
-+	GATE("rf_lp", 3, 0),
++	[CLK_RF_TEST] = GATE("rf_dft", 0, 0),
++	[CLK_RF_AXIS] = GATE("rf_axis", 1, 0),
++	[CLK_RF_BOOT] = GATE("rf_boot", 2, 0),
++	[CLK_RF_LP] = GATE("rf_lp", 3, 0),
 +};
 +
 +static const struct sf19a2890_periphcrm_data sf19a2890_rf_crm =
@@ -286,38 +288,44 @@ index 000000000..3cafcf4dc
 +
 +/* Nothing describes a consumer of usb_axim, and gating it is not safe */
 +static const struct sf19a2890_periphcrm_gate sf19a2890_usb_gates[] = {
-+	GATE("usb", 0, 0),
-+	GATE("usb_axim", 2, CLK_IS_CRITICAL),
-+	GATE("usbphy_ref", 3, 0),
++	[CLK_USB] = GATE("usb", 0, 0),
++	[CLK_USB_AXIM] = GATE("usb_axim", 2, CLK_IS_CRITICAL),
++	[CLK_USB_PHY_REF] = GATE("usbphy_ref", 3, 0),
 +};
 +
-+static const u32 sf19a2890_usb_resets[] = { GENMASK(2, 0), BIT(3), BIT(4) };
++static const u32 sf19a2890_usb_resets[] = {
++	[RST_USB] = GENMASK(2, 0),
++	[RST_USB_PHY_POR] = BIT(3),
++	[RST_USB_PHY] = BIT(4),
++};
 +
 +static const struct sf19a2890_periphcrm_data sf19a2890_usb_crm =
 +	CRM_DATA(usb, usb);
 +
 +static const struct sf19a2890_periphcrm_gate sf19a2890_spi_gates[] = {
-+	GATE("spi_apb", 4, 0),
-+	GATE("spi_ssp", 5, 0),
++	[CLK_SPI_APB] = GATE("spi_apb", 4, 0),
++	[CLK_SPI_SSP] = GATE("spi_ssp", 5, 0),
 +};
 +
-+static const u32 sf19a2890_spi_resets[] = { GENMASK(5, 4) };
++static const u32 sf19a2890_spi_resets[] = { [RST_SPI] = GENMASK(5, 4) };
 +
 +static const struct sf19a2890_periphcrm_data sf19a2890_spi_crm =
 +	CRM_DATA(spi, spi);
 +
 +/* UART0 carries the console from the bootloader on */
 +static const struct sf19a2890_periphcrm_gate sf19a2890_uart_gates[] = {
-+	GATE("uart0_apb", 0, CLK_IS_CRITICAL),
-+	GATE("uart1_apb", 1, 0),
-+	GATE("uart2_apb", 2, 0),
-+	GATE("uart0", 4, CLK_IS_CRITICAL),
-+	GATE("uart1", 5, 0),
-+	GATE("uart2", 6, 0),
++	[CLK_UART0_APB] = GATE("uart0_apb", 0, CLK_IS_CRITICAL),
++	[CLK_UART1_APB] = GATE("uart1_apb", 1, 0),
++	[CLK_UART2_APB] = GATE("uart2_apb", 2, 0),
++	[CLK_UART0] = GATE("uart0", 4, CLK_IS_CRITICAL),
++	[CLK_UART1] = GATE("uart1", 5, 0),
++	[CLK_UART2] = GATE("uart2", 6, 0),
 +};
 +
 +static const u32 sf19a2890_uart_resets[] = {
-+	BIT(0) | BIT(4), BIT(1) | BIT(5), BIT(2) | BIT(6),
++	[RST_UART0] = BIT(0) | BIT(4),
++	[RST_UART1] = BIT(1) | BIT(5),
++	[RST_UART2] = BIT(2) | BIT(6),
 +};
 +
 +static const struct sf19a2890_periphcrm_data sf19a2890_uart_crm =

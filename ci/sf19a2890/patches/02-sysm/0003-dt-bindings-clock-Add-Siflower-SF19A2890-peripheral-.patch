@@ -1,4 +1,4 @@
-From bd6f5aec3101f54e4a227f265b1e7bdee48a101b Mon Sep 17 00:00:00 2001
+From 3ef69066f50b4dd616311daefb37910e49ea7c76 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:18:45 -0500
 Subject: [PATCH 3/4] dt-bindings: clock: Add Siflower SF19A2890 peripheral
@@ -8,24 +8,27 @@ Each peripheral block of the Siflower SF19A2890 has a clock and reset
 manager of its own, with a reset register, a clock gate register and a
 bus output enable. The blocks differ in which gate and reset bits they
 use, so each has its own compatible, and clock N of a manager is its
-input clock N, gated.
+input clock N, gated. The header names the clocks and resets of each
+manager, since their meaning depends on the manager.
 
 Based on Chuanhong Guo's binding, which described every block with one
 compatible and its bit layout in properties.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- .../clock/siflower,sf19a2890-periph-crm.yaml  | 169 ++++++++++++++++++
- MAINTAINERS                                   |   1 +
- 2 files changed, 170 insertions(+)
+ .../clock/siflower,sf19a2890-periph-crm.yaml  | 166 ++++++++++++++++++
+ MAINTAINERS                                   |   2 +
+ .../clock/siflower,sf19a2890-periph-crm.h     |  87 +++++++++
+ 3 files changed, 255 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml
+ create mode 100644 include/dt-bindings/clock/siflower,sf19a2890-periph-crm.h
 
 diff --git a/Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml b/Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml
 new file mode 100644
-index 000000000..7f0bce603
+index 000000000..f464cfffb
 --- /dev/null
 +++ b/Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml
-@@ -0,0 +1,169 @@
+@@ -0,0 +1,166 @@
 +# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 +%YAML 1.2
 +---
@@ -43,12 +46,9 @@ index 000000000..7f0bce603
 +  register, and a bus output enable that the peripherals need as well as
 +  their clocks to answer bus requests.
 +
-+  Clock N of the manager is input clock N, gated. The reset lines are:
-+
-+    gmac-crm:  0 GMAC
-+    usb-crm:   0 USB controller, 1 USB PHY power-on, 2 USB PHY
-+    uart-crm:  0 UART0, 1 UART1, 2 UART2
-+    the others: 0 the block
++  Clock N of the manager is input clock N, gated. The clocks and resets of
++  each manager are defined in
++  include/dt-bindings/clock/siflower,sf19a2890-periph-crm.h.
 +
 +properties:
 +  compatible:
@@ -196,17 +196,113 @@ index 000000000..7f0bce603
 +        #reset-cells = <1>;
 +    };
 diff --git a/MAINTAINERS b/MAINTAINERS
-index b55aa37a7..81577e147 100644
+index b55aa37a7..a61af3aa6 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
+@@ -25703,8 +25703,10 @@ M:	Joseph Telaak <joseph@telaak.dev>
  L:	linux-clk@vger.kernel.org
  S:	Maintained
  F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-clk.yaml
 +F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml
  F:	drivers/clk/siflower/
  F:	include/dt-bindings/clock/siflower,sf19a2890-clk.h
++F:	include/dt-bindings/clock/siflower,sf19a2890-periph-crm.h
  
+ SILEAD TOUCHSCREEN DRIVER
+ M:	Hans de Goede <hansg@kernel.org>
+diff --git a/include/dt-bindings/clock/siflower,sf19a2890-periph-crm.h b/include/dt-bindings/clock/siflower,sf19a2890-periph-crm.h
+new file mode 100644
+index 000000000..1cf54761f
+--- /dev/null
++++ b/include/dt-bindings/clock/siflower,sf19a2890-periph-crm.h
+@@ -0,0 +1,87 @@
++/* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */
++#ifndef __DT_BINDINGS_CLOCK_SIFLOWER_SF19A2890_PERIPH_CRM_H
++#define __DT_BINDINGS_CLOCK_SIFLOWER_SF19A2890_PERIPH_CRM_H
++
++/* siflower,sf19a2890-gmac-crm */
++#define CLK_GMAC_BUS		0
++#define CLK_GMAC_REG		1
++#define CLK_GMAC_TX_REF		2
++#define CLK_GMAC_TSU		3
++
++#define RST_GMAC		0
++
++/* siflower,sf19a2890-gpio-crm */
++#define CLK_GPIO		0
++
++#define RST_GPIO		0
++
++/* siflower,sf19a2890-i2c-crm */
++#define CLK_I2C			0
++
++#define RST_I2C			0
++
++/* siflower,sf19a2890-pwm-crm */
++#define CLK_PWM			0
++
++#define RST_PWM			0
++
++/* siflower,sf19a2890-rf-crm */
++#define CLK_RF_TEST		0
++#define CLK_RF_AXIS		1
++#define CLK_RF_BOOT		2
++#define CLK_RF_LP		3
++
++#define RST_RF			0
++
++/* siflower,sf19a2890-spi-crm */
++#define CLK_SPI_APB		0
++#define CLK_SPI_SSP		1
++
++#define RST_SPI			0
++
++/* siflower,sf19a2890-timer-crm */
++#define CLK_TIMER		0
++
++#define RST_TIMER		0
++
++/* siflower,sf19a2890-uart-crm */
++#define CLK_UART0_APB		0
++#define CLK_UART1_APB		1
++#define CLK_UART2_APB		2
++#define CLK_UART0		3
++#define CLK_UART1		4
++#define CLK_UART2		5
++
++#define RST_UART0		0
++#define RST_UART1		1
++#define RST_UART2		2
++
++/* siflower,sf19a2890-usb-crm */
++#define CLK_USB			0
++#define CLK_USB_AXIM		1
++#define CLK_USB_PHY_REF		2
++
++#define RST_USB			0
++#define RST_USB_PHY_POR		1
++#define RST_USB_PHY		2
++
++/* siflower,sf19a2890-wdt-crm */
++#define CLK_WDT			0
++
++#define RST_WDT			0
++
++/* siflower,sf19a2890-wlan24-crm */
++#define CLK_WLAN24_AXIS		0
++#define CLK_WLAN24_AXIM		1
++#define CLK_WLAN24_PLF		2
++
++#define RST_WLAN24		0
++
++/* siflower,sf19a2890-wlan5-crm */
++#define CLK_WLAN5_AXIS		0
++#define CLK_WLAN5_AXIM		1
++#define CLK_WLAN5_PLF		2
++
++#define RST_WLAN5		0
++
++#endif /* __DT_BINDINGS_CLOCK_SIFLOWER_SF19A2890_PERIPH_CRM_H */
 -- 
 2.50.1 (Apple Git-155)
 
