@@ -1,4 +1,4 @@
-From c09b98c1dd6267850e8d63f6fc7d970e56fe053f Mon Sep 17 00:00:00 2001
+From 8efe3c00782a317a51cbf1aa2658e4cded7b1e03 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Tue, 27 Oct 2026 22:01:01 -0400
 Subject: [PATCH 2/2] net: dsa: mxl-gsw1xx: reset the switch through
@@ -19,8 +19,8 @@ Get the reset through the reset controller API and pulse it before the
 first register access. The reset core hands a reset-gpios property to
 the reset-gpio driver, so a board that wires the reset this way needs
 CONFIG_RESET_GPIO; without it the reset is skipped. The timing follows
-the vendor driver: asserted for 2 ms, then 100 ms before the switch is
-accessed.
+the vendor's driver for the GSW150: asserted for 250 ms, then 1 s before
+the switch is accessed.
 
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
@@ -79,16 +79,16 @@ index a26f78e1a4..94a7eff5e0 100644
  					       GSW1XX_SWITCH_BASE, 0xfff);
  	if (IS_ERR(priv->gswip.gswip))
 diff --git a/drivers/net/dsa/lantiq/mxl-gsw1xx.h b/drivers/net/dsa/lantiq/mxl-gsw1xx.h
-index 81bc00eabb..684bb135bc 100644
+index 81bc00eabb..bca8e3223c 100644
 --- a/drivers/net/dsa/lantiq/mxl-gsw1xx.h
 +++ b/drivers/net/dsa/lantiq/mxl-gsw1xx.h
 @@ -19,6 +19,10 @@
  
  #define GSW1XX_SYS_CLK_FREQ			340000000
  
-+/* Hardware reset timing, as the vendor driver for the GSW150 does it */
-+#define GSW1XX_RESET_ASSERT_US			2000
-+#define GSW1XX_RESET_DEASSERT_US		100000
++/* Hardware reset timing of the vendor's driver for the GSW150 */
++#define GSW1XX_RESET_ASSERT_US			250000
++#define GSW1XX_RESET_DEASSERT_US		1000000
 +
  /* SMDIO switch register base address */
  #define GSW1XX_SMDIO_BADR			0x1f
