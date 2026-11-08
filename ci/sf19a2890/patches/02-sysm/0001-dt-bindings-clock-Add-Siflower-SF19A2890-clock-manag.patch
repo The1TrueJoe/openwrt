@@ -1,4 +1,4 @@
-From d8be57bc4ba6e85a216bb90dec7dc0152d0960a0 Mon Sep 17 00:00:00 2001
+From 6fb96639f795140a085066c651518152c0bd29c7 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:17:23 -0500
 Subject: [PATCH 1/4] dt-bindings: clock: Add Siflower SF19A2890 clock manager

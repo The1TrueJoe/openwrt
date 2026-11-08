@@ -1,4 +1,4 @@
-From 0cc87293c84ab6de63755111c15379de08a3ca78 Mon Sep 17 00:00:00 2001
+From 6f8007a589250be6f48f46e2a378f3e4ed1e0668 Mon Sep 17 00:00:00 2001
 From: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
 Subject: [PATCH 2/2] gpio: Add Siflower GPIO controller driver
@@ -88,7 +88,7 @@ index 88f748846..bde618108 100644
  obj-$(CONFIG_GPIO_SL28CPLD)		+= gpio-sl28cpld.o
 diff --git a/drivers/gpio/gpio-siflower.c b/drivers/gpio/gpio-siflower.c
 new file mode 100644
-index 000000000..acb2add6a
+index 000000000..35fd0e082
 --- /dev/null
 +++ b/drivers/gpio/gpio-siflower.c
 @@ -0,0 +1,311 @@
@@ -387,7 +387,7 @@ index 000000000..acb2add6a
 +
 +static const struct of_device_id sf_gpio_ids[] = {
 +	{ .compatible = "siflower,sf19a2890-gpio", .data = &sf19a2890_gpio_data },
-+	{},
++	{ }
 +};
 +MODULE_DEVICE_TABLE(of, sf_gpio_ids);
 +

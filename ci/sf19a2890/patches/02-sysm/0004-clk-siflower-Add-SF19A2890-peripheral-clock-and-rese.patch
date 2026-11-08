@@ -1,4 +1,4 @@
-From 00c6ec3eadd00c6e1549a7c0650859fd15d19e94 Mon Sep 17 00:00:00 2001
+From ff333654b124ca28c7323b65528eaca1138d2965 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Wed, 8 Apr 2026 22:17:11 +0800
 Subject: [PATCH 4/4] clk: siflower: Add SF19A2890 peripheral clock and reset
@@ -73,7 +73,7 @@ index 3f4d689f7..c4f4e0b88 100644
 +obj-$(CONFIG_CLK_SF19A2890_PERIPHCRM) += clk-sf19a2890-periphcrm.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890-periphcrm.c b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 new file mode 100644
-index 000000000..f26470e42
+index 000000000..349e0d7ce
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 @@ -0,0 +1,368 @@
@@ -434,7 +434,7 @@ index 000000000..f26470e42
 +	{ .compatible = "siflower,sf19a2890-wdt-crm", .data = &sf19a2890_wdt_crm },
 +	{ .compatible = "siflower,sf19a2890-wlan24-crm", .data = &sf19a2890_wlan24_crm },
 +	{ .compatible = "siflower,sf19a2890-wlan5-crm", .data = &sf19a2890_wlan5_crm },
-+	{ /* sentinel */ },
++	{ /* sentinel */ }
 +};
 +
 +static struct platform_driver sf19a2890_periphcrm_driver = {
