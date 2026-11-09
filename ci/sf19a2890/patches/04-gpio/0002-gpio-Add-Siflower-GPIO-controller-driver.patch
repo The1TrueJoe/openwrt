@@ -1,4 +1,4 @@
-From 6f8007a589250be6f48f46e2a378f3e4ed1e0668 Mon Sep 17 00:00:00 2001
+From bb0cfaedeb13e2ab311d5c35104b7a3cf58a638a Mon Sep 17 00:00:00 2001
 From: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
 Subject: [PATCH 2/2] gpio: Add Siflower GPIO controller driver
@@ -27,7 +27,8 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
   - use readl() and writel() directly, without wrapper functions
   - take the number of lines from the match data, not from an
     ngpios property
-  - include linux/math64.h, sort the includes, spell it "Siflower"
+  - include linux/math64.h, drop the unused linux/pinctrl/consumer.h,
+    sort the includes, spell it "Siflower"
   - subject]
 Co-developed-by: Joseph Telaak <joseph@telaak.dev>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
@@ -35,8 +36,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  MAINTAINERS                  |   1 +
  drivers/gpio/Kconfig         |  12 ++
  drivers/gpio/Makefile        |   1 +
- drivers/gpio/gpio-siflower.c | 311 +++++++++++++++++++++++++++++++++++
- 4 files changed, 325 insertions(+)
+ drivers/gpio/gpio-siflower.c | 310 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 324 insertions(+)
  create mode 100644 drivers/gpio/gpio-siflower.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
@@ -88,10 +89,10 @@ index 88f748846..bde618108 100644
  obj-$(CONFIG_GPIO_SL28CPLD)		+= gpio-sl28cpld.o
 diff --git a/drivers/gpio/gpio-siflower.c b/drivers/gpio/gpio-siflower.c
 new file mode 100644
-index 000000000..35fd0e082
+index 000000000..3fde9a287
 --- /dev/null
 +++ b/drivers/gpio/gpio-siflower.c
-@@ -0,0 +1,311 @@
+@@ -0,0 +1,310 @@
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +/*
 + * GPIO controller driver for Siflower MIPS and RISC-V SoCs including:
@@ -105,7 +106,6 @@ index 000000000..35fd0e082
 +#include <linux/irqchip/chained_irq.h>
 +#include <linux/math64.h>
 +#include <linux/module.h>
-+#include <linux/pinctrl/consumer.h>
 +#include <linux/platform_device.h>
 +#include <linux/property.h>
 +#include <linux/reset.h>
