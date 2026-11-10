@@ -1,0 +1,48 @@
+From eb60fb38c3834f2be354edd8dd5be3dc05440549 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Sun, 1 Nov 2026 21:38:31 -0500
+Subject: [PATCH 05/11] leds: rgb: ktd202x: Keep the unlit colors of a blinking
+ LED off
+
+blink_set() switches every channel of a multicolor LED to the flash
+timer, or to always on when delay_off is 0, including the colors whose
+brightness is 0. Their current register still holds the last brightness
+they had, or the 10 mA default, so for example a red blink set with a
+multi_intensity of "255 0 0" also blinks green and blue.
+
+Leave the channels of the colors with no brightness off, as
+brightness_set() does. A single color LED now passes its brightness too.
+
+Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
+Cc: stable@vger.kernel.org
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ drivers/leds/rgb/leds-ktd202x.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
+index 8af20af0e740..b73d59374172 100644
+--- a/drivers/leds/rgb/leds-ktd202x.c
++++ b/drivers/leds/rgb/leds-ktd202x.c
+@@ -284,6 +284,10 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+ 		int channel = subleds[i].channel;
+ 
+ 		ctrl_mask |= KTD202X_CHANNEL_CTRL_MASK(channel);
++		/* A color with no brightness stays off */
++		if (!subleds[i].brightness)
++			continue;
++
+ 		ctrl_on |= KTD202X_CHANNEL_CTRL_ON(channel);
+ 		ctrl_pwm1 |= KTD202X_CHANNEL_CTRL_PWM1(channel);
+ 	}
+@@ -359,6 +363,7 @@ static int ktd202x_blink_single_set(struct led_classdev *cdev,
+ 	if (!*delay_on)
+ 		return ktd202x_brightness_single_set(cdev, LED_OFF);
+ 
++	info.brightness = cdev->brightness;
+ 	info.channel = led->index;
+ 
+ 	return ktd202x_blink_set(led, delay_on, delay_off, &info, 1);
+-- 
+2.50.1 (Apple Git-155)
+

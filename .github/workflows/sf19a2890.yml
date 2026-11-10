@@ -261,7 +261,9 @@ jobs:
           echo "MAINLINE=$base" >> "$GITHUB_ENV"
           git am -q $P/01-mips/*.patch
           git branch s1
-          for s in 02-sysm 03-pinctrl 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts 09-leds deps-gsw; do
+          # 09-leds-mainline is the LED series as sent, rebased onto mainline:
+          # since v7.4-rc2 the probe allocates with devm_kzalloc_flex().
+          for s in 02-sysm 03-pinctrl 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts 09-leds-mainline deps-gsw; do
             git am -q $P/$s/*.patch && continue
             git am --abort
             # Series for different trees may add MAINTAINERS entries at the
