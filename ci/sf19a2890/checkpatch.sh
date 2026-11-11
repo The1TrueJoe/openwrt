@@ -13,10 +13,8 @@ done
 echo "checkpatch from linux$(cat $cp/localversion-next)"
 
 # series/patch/type/count. FILE_PATH_CHANGES: the new file is covered by
-# an existing entry (drivers/clk/siflower/ from patch 2; LED SUBSYSTEM's
-# Documentation/leds/). ENOTSUPP: the pinconf core requires it.
+# an existing entry (LED SUBSYSTEM's Documentation/leds/). ENOTSUPP: the pinconf core requires it.
 allowed="
-02-sysm/0004/WARNING:FILE_PATH_CHANGES/1
 03-pinctrl/0002/WARNING:ENOTSUPP/2
 09-leds/0008/WARNING:FILE_PATH_CHANGES/1
 "

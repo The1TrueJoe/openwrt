@@ -1,4 +1,4 @@
-From c3b6b3fdbea6055150d43ed4d669c2a26fe907f8 Mon Sep 17 00:00:00 2001
+From 881076f693d1ab97961bdee59a6d0648bb6dc56a Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:22:24 -0500
 Subject: [PATCH 1/2] dt-bindings: phy: Add Siflower SF19A2890 USB 2.0 PHY
@@ -17,7 +17,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 
 diff --git a/Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml b/Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
 new file mode 100644
-index 000000000..77b8e35d8
+index 000000000000..77b8e35d8017
 --- /dev/null
 +++ b/Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
 @@ -0,0 +1,58 @@
@@ -80,7 +80,7 @@ index 000000000..77b8e35d8
 +        #phy-cells = <0>;
 +    };
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 93abbb315..7033d9b61 100644
+index 93abbb315065..7033d9b6152d 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
 @@ -25698,6 +25698,12 @@ N:	sifive

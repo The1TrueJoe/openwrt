@@ -1,4 +1,4 @@
-From 6fb96639f795140a085066c651518152c0bd29c7 Mon Sep 17 00:00:00 2001
+From a27e4823fb1876a0e0cd08e732848e8061a4d4f1 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:17:23 -0500
 Subject: [PATCH 1/4] dt-bindings: clock: Add Siflower SF19A2890 clock manager
@@ -23,7 +23,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 
 diff --git a/Documentation/devicetree/bindings/clock/siflower,sf19a2890-clk.yaml b/Documentation/devicetree/bindings/clock/siflower,sf19a2890-clk.yaml
 new file mode 100644
-index 000000000..9b72f14c2
+index 000000000000..9b72f14c2bd9
 --- /dev/null
 +++ b/Documentation/devicetree/bindings/clock/siflower,sf19a2890-clk.yaml
 @@ -0,0 +1,57 @@
@@ -85,7 +85,7 @@ index 000000000..9b72f14c2
 +        #clock-cells = <1>;
 +    };
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 93abbb315..ce8d05969 100644
+index 93abbb315065..ce8d0596939c 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
 @@ -25698,6 +25698,13 @@ N:	sifive
@@ -104,7 +104,7 @@ index 93abbb315..ce8d05969 100644
  L:	linux-input@vger.kernel.org
 diff --git a/include/dt-bindings/clock/siflower,sf19a2890-clk.h b/include/dt-bindings/clock/siflower,sf19a2890-clk.h
 new file mode 100644
-index 000000000..a9fc9ecf4
+index 000000000000..a9fc9ecf4520
 --- /dev/null
 +++ b/include/dt-bindings/clock/siflower,sf19a2890-clk.h
 @@ -0,0 +1,27 @@

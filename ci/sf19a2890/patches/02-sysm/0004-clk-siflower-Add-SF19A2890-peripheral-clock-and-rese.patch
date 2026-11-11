@@ -1,4 +1,4 @@
-From ff333654b124ca28c7323b65528eaca1138d2965 Mon Sep 17 00:00:00 2001
+From 79428586467ff8aea2436ed331845a4f76d1d709 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Wed, 8 Apr 2026 22:17:11 +0800
 Subject: [PATCH 4/4] clk: siflower: Add SF19A2890 peripheral clock and reset
@@ -38,14 +38,27 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 Co-developed-by: Joseph Telaak <joseph@telaak.dev>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
+ MAINTAINERS                                   |   1 +
  drivers/clk/siflower/Kconfig                  |  11 +
  drivers/clk/siflower/Makefile                 |   1 +
  .../clk/siflower/clk-sf19a2890-periphcrm.c    | 368 ++++++++++++++++++
- 3 files changed, 380 insertions(+)
+ 4 files changed, 381 insertions(+)
  create mode 100644 drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 47a3a72a5d08..34ff7ec0b60e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25704,6 +25704,7 @@ L:	linux-clk@vger.kernel.org
+ S:	Maintained
+ F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-clk.yaml
+ F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-periph-crm.yaml
++F:	drivers/clk/siflower/clk-sf19a2890-periphcrm.c
+ F:	drivers/clk/siflower/clk-sf19a2890.c
+ F:	include/dt-bindings/clock/siflower,sf19a2890-clk.h
+ F:	include/dt-bindings/clock/siflower,sf19a2890-periph-crm.h
 diff --git a/drivers/clk/siflower/Kconfig b/drivers/clk/siflower/Kconfig
-index ad1b04b4b..4fa6dd156 100644
+index ad1b04b4bb9b..4fa6dd156b8a 100644
 --- a/drivers/clk/siflower/Kconfig
 +++ b/drivers/clk/siflower/Kconfig
 @@ -9,3 +9,14 @@ config CLK_SF19A2890
@@ -64,7 +77,7 @@ index ad1b04b4b..4fa6dd156 100644
 +	  its resets and the bus output enable it needs to answer bus
 +	  requests.
 diff --git a/drivers/clk/siflower/Makefile b/drivers/clk/siflower/Makefile
-index 3f4d689f7..c4f4e0b88 100644
+index 3f4d689f7d9b..c4f4e0b8820d 100644
 --- a/drivers/clk/siflower/Makefile
 +++ b/drivers/clk/siflower/Makefile
 @@ -1,2 +1,3 @@
@@ -73,7 +86,7 @@ index 3f4d689f7..c4f4e0b88 100644
 +obj-$(CONFIG_CLK_SF19A2890_PERIPHCRM) += clk-sf19a2890-periphcrm.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890-periphcrm.c b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 new file mode 100644
-index 000000000..349e0d7ce
+index 000000000000..349e0d7ce0c3
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 @@ -0,0 +1,368 @@

@@ -1,4 +1,4 @@
-From af70e2f939e071d0118f83f9c34972a4a7ae61d1 Mon Sep 17 00:00:00 2001
+From 6fe217806712c3c3cf7639ea46fd0acca6c8aa98 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
 Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver
@@ -34,26 +34,26 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  drivers/clk/Makefile                 |   1 +
  drivers/clk/siflower/Kconfig         |  11 +
  drivers/clk/siflower/Makefile        |   2 +
- drivers/clk/siflower/clk-sf19a2890.c | 416 +++++++++++++++++++++++++++
- 6 files changed, 432 insertions(+)
+ drivers/clk/siflower/clk-sf19a2890.c | 419 +++++++++++++++++++++++++++
+ 6 files changed, 435 insertions(+)
  create mode 100644 drivers/clk/siflower/Kconfig
  create mode 100644 drivers/clk/siflower/Makefile
  create mode 100644 drivers/clk/siflower/clk-sf19a2890.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index ce8d05969..b55aa37a7 100644
+index ce8d0596939c..de087d1c255d 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
 @@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
  L:	linux-clk@vger.kernel.org
  S:	Maintained
  F:	Documentation/devicetree/bindings/clock/siflower,sf19a2890-clk.yaml
-+F:	drivers/clk/siflower/
++F:	drivers/clk/siflower/clk-sf19a2890.c
  F:	include/dt-bindings/clock/siflower,sf19a2890-clk.h
  
  SILEAD TOUCHSCREEN DRIVER
 diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 37a8e35d4..8e73490cb 100644
+index 37a8e35d4178..8e73490cb702 100644
 --- a/drivers/clk/Kconfig
 +++ b/drivers/clk/Kconfig
 @@ -536,6 +536,7 @@ source "drivers/clk/renesas/Kconfig"
@@ -65,7 +65,7 @@ index 37a8e35d4..8e73490cb 100644
  source "drivers/clk/sophgo/Kconfig"
  source "drivers/clk/spacemit/Kconfig"
 diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 52d138d4f..d2f075847 100644
+index 52d138d4ffc8..d2f07584783e 100644
 --- a/drivers/clk/Makefile
 +++ b/drivers/clk/Makefile
 @@ -160,6 +160,7 @@ obj-y					+= renesas/
@@ -78,7 +78,7 @@ index 52d138d4f..d2f075847 100644
  obj-y					+= spacemit/
 diff --git a/drivers/clk/siflower/Kconfig b/drivers/clk/siflower/Kconfig
 new file mode 100644
-index 000000000..ad1b04b4b
+index 000000000000..ad1b04b4bb9b
 --- /dev/null
 +++ b/drivers/clk/siflower/Kconfig
 @@ -0,0 +1,11 @@
@@ -95,7 +95,7 @@ index 000000000..ad1b04b4b
 +	  for this SoC needs it built in.
 diff --git a/drivers/clk/siflower/Makefile b/drivers/clk/siflower/Makefile
 new file mode 100644
-index 000000000..3f4d689f7
+index 000000000000..3f4d689f7d9b
 --- /dev/null
 +++ b/drivers/clk/siflower/Makefile
 @@ -0,0 +1,2 @@
@@ -103,10 +103,10 @@ index 000000000..3f4d689f7
 +obj-$(CONFIG_CLK_SF19A2890) += clk-sf19a2890.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890.c b/drivers/clk/siflower/clk-sf19a2890.c
 new file mode 100644
-index 000000000..5e6ded5c1
+index 000000000000..b390f649a6db
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890.c
-@@ -0,0 +1,416 @@
+@@ -0,0 +1,419 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +#define pr_fmt(fmt) "sf19a2890-clk: " fmt
@@ -318,7 +318,8 @@ index 000000000..5e6ded5c1
 +	return parent_rate / div;
 +}
 +
-+static int sf19a28_muxdiv_determine_rate(struct clk_hw *hw, struct clk_rate_request *req)
++static int sf19a28_muxdiv_determine_rate(struct clk_hw *hw,
++					 struct clk_rate_request *req)
 +{
 +	unsigned int div;
 +
@@ -442,7 +443,8 @@ index 000000000..5e6ded5c1
 +static SF19A28_MUXDIV(muxdiv_bus1, 0x0, CLK_IS_CRITICAL);
 +static SF19A28_MUXDIV(muxdiv_bus2, 0x20, CLK_IS_CRITICAL);
 +static SF19A28_MUXDIV(muxdiv_bus3, 0x40, CLK_IS_CRITICAL);
-+static SF19A28_MUXDIV(muxdiv_cpu, 0x100, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT);
++static SF19A28_MUXDIV(muxdiv_cpu, 0x100,
++		      CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT);
 +static SF19A28_MUXDIV(muxdiv_pbus, 0x120, CLK_IS_CRITICAL);
 +static SF19A28_MUXDIV(muxdiv_mem_phy, 0x140, CLK_IS_CRITICAL);
 +static SF19A28_MUXDIV(muxdiv_uart, 0x180, 0);
@@ -509,7 +511,8 @@ index 000000000..5e6ded5c1
 +		}
 +	}
 +
-+	ret = of_clk_add_hw_provider(node, of_clk_hw_onecell_get, &sf19a2890_hw_clks);
++	ret = of_clk_add_hw_provider(node, of_clk_hw_onecell_get,
++				     &sf19a2890_hw_clks);
 +	if (ret) {
 +		pr_err("failed to add the clock provider: %d\n", ret);
 +		goto err;

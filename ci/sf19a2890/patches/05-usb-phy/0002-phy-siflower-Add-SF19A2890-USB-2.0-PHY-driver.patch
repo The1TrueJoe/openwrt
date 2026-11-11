@@ -1,4 +1,4 @@
-From 6ab3d69367093981455decd4b9713ee9a122503f Mon Sep 17 00:00:00 2001
+From 8c138edf26cfcc4ca32c624f00b22289614f5c37 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 9 Sep 2024 10:18:33 +0800
 Subject: [PATCH 2/2] phy: siflower: Add SF19A2890 USB 2.0 PHY driver
@@ -22,26 +22,26 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  drivers/phy/Makefile                     |   1 +
  drivers/phy/siflower/Kconfig             |  12 +++
  drivers/phy/siflower/Makefile            |   2 +
- drivers/phy/siflower/phy-sf19a2890-usb.c | 130 +++++++++++++++++++++++
- 6 files changed, 147 insertions(+)
+ drivers/phy/siflower/phy-sf19a2890-usb.c | 132 +++++++++++++++++++++++
+ 6 files changed, 149 insertions(+)
  create mode 100644 drivers/phy/siflower/Kconfig
  create mode 100644 drivers/phy/siflower/Makefile
  create mode 100644 drivers/phy/siflower/phy-sf19a2890-usb.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 7033d9b61..57f9bb1e3 100644
+index 7033d9b6152d..b9d5cfd3e30b 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
 @@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
  L:	linux-phy@lists.infradead.org
  S:	Maintained
  F:	Documentation/devicetree/bindings/phy/siflower,sf19a2890-usb-phy.yaml
-+F:	drivers/phy/siflower/
++F:	drivers/phy/siflower/phy-sf19a2890-usb.c
  
  SILEAD TOUCHSCREEN DRIVER
  M:	Hans de Goede <hansg@kernel.org>
 diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 105fbe408..8ba351e23 100644
+index 105fbe408aa2..8ba351e23c09 100644
 --- a/drivers/phy/Kconfig
 +++ b/drivers/phy/Kconfig
 @@ -194,6 +194,7 @@ source "drivers/phy/realtek/Kconfig"
@@ -53,7 +53,7 @@ index 105fbe408..8ba351e23 100644
  source "drivers/phy/sophgo/Kconfig"
  source "drivers/phy/spacemit/Kconfig"
 diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index c6dd02003..8c917c4c5 100644
+index c6dd02003bbe..8c917c4c5531 100644
 --- a/drivers/phy/Makefile
 +++ b/drivers/phy/Makefile
 @@ -46,6 +46,7 @@ obj-$(CONFIG_GENERIC_PHY)		+= allwinner/	\
@@ -66,7 +66,7 @@ index c6dd02003..8c917c4c5 100644
  					   spacemit/	\
 diff --git a/drivers/phy/siflower/Kconfig b/drivers/phy/siflower/Kconfig
 new file mode 100644
-index 000000000..5ae1f83d1
+index 000000000000..5ae1f83d1449
 --- /dev/null
 +++ b/drivers/phy/siflower/Kconfig
 @@ -0,0 +1,12 @@
@@ -84,7 +84,7 @@ index 000000000..5ae1f83d1
 +	  Say M or Y if the kernel is to run on this SoC.
 diff --git a/drivers/phy/siflower/Makefile b/drivers/phy/siflower/Makefile
 new file mode 100644
-index 000000000..a12383193
+index 000000000000..a12383193429
 --- /dev/null
 +++ b/drivers/phy/siflower/Makefile
 @@ -0,0 +1,2 @@
@@ -92,10 +92,10 @@ index 000000000..a12383193
 +obj-$(CONFIG_PHY_SF19A2890_USB)	+= phy-sf19a2890-usb.o
 diff --git a/drivers/phy/siflower/phy-sf19a2890-usb.c b/drivers/phy/siflower/phy-sf19a2890-usb.c
 new file mode 100644
-index 000000000..0dfc2f108
+index 000000000000..a7de66e54cba
 --- /dev/null
 +++ b/drivers/phy/siflower/phy-sf19a2890-usb.c
-@@ -0,0 +1,130 @@
+@@ -0,0 +1,132 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +#include <linux/array_size.h>
@@ -124,7 +124,8 @@ index 000000000..0dfc2f108
 +
 +	ret = clk_prepare_enable(p_phy->phy_clk);
 +	if (ret) {
-+		dev_err(p_phy->dev, "failed to enable the PHY clock: %d\n", ret);
++		dev_err(p_phy->dev, "failed to enable the PHY clock: %d\n",
++			ret);
 +		return ret;
 +	}
 +
@@ -200,7 +201,8 @@ index 000000000..0dfc2f108
 +
 +	phy_set_drvdata(phy, p_phy);
 +
-+	provider = devm_of_phy_provider_register(p_phy->dev, of_phy_simple_xlate);
++	provider = devm_of_phy_provider_register(p_phy->dev,
++						 of_phy_simple_xlate);
 +	if (IS_ERR(provider))
 +		return dev_err_probe(p_phy->dev, PTR_ERR(provider),
 +				     "failed to register the PHY provider\n");
