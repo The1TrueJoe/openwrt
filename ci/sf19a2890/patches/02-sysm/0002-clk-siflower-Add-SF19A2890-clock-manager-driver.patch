@@ -1,4 +1,4 @@
-From 6fe217806712c3c3cf7639ea46fd0acca6c8aa98 Mon Sep 17 00:00:00 2001
+From 6e2f48e54e5d164c052c3b1f881ec897e5b6a007 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
 Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver
@@ -103,7 +103,7 @@ index 000000000000..3f4d689f7d9b
 +obj-$(CONFIG_CLK_SF19A2890) += clk-sf19a2890.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890.c b/drivers/clk/siflower/clk-sf19a2890.c
 new file mode 100644
-index 000000000000..b390f649a6db
+index 000000000000..cc3ee5c904a2
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890.c
 @@ -0,0 +1,419 @@
@@ -119,7 +119,7 @@ index 000000000000..b390f649a6db
 +
 +#include <dt-bindings/clock/siflower,sf19a2890-clk.h>
 +
-+#define CLK_SF19A2890_NR_CLKS	(CLK_MUXDIV_NPU_PE_CLK + 1)
++#define CLK_SF19A2890_NR_CLKS	(CLK_MUXDIV_NPU_PE + 1)
 +
 +#define REG_PLL_BASE		0x0
 +#define REG_PLL_PD		0x0
@@ -483,7 +483,7 @@ index 000000000000..b390f649a6db
 +		[CLK_MUXDIV_WLAN5_PLF] = &muxdiv_wlan5_plf.common.hw,
 +		[CLK_MUXDIV_USBPHY_REF] = &muxdiv_usbphy_ref.common.hw,
 +		[CLK_MUXDIV_TCLK] = &muxdiv_tclk.common.hw,
-+		[CLK_MUXDIV_NPU_PE_CLK] = &muxdiv_npu_pe.common.hw,
++		[CLK_MUXDIV_NPU_PE] = &muxdiv_npu_pe.common.hw,
 +	},
 +};
 +

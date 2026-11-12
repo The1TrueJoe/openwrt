@@ -1,4 +1,4 @@
-From e29a1963c21af058cecbba629ff001cfddc4c751 Mon Sep 17 00:00:00 2001
+From b875a8db5b34615d0ddce08b8151027103cb6ba7 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:18:45 -0500
 Subject: [PATCH 3/4] dt-bindings: clock: Add Siflower SF19A2890 peripheral
@@ -14,6 +14,7 @@ manager, since their meaning depends on the manager.
 Based on Chuanhong Guo's binding, which described every block with one
 compatible and its bit layout in properties.
 
+Acked-by: Conor Dooley <conor.dooley@microchip.com>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../clock/siflower,sf19a2890-periph-crm.yaml  | 166 ++++++++++++++++++

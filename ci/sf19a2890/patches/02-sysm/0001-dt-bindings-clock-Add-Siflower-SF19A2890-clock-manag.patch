@@ -1,4 +1,4 @@
-From a27e4823fb1876a0e0cd08e732848e8061a4d4f1 Mon Sep 17 00:00:00 2001
+From 09be1e1a27ecd868de43bdee0ce6406712b93193 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:17:23 -0500
 Subject: [PATCH 1/4] dt-bindings: clock: Add Siflower SF19A2890 clock manager
@@ -8,8 +8,9 @@ the muxes and dividers that derive the bus, CPU and peripheral clocks
 from them. The peripherals' own gates and resets are in separate
 blocks.
 
-The header is Chuanhong Guo's, from his SF19A2890 branch, without the
-count at its end.
+The header is Chuanhong Guo's, from his SF19A2890 branch, and keeps his
+license. It drops the count at its end, and names the NPU clock
+CLK_MUXDIV_NPU_PE, without the _CLK suffix that no other clock has.
 
 Acked-by: Conor Dooley <conor.dooley@microchip.com>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
@@ -104,7 +105,7 @@ index 93abbb315065..ce8d0596939c 100644
  L:	linux-input@vger.kernel.org
 diff --git a/include/dt-bindings/clock/siflower,sf19a2890-clk.h b/include/dt-bindings/clock/siflower,sf19a2890-clk.h
 new file mode 100644
-index 000000000000..a9fc9ecf4520
+index 000000000000..94bbebd0c1cc
 --- /dev/null
 +++ b/include/dt-bindings/clock/siflower,sf19a2890-clk.h
 @@ -0,0 +1,27 @@
@@ -132,7 +133,7 @@ index 000000000000..a9fc9ecf4520
 +#define CLK_MUXDIV_WLAN5_PLF	17
 +#define CLK_MUXDIV_USBPHY_REF	18
 +#define CLK_MUXDIV_TCLK		19
-+#define CLK_MUXDIV_NPU_PE_CLK	20
++#define CLK_MUXDIV_NPU_PE	20
 +
 +#endif /* __DT_BINDINGS_CLOCK_SIFLOWER_SF19A2890_CLK_H */
 -- 
