@@ -6,9 +6,8 @@ set -e
 dir=$1; shift
 series=$(basename "$dir")
 cp=$(mktemp -d)
-url=https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/plain
 for f in scripts/checkpatch.pl scripts/spelling.txt scripts/const_structs.checkpatch localversion-next; do
-	curl -fsSL "$url/$f" -o "$cp/$(basename $f)"
+	"$(dirname "$0")/next-file.sh" $f > "$cp/$(basename $f)"
 done
 echo "checkpatch from linux$(cat $cp/localversion-next)"
 

@@ -131,8 +131,8 @@ jobs:
         working-directory: linux
         run: |
           # linux-next's, like checkpatch: a tree's own copy may predate rule changes
-          s=../dt-check-style; curl -fsSL "$KORG/next/linux-next.git/plain/scripts/dtc/dt-check-style" -o $s
-          echo "dt-check-style from linux$(curl -fsSL "$KORG/next/linux-next.git/plain/localversion-next")"
+          s=../dt-check-style; ../ci-src/ci/sf19a2890/next-file.sh scripts/dtc/dt-check-style > $s
+          echo "dt-check-style from linux$(../ci-src/ci/sf19a2890/next-file.sh localversion-next)"
           new=$(git diff --name-only --diff-filter=A HEAD~$NPATCHES HEAD -- 'Documentation/devicetree/bindings/*.yaml')
           dts=$(git diff --name-only --diff-filter=AM HEAD~$NPATCHES HEAD -- '*.dts' '*.dtsi')
           [ -n "$new$dts" ] || { echo "no new bindings or changed dts"; exit 0; }
@@ -338,8 +338,8 @@ jobs:
           perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/pinctrl/pinctrl-sf19a2890.c
           perl scripts/get_maintainer.pl --no-git --no-git-fallback -f drivers/phy/siflower/phy-sf19a2890-usb.c
           new=$(git diff --name-only --diff-filter=A $MAINLINE HEAD -- 'Documentation/devicetree/bindings/*.yaml')
-          curl -fsSL "$KORG/next/linux-next.git/plain/scripts/dtc/dt-check-style" -o ../dt-check-style
-          echo "dt-check-style from linux$(curl -fsSL "$KORG/next/linux-next.git/plain/localversion-next")"
+          ../ci-src/ci/sf19a2890/next-file.sh scripts/dtc/dt-check-style > ../dt-check-style
+          echo "dt-check-style from linux$(../ci-src/ci/sf19a2890/next-file.sh localversion-next)"
           python3 ../dt-check-style --mode=strict $new
           echo "dt-check-style --mode=strict: clean on" $new
 
