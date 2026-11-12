@@ -17,6 +17,8 @@ permissions:
 
 env:
   KORG: https://git.kernel.org/pub/scm/linux/kernel/git
+  # kernel.org sometimes refuses runner addresses; this mirrors the same trees
+  KMIRROR: https://kernel.googlesource.com/pub/scm/linux/kernel/git
 
 jobs:
   series:
@@ -96,7 +98,8 @@ jobs:
 
       - name: Fetch the tree and apply the series
         run: |
-          git clone -q --depth 1 --branch "${{ matrix.branch }}" "$KORG/${{ matrix.tree }}" linux
+          git clone -q --depth 1 --branch "${{ matrix.branch }}" "$KORG/${{ matrix.tree }}" linux ||
+            { rm -rf linux; echo "::warning::kernel.org unreachable, using its mirror"; git clone -q --depth 1 --branch "${{ matrix.branch }}" "$KMIRROR/${{ matrix.tree }}" linux; }
           cd linux
           echo "base: ${{ matrix.tree }} ${{ matrix.branch }} $(git rev-parse --short=12 HEAD) $(git log -1 --format=%s)"
           git config user.name ci
@@ -251,7 +254,8 @@ jobs:
 
       - name: Fetch mainline and apply everything
         run: |
-          git clone -q --depth 1 "$KORG/torvalds/linux.git" linux
+          git clone -q --depth 1 "$KORG/torvalds/linux.git" linux ||
+            { rm -rf linux; echo "::warning::kernel.org unreachable, using its mirror"; git clone -q --depth 1 "$KMIRROR/torvalds/linux.git" linux; }
           cd linux
           echo "mainline: $(git rev-parse --short=12 HEAD) $(git describe --tags 2>/dev/null || true)"
           git config user.name ci
