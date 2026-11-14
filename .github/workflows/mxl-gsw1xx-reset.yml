@@ -61,7 +61,8 @@ jobs:
 
       - name: Fetch net-next and apply the series
         run: |
-          git clone -q --depth 1 --branch "$NEXT_BRANCH" "$NEXT_URL" linux
+          git clone -q --depth 1 --branch "$NEXT_BRANCH" "$NEXT_URL" linux ||
+            { rm -rf linux; echo "::warning::kernel.org unreachable, using its mirror"; git clone -q --depth 1 --branch "$NEXT_BRANCH" https://kernel.googlesource.com/pub/scm/linux/kernel/git/netdev/net-next linux; }
           cd linux
           git config user.name ci
           git config user.email ci@example.invalid
@@ -119,7 +120,8 @@ jobs:
 
       - name: Fetch net-next and apply the series
         run: |
-          git clone -q --depth 1 --branch "$NEXT_BRANCH" "$NEXT_URL" linux
+          git clone -q --depth 1 --branch "$NEXT_BRANCH" "$NEXT_URL" linux ||
+            { rm -rf linux; echo "::warning::kernel.org unreachable, using its mirror"; git clone -q --depth 1 --branch "$NEXT_BRANCH" https://kernel.googlesource.com/pub/scm/linux/kernel/git/netdev/net-next linux; }
           cd linux
           git config user.name ci
           git config user.email ci@example.invalid
