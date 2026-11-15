@@ -78,6 +78,7 @@ jobs:
           scripts/config -e NET -e NETDEVICES -e PHYLIB -e GPIOLIB -e OF \
             -e NET_DSA -m NET_DSA_MXL_GSW1XX
           make $m olddefconfig >/dev/null
+          echo "imply check: $(grep -E '^CONFIG_(RESET_CONTROLLER|RESET_GPIO|NET_DSA_MXL_GSW1XX)=' .config | tr '\n' ' ')"
           grep -E 'CONFIG_(NET_DSA|NET_DSA_MXL_GSW1XX|GPIOLIB|OF)=' .config || true
           grep -q '^CONFIG_NET_DSA_MXL_GSW1XX=m' .config
           make $m -j"$(nproc)" prepare >/dev/null

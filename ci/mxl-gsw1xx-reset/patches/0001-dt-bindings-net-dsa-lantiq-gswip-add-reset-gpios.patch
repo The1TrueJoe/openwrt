@@ -1,4 +1,4 @@
-From 257b8d1090a09d98e864cb1d03c421305f132ca6 Mon Sep 17 00:00:00 2001
+From 29fcee080e02e9ccd6eb0bbaeab2be74e6b5f8d3 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Tue, 27 Oct 2026 22:00:16 -0400
 Subject: [PATCH 1/2] dt-bindings: net: dsa: lantiq,gswip: add reset-gpios
