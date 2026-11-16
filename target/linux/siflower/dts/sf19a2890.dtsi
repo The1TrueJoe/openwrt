@@ -373,7 +373,7 @@
 			reg = <0x19e0C040 0x60>;
 			clocks = <&usbclk 2>;
 			resets = <&usbrst 1>, <&usbrst 2>;
-			reset-names = "power_on_rst", "usb_phy_rst";
+			reset-names = "por", "phy";
 			#phy-cells = <0>;
 			status = "disabled";
 		};
