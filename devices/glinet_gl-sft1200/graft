@@ -1,0 +1,17 @@
+# <repository> <commit> <path>...
+#
+# The kernel side of the GL-SFT1200 upstream work on OpenWrt main's 6.18: the
+# siflower target, with the device tree, NAND image recipe, board files and
+# the MaxLinear GSW1xx (GSW150) backport from Linux 7.x; the generic 6.18
+# patches, config and in-tree driver files it is built against (25.12's
+# generic/files are 6.12's, and fail on 6.18: rtl8306.c calls the removed
+# phy_driver_register); and the kernel packages, which know 6.18's module
+# paths and have kmod-dsa-mxl-gsw1xx, with gpio-button-hotplug, the one kernel
+# package outside it the board needs, for its reset button; and siwifi, the
+# radios' driver and firmware, which the device recipe installs, with the
+# mac80211 package (cfg80211) it builds against: 25.12's backports are made
+# for 6.12 and fail to compile on 6.18 (pre-6.14 debugfs, SOCK_ASYNC_*), which
+# the earlier releases hid behind IGNORE_ERRORS=m. The commit is
+# 2a2b4ddcb2 with the three Wi-Fi commits of branch siflower-siwifi on top
+# (branch siflower-gl-sft1200-wifi), whose STA and AP were run on an Opal.
+https://github.com/The1TrueJoe/openwrt 52cd63f0066631ca86dd980fdacea2b6c1d1bc9d target/linux/siflower target/linux/generic/backport-6.18 target/linux/generic/pending-6.18 target/linux/generic/hack-6.18 target/linux/generic/config-6.18 target/linux/generic/kernel-6.18 target/linux/generic/files package/kernel/linux package/kernel/gpio-button-hotplug package/kernel/siwifi package/kernel/mac80211

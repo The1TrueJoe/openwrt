@@ -1,0 +1,19 @@
+Kernel packages that link against another package's modules on 6.18: from
+6.13 an external module's Module.symvers line no longer carries its build
+path, so 25.12's collect_module_symvers, which greps by that path, writes an
+empty mac80211.symvers, and kmod-siwifi fails modpost on every cfg80211
+symbol. This is OpenWrt main's include/kernel.mk as of f74bde6bb9 (from
+666fee6f48, "kernel.mk: add 6.18 workaround for empty Module.symvers.tmp"):
+the modules a package built, by modules.order, as well.
+
+--- a/include/kernel.mk
++++ b/include/kernel.mk
+@@ -154,6 +154,8 @@
+ 		grep -F $(PKG_BUILD_DIR) $(PKG_BUILD_DIR)/$$$$subdir/Module.symvers >> $(PKG_BUILD_DIR)/Module.symvers.tmp; \
+ 		[ "$(PKG_BUILD_DIR)" = "$$$$realdir" ] || \
+ 			grep -F $$$$realdir $(PKG_BUILD_DIR)/$$$$subdir/Module.symvers >> $(PKG_BUILD_DIR)/Module.symvers.tmp; \
++		sed 's/\.o$$$$//' $(PKG_BUILD_DIR)/$$$$subdir/modules.order | \
++			grep -Ff - $(PKG_BUILD_DIR)/$$$$subdir/Module.symvers >> $(PKG_BUILD_DIR)/Module.symvers.tmp; \
+ 	done; \
+ 	sort -u $(PKG_BUILD_DIR)/Module.symvers.tmp > $(PKG_BUILD_DIR)/Module.symvers; \
+ 	mkdir -p $(PKG_SYMVERS_DIR); \
