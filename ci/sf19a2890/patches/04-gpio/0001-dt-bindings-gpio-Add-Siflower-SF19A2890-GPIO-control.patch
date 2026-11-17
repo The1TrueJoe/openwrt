@@ -1,4 +1,4 @@
-From 4a3b36f5a010efd693de4f189833744689f212ac Mon Sep 17 00:00:00 2001
+From ca5331809dfbb3b8df574d0ca666e5fd396e95ab Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Wed, 25 Dec 2024 10:37:58 +0800
 Subject: [PATCH 1/2] dt-bindings: gpio: Add Siflower SF19A2890 GPIO controller
@@ -7,7 +7,6 @@ Document the GPIO controller of the Siflower SF19A2890. Siflower's SF21
 RISC-V SoCs have the same controller, and will get compatibles of their
 own with their device trees.
 
-Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 [Joseph Telaak:
   - take it from Chuanhong's siflower-7.1 branch
   - list myself as the binding's maintainer
@@ -17,6 +16,9 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
   - drop the ngpios property, which the compatible implies, take
     exactly four interrupts, and order the properties as in required
   - commit message and subject]
+
+Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
+Reviewed-by: Krzysztof Kozlowski <krzysztof.kozlowski@oss.qualcomm.com>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../gpio/siflower,sf19a2890-gpio.yaml         | 76 +++++++++++++++++++
@@ -26,7 +28,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 
 diff --git a/Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml b/Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml
 new file mode 100644
-index 000000000..830a049ae
+index 000000000000..830a049ae4f5
 --- /dev/null
 +++ b/Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml
 @@ -0,0 +1,76 @@
@@ -107,7 +109,7 @@ index 000000000..830a049ae
 +        #interrupt-cells = <2>;
 +    };
 diff --git a/MAINTAINERS b/MAINTAINERS
-index b5a6dc379..4193b433c 100644
+index b5a6dc379c09..4193b433c915 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
 @@ -25706,6 +25706,12 @@ N:	sifive
