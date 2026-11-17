@@ -1,95 +1,72 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+ * GPIO controller driver for Siflower MIPS and RISC-V SoCs including:
+ *  Siflower SF19A2890
+ *  Siflower SF21A6826
+ *  Siflower SF21H8898
+ */
 
-#include <linux/pinctrl/consumer.h>
+#include <linux/bitops.h>
 #include <linux/clk.h>
 #include <linux/gpio/driver.h>
+#include <linux/gpio/regmap.h>
+#include <linux/irq.h>
+#include <linux/irqchip/chained_irq.h>
+#include <linux/irqdomain.h>
+#include <linux/math64.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/property.h>
+#include <linux/regmap.h>
 #include <linux/reset.h>
-#include <asm/div64.h>
 
-#define GPIO_IR(n)	(0x40 * (n) + 0x00)
-#define GPIO_OR(n)	(0x40 * (n) + 0x04)
-#define GPIO_OEN(n)	(0x40 * (n) + 0x08)
-#define GPIO_IMR(n)	(0x40 * (n) + 0x0c)
-#define GPIO_GPIMR(n)	(0x40 * (n) + 0x10)
-#define GPIO_PIR(n)	(0x40 * (n) + 0x14)
-#define GPIO_ITR(n)	(0x40 * (n) + 0x18)
-#define GPIO_IFR(n)	(0x40 * (n) + 0x1c)
-#define GPIO_ICR(n)	(0x40 * (n) + 0x20)
+/* Each line has its own registers, GPIO_STRIDE apart */
+#define GPIO_STRIDE	0x40
+#define GPIO_IR(n)	(GPIO_STRIDE * (n) + 0x00)
+#define GPIO_OR(n)	(GPIO_STRIDE * (n) + 0x04)
+#define GPIO_OEN(n)	(GPIO_STRIDE * (n) + 0x08)
+#define GPIO_IMR(n)	(GPIO_STRIDE * (n) + 0x0c)
+#define GPIO_GPIMR(n)	(GPIO_STRIDE * (n) + 0x10)
+#define GPIO_PIR(n)	(GPIO_STRIDE * (n) + 0x14)
+#define GPIO_ITR(n)	(GPIO_STRIDE * (n) + 0x18)
+#define GPIO_IFR(n)	(GPIO_STRIDE * (n) + 0x1c)
+#define GPIO_ICR(n)	(GPIO_STRIDE * (n) + 0x20)
 #define GPIO_GPxIR(n)	(0x4 * (n) + 0x4000)
 
 #define GPIOS_PER_GROUP	16
 
+static struct lock_class_key sf_gpio_irq_lock_class;
+static struct lock_class_key sf_gpio_irq_request_class;
+
+struct sf_gpio_soc_data {
+	unsigned int ngpios;
+};
+
 struct sf_gpio_priv {
-	struct gpio_chip gc;
-	void __iomem *base;
+	struct gpio_regmap *gpio;
+	struct regmap *regmap;
+	struct irq_domain *domain;
 	struct clk *clk;
-	struct reset_control *rstc;
+	unsigned int ngroups;
 	unsigned int irq[];
 };
 
-static u32 sf_gpio_rd(struct sf_gpio_priv *priv, unsigned long reg)
+static int sf_gpio_reg_mask_xlate(struct gpio_regmap *gpio,
+				  enum gpio_regmap_operation op,
+				  unsigned int base, unsigned int offset,
+				  unsigned int *reg, unsigned int *mask)
 {
-	return readl_relaxed(priv->base + reg);
-}
-
-static void sf_gpio_wr(struct sf_gpio_priv *priv, unsigned long reg,
-		       u32 val)
-{
-	writel_relaxed(val, priv->base + reg);
-}
-
-static int sf_gpio_get_value(struct gpio_chip *gc, unsigned int offset)
-{
-	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
-
-	return sf_gpio_rd(priv, GPIO_IR(offset));
-}
-
-static int sf_gpio_set_value(struct gpio_chip *gc, unsigned int offset,
-			     int value)
-{
-	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
-
-	sf_gpio_wr(priv, GPIO_OR(offset), value);
+	*reg = base + GPIO_STRIDE * offset;
+	*mask = BIT(0);
 	return 0;
 }
 
-static int sf_gpio_get_direction(struct gpio_chip *gc, unsigned int offset)
-{
-	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
-
-	if (sf_gpio_rd(priv, GPIO_OEN(offset)))
-		return GPIO_LINE_DIRECTION_IN;
-	else
-		return GPIO_LINE_DIRECTION_OUT;
-}
-
-static int sf_gpio_direction_input(struct gpio_chip *gc, unsigned int offset)
-{
-	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
-
-	sf_gpio_wr(priv, GPIO_OEN(offset), 1);
-	return 0;
-}
-
-static int sf_gpio_direction_output(struct gpio_chip *gc, unsigned int offset,
-				    int value)
-{
-	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
-
-	sf_gpio_wr(priv, GPIO_OR(offset), value);
-	sf_gpio_wr(priv, GPIO_OEN(offset), 0);
-	return 0;
-}
-
-static int sf_gpio_set_debounce(struct gpio_chip *gc, unsigned int offset,
+static int sf_gpio_set_debounce(struct sf_gpio_priv *priv, unsigned int offset,
 				u32 debounce)
 {
-	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
 	unsigned long freq = clk_get_rate(priv->clk);
 	u64 mul;
+	int ret;
 
 	/* (ICR + 1) * IFR = debounce_us * clkfreq_mhz / 4 */
 	mul = (u64)debounce * freq;
@@ -97,18 +74,22 @@ static int sf_gpio_set_debounce(struct gpio_chip *gc, unsigned int offset,
 	if (mul > 0xff00)
 		return -EINVAL;
 
-	sf_gpio_wr(priv, GPIO_ICR(offset), 0xff);
-	sf_gpio_wr(priv, GPIO_IFR(offset), DIV_ROUND_UP(mul, 0x100));
+	ret = regmap_write(priv->regmap, GPIO_ICR(offset), 0xff);
+	if (ret)
+		return ret;
 
-	return 0;
+	return regmap_write(priv->regmap, GPIO_IFR(offset),
+			    DIV_ROUND_UP(mul, 0x100));
 }
 
-static int sf_gpio_set_config(struct gpio_chip *gc, unsigned int offset,
-			      unsigned long config)
+static int sf_gpio_set_config(struct gpio_regmap *gpio, struct gpio_chip *gc,
+			      unsigned int offset, unsigned long config)
 {
+	struct sf_gpio_priv *priv = gpio_regmap_get_drvdata(gpio);
+
 	switch (pinconf_to_config_param(config)) {
 	case PIN_CONFIG_INPUT_DEBOUNCE:
-		return sf_gpio_set_debounce(gc, offset,
+		return sf_gpio_set_debounce(priv, offset,
 			pinconf_to_config_argument(config));
 	default:
 		return gpiochip_generic_config(gc, offset, config);
@@ -117,74 +98,36 @@ static int sf_gpio_set_config(struct gpio_chip *gc, unsigned int offset,
 
 static void sf_gpio_irq_ack(struct irq_data *data)
 {
-	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
-	unsigned long offset = irqd_to_hwirq(data);
+	struct sf_gpio_priv *priv = irq_data_get_irq_chip_data(data);
 
-	sf_gpio_wr(priv, GPIO_PIR(offset), 0);
+	regmap_write(priv->regmap, GPIO_PIR(irqd_to_hwirq(data)), 0);
 }
 
 static void sf_gpio_irq_mask(struct irq_data *data)
 {
-	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
-	unsigned long offset = irqd_to_hwirq(data);
+	struct sf_gpio_priv *priv = irq_data_get_irq_chip_data(data);
+	irq_hw_number_t hwirq = irqd_to_hwirq(data);
 
-	sf_gpio_wr(priv, GPIO_IMR(offset), 1);
-	sf_gpio_wr(priv, GPIO_GPIMR(offset), 1);
+	regmap_write(priv->regmap, GPIO_IMR(hwirq), 1);
+	regmap_write(priv->regmap, GPIO_GPIMR(hwirq), 1);
+	gpio_regmap_disable_irq(priv->gpio, hwirq);
 }
 
 static void sf_gpio_irq_unmask(struct irq_data *data)
 {
-	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
-	unsigned long offset = irqd_to_hwirq(data);
+	struct sf_gpio_priv *priv = irq_data_get_irq_chip_data(data);
+	irq_hw_number_t hwirq = irqd_to_hwirq(data);
 
-	sf_gpio_wr(priv, GPIO_IMR(offset), 0);
-	sf_gpio_wr(priv, GPIO_GPIMR(offset), 0);
-}
-
-/* We are actually setting the parents' affinity. */
-static int sf_gpio_irq_set_affinity(struct irq_data *data,
-				    const struct cpumask *dest, bool force)
-{
-	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-	unsigned long offset = irqd_to_hwirq(data);
-	const struct cpumask *pdest;
-	struct irq_desc *pdesc;
-	struct irq_data *pdata;
-	unsigned int group;
-	int ret;
-
-	/* Find the parent IRQ and call its irq_set_affinity */
-	group = offset / GPIOS_PER_GROUP;
-	if (group >= gc->irq.num_parents)
-		return -EINVAL;
-
-	pdesc = irq_to_desc(gc->irq.parents[group]);
-	if (!pdesc)
-		return -EINVAL;
-
-	pdata = irq_desc_get_irq_data(pdesc);
-	if (!pdata->chip->irq_set_affinity)
-		return -EINVAL;
-
-	ret = pdata->chip->irq_set_affinity(pdata, dest, force);
-	if (ret < 0)
-		return ret;
-
-	/* Copy its effective_affinity back */
-	pdest = irq_data_get_effective_affinity_mask(pdata);
-	irq_data_update_effective_affinity(data, pdest);
-	return ret;
+	gpio_regmap_enable_irq(priv->gpio, hwirq);
+	regmap_write(priv->regmap, GPIO_IMR(hwirq), 0);
+	regmap_write(priv->regmap, GPIO_GPIMR(hwirq), 0);
 }
 
 static int sf_gpio_irq_set_type(struct irq_data *data, unsigned int flow_type)
 {
-	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
-	unsigned long offset = irqd_to_hwirq(data);
+	struct sf_gpio_priv *priv = irq_data_get_irq_chip_data(data);
 	u32 val;
+	int ret;
 
 	switch (flow_type) {
 	case IRQ_TYPE_EDGE_RISING:
@@ -205,7 +148,10 @@ static int sf_gpio_irq_set_type(struct irq_data *data, unsigned int flow_type)
 	default:
 		return -EINVAL;
 	}
-	sf_gpio_wr(priv, GPIO_ITR(offset), val);
+
+	ret = regmap_write(priv->regmap, GPIO_ITR(irqd_to_hwirq(data)), val);
+	if (ret)
+		return ret;
 
 	if (flow_type & IRQ_TYPE_LEVEL_MASK)
 		irq_set_handler_locked(data, handle_level_irq);
@@ -215,73 +161,133 @@ static int sf_gpio_irq_set_type(struct irq_data *data, unsigned int flow_type)
 	return 0;
 }
 
+static int sf_gpio_irq_request_resources(struct irq_data *data)
+{
+	struct sf_gpio_priv *priv = irq_data_get_irq_chip_data(data);
+
+	return gpio_regmap_reqres_irq(priv->gpio, irqd_to_hwirq(data));
+}
+
+static void sf_gpio_irq_release_resources(struct irq_data *data)
+{
+	struct sf_gpio_priv *priv = irq_data_get_irq_chip_data(data);
+
+	gpio_regmap_relres_irq(priv->gpio, irqd_to_hwirq(data));
+}
+
 static const struct irq_chip sf_gpio_irqchip = {
 	.name			= KBUILD_MODNAME,
 	.irq_ack		= sf_gpio_irq_ack,
 	.irq_mask		= sf_gpio_irq_mask,
 	.irq_unmask		= sf_gpio_irq_unmask,
-	.irq_set_affinity	= sf_gpio_irq_set_affinity,
 	.irq_set_type		= sf_gpio_irq_set_type,
+	.irq_request_resources	= sf_gpio_irq_request_resources,
+	.irq_release_resources	= sf_gpio_irq_release_resources,
 	.flags			= IRQCHIP_IMMUTABLE,
-	GPIOCHIP_IRQ_RESOURCE_HELPERS,
 };
 
 static void sf_gpio_irq_handler(struct irq_desc *desc)
 {
-	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
+	struct sf_gpio_priv *priv = irq_desc_get_handler_data(desc);
 	struct irq_chip *ic = irq_desc_get_chip(desc);
-	struct sf_gpio_priv *priv = gpiochip_get_data(gc);
 	unsigned int irq = irq_desc_get_irq(desc);
-	unsigned int group = irq - priv->irq[0];
+	unsigned int group, n, val;
 	unsigned long pending;
-	unsigned int n;
+
+	for (group = 0; group < priv->ngroups; group++)
+		if (priv->irq[group] == irq)
+			break;
+	if (WARN_ON_ONCE(group == priv->ngroups))
+		return;
 
 	chained_irq_enter(ic, desc);
 
-	pending = sf_gpio_rd(priv, GPIO_GPxIR(group));
-	for_each_set_bit(n, &pending, GPIOS_PER_GROUP) {
-		generic_handle_domain_irq(gc->irq.domain,
-					  n + group * GPIOS_PER_GROUP);
+	if (!regmap_read(priv->regmap, GPIO_GPxIR(group), &val)) {
+		pending = val;
+		for_each_set_bit(n, &pending, GPIOS_PER_GROUP)
+			generic_handle_domain_irq(priv->domain,
+						  n + group * GPIOS_PER_GROUP);
 	}
 
 	chained_irq_exit(ic, desc);
 }
 
+static int sf_gpio_irq_map(struct irq_domain *domain, unsigned int irq,
+			   irq_hw_number_t hwirq)
+{
+	irq_set_chip_data(irq, domain->host_data);
+	irq_set_chip_and_handler(irq, &sf_gpio_irqchip, handle_bad_irq);
+	irq_set_noprobe(irq);
+	irq_set_lockdep_class(irq, &sf_gpio_irq_lock_class,
+			      &sf_gpio_irq_request_class);
+
+	return 0;
+}
+
+static const struct irq_domain_ops sf_gpio_irq_domain_ops = {
+	.map	= sf_gpio_irq_map,
+	.xlate	= irq_domain_xlate_twocell,
+};
+
+static void sf_gpio_remove_chained_handler(void *data)
+{
+	irq_set_chained_handler_and_data((unsigned long)data, NULL, NULL);
+}
+
+static const struct regmap_config sf_gpio_regmap_config = {
+	.reg_bits	= 32,
+	.reg_stride	= 4,
+	.val_bits	= 32,
+};
+
 static int sf_gpio_probe(struct platform_device *pdev)
 {
+	struct gpio_regmap_config config = { };
+	struct irq_domain_info d_info = { };
 	struct device *dev = &pdev->dev;
+	const struct sf_gpio_soc_data *soc;
+	struct reset_control *rstc;
 	struct sf_gpio_priv *priv;
-	struct gpio_irq_chip *girq;
-	struct gpio_chip *gc;
-	u32 ngpios, ngroups;
-	int ret, i;
+	unsigned int ngroups, i;
+	void __iomem *base;
+	int ret;
 
-	ret = of_property_read_u32(pdev->dev.of_node, "ngpios", &ngpios);
-	if (ret)
-		return ret;
+	soc = device_get_match_data(dev);
+	if (!soc)
+		return -ENODEV;
 
-	ngroups = DIV_ROUND_UP(ngpios, GPIOS_PER_GROUP);
+	ngroups = DIV_ROUND_UP(soc->ngpios, GPIOS_PER_GROUP);
 	priv = devm_kzalloc(dev, struct_size(priv, irq, ngroups), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 
-	platform_set_drvdata(pdev, priv);
+	priv->ngroups = ngroups;
 
-	priv->base = devm_platform_ioremap_resource(pdev, 0);
-	if (IS_ERR(priv->base))
-		return PTR_ERR(priv->base);
+	base = devm_platform_ioremap_resource(pdev, 0);
+	if (IS_ERR(base))
+		return PTR_ERR(base);
+
+	priv->regmap = devm_regmap_init_mmio(dev, base, &sf_gpio_regmap_config);
+	if (IS_ERR(priv->regmap))
+		return PTR_ERR(priv->regmap);
 
 	priv->clk = devm_clk_get_enabled(dev, NULL);
 	if (IS_ERR(priv->clk))
 		return PTR_ERR(priv->clk);
 
-	priv->rstc = devm_reset_control_get_optional(&pdev->dev, NULL);
-	if (IS_ERR(priv->rstc))
-		return PTR_ERR(priv->rstc);
+	rstc = devm_reset_control_get_exclusive_deasserted(dev, NULL);
+	if (IS_ERR(rstc))
+		return PTR_ERR(rstc);
 
-	ret = reset_control_deassert(priv->rstc);
-	if (ret)
-		return ret;
+	d_info.fwnode = dev_fwnode(dev);
+	d_info.size = soc->ngpios;
+	d_info.hwirq_max = soc->ngpios;
+	d_info.ops = &sf_gpio_irq_domain_ops;
+	d_info.host_data = priv;
+
+	priv->domain = devm_irq_domain_instantiate(dev, &d_info);
+	if (IS_ERR(priv->domain))
+		return PTR_ERR(priv->domain);
 
 	for (i = 0; i < ngroups; i++) {
 		ret = platform_get_irq(pdev, i);
@@ -289,54 +295,45 @@ static int sf_gpio_probe(struct platform_device *pdev)
 			return ret;
 
 		priv->irq[i] = ret;
+		irq_set_chained_handler_and_data(priv->irq[i],
+						 sf_gpio_irq_handler, priv);
+		ret = devm_add_action_or_reset(dev,
+					       sf_gpio_remove_chained_handler,
+					       (void *)(unsigned long)priv->irq[i]);
+		if (ret)
+			return ret;
 	}
 
-	gc = &priv->gc;
-	gc->label = KBUILD_MODNAME;
-	gc->parent = dev;
-	gc->owner = THIS_MODULE;
-	gc->request = gpiochip_generic_request;
-	gc->free = gpiochip_generic_free;
-	gc->get_direction = sf_gpio_get_direction;
-	gc->direction_input = sf_gpio_direction_input;
-	gc->direction_output = sf_gpio_direction_output;
-	gc->get = sf_gpio_get_value;
-	gc->set = sf_gpio_set_value;
-	gc->set_config = sf_gpio_set_config;
-	gc->base = -1;
-	gc->ngpio = ngpios;
+	config.parent = dev;
+	config.regmap = priv->regmap;
+	config.ngpio = soc->ngpios;
+	config.reg_dat_base = GPIO_REGMAP_ADDR(GPIO_IR(0));
+	config.reg_set_base = GPIO_OR(0);
+	config.reg_dir_in_base = GPIO_OEN(0);
+	config.reg_mask_xlate = sf_gpio_reg_mask_xlate;
+	config.set_config = sf_gpio_set_config;
+	config.irq_domain = priv->domain;
+	config.drvdata = priv;
 
-	girq = &gc->irq;
-	gpio_irq_chip_set_chip(girq, &sf_gpio_irqchip);
-	girq->num_parents = ngroups;
-	girq->parents = priv->irq;
-	girq->parent_handler = sf_gpio_irq_handler;
-	girq->default_type = IRQ_TYPE_NONE;
-	girq->handler = handle_bad_irq;
+	priv->gpio = devm_gpio_regmap_register(dev, &config);
 
-	platform_set_drvdata(pdev, priv);
-	return devm_gpiochip_add_data(dev, gc, priv);
+	return PTR_ERR_OR_ZERO(priv->gpio);
 }
 
-static void sf_gpio_remove(struct platform_device *pdev)
-{
-	struct sf_gpio_priv *priv = platform_get_drvdata(pdev);
-
-	reset_control_assert(priv->rstc);
-}
+static const struct sf_gpio_soc_data sf19a2890_gpio_data = {
+	.ngpios = 49,
+};
 
 static const struct of_device_id sf_gpio_ids[] = {
-	{ .compatible = "siflower,sf19a2890-gpio" },
-	{},
+	{ .compatible = "siflower,sf19a2890-gpio", .data = &sf19a2890_gpio_data },
+	{ }
 };
 MODULE_DEVICE_TABLE(of, sf_gpio_ids);
 
 static struct platform_driver sf_gpio_driver = {
 	.probe		= sf_gpio_probe,
-	.remove		= sf_gpio_remove,
 	.driver = {
 		.name		= "siflower_gpio",
-		.owner		= THIS_MODULE,
 		.of_match_table	= sf_gpio_ids,
 	},
 };
@@ -344,4 +341,4 @@ module_platform_driver(sf_gpio_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Qingfang Deng <qingfang.deng@siflower.com.cn>");
-MODULE_DESCRIPTION("GPIO driver for SiFlower SoCs");
+MODULE_DESCRIPTION("GPIO driver for Siflower SoCs");
