@@ -14,4 +14,4 @@
 # the earlier releases hid behind IGNORE_ERRORS=m. The commit is
 # 2a2b4ddcb2 with the three Wi-Fi commits of branch siflower-siwifi on top
 # (branch siflower-gl-sft1200-wifi), whose STA and AP were run on an Opal.
-https://github.com/The1TrueJoe/openwrt e0b4187f32717f82b343de2a94df79548b0b2e83 target/linux/siflower target/linux/generic/backport-6.18 target/linux/generic/pending-6.18 target/linux/generic/hack-6.18 target/linux/generic/config-6.18 target/linux/generic/kernel-6.18 target/linux/generic/files package/kernel/linux package/kernel/gpio-button-hotplug package/kernel/siwifi package/kernel/mac80211
+https://github.com/The1TrueJoe/openwrt f57cc9d2ee53f37d07394f2205411492f080a0ce target/linux/siflower target/linux/generic/backport-6.18 target/linux/generic/pending-6.18 target/linux/generic/hack-6.18 target/linux/generic/config-6.18 target/linux/generic/kernel-6.18 target/linux/generic/files package/kernel/linux package/kernel/gpio-button-hotplug package/kernel/siwifi package/kernel/mac80211
