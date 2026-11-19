@@ -3,6 +3,7 @@
 /dts-v1/;
 
 #include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
 #include "sf19a2890.dtsi"
 
 / {
@@ -63,6 +64,33 @@
 		speed = <1000>;
 		full-duplex;
 		pause;
+	};
+};
+
+&i2c {
+	clock-frequency = <400000>;
+	status = "okay";
+
+	led-controller@30 {
+		compatible = "etekmicro,et6326", "kinetic,ktd2026";
+		reg = <0x30>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		/* Each channel drives three LEDs in parallel, D3 is not connected */
+		led@0 {
+			reg = <0>;
+			function = LED_FUNCTION_STATUS;
+			color = <LED_COLOR_ID_BLUE>;
+			led-max-microamp = <1375>;
+		};
+
+		led@1 {
+			reg = <1>;
+			function = LED_FUNCTION_WAN_ONLINE;
+			color = <LED_COLOR_ID_WHITE>;
+			led-max-microamp = <1375>;
+		};
 	};
 };
 
