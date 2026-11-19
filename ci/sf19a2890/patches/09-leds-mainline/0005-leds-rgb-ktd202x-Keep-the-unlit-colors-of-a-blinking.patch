@@ -1,4 +1,4 @@
-From eb60fb38c3834f2be354edd8dd5be3dc05440549 Mon Sep 17 00:00:00 2001
+From 9d97ff3f399991a1eb6d3e5750ee9e3e28dfcac8 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Sun, 1 Nov 2026 21:38:31 -0500
 Subject: [PATCH 05/11] leds: rgb: ktd202x: Keep the unlit colors of a blinking
@@ -17,17 +17,18 @@ Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
 Cc: stable@vger.kernel.org
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- drivers/leds/rgb/leds-ktd202x.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/leds/rgb/leds-ktd202x.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 8af20af0e740..b73d59374172 100644
+index bfc05f5f02d6..ac7ed7552fb2 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
-@@ -284,6 +284,10 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+@@ -285,6 +285,11 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
  		int channel = subleds[i].channel;
  
  		ctrl_mask |= KTD202X_CHANNEL_CTRL_MASK(channel);
++
 +		/* A color with no brightness stays off */
 +		if (!subleds[i].brightness)
 +			continue;
@@ -35,7 +36,7 @@ index 8af20af0e740..b73d59374172 100644
  		ctrl_on |= KTD202X_CHANNEL_CTRL_ON(channel);
  		ctrl_pwm1 |= KTD202X_CHANNEL_CTRL_PWM1(channel);
  	}
-@@ -359,6 +363,7 @@ static int ktd202x_blink_single_set(struct led_classdev *cdev,
+@@ -360,6 +365,7 @@ static int ktd202x_blink_single_set(struct led_classdev *cdev,
  	if (!*delay_on)
  		return ktd202x_brightness_single_set(cdev, LED_OFF);
  

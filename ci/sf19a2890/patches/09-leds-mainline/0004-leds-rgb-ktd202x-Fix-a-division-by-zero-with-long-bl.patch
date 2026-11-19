@@ -1,4 +1,4 @@
-From 29100b17840585eb80bfc1e273ab6ce78dc23b12 Mon Sep 17 00:00:00 2001
+From 85d830b3a0366bd04e126f86d272c5a913729854 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Tue, 27 Oct 2026 00:01:02 -0400
 Subject: [PATCH 04/11] leds: rgb: ktd202x: Fix a division by zero with long
@@ -26,7 +26,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 9e5624aa8245..8af20af0e740 100644
+index 362d231eddcc..bfc05f5f02d6 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -9,10 +9,12 @@
@@ -42,7 +42,7 @@ index 9e5624aa8245..8af20af0e740 100644
  #include <linux/regmap.h>
  #include <linux/regulator/consumer.h>
  
-@@ -296,7 +298,8 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+@@ -297,7 +299,8 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
  	/* Convert into values the HW will understand. */
  
  	/* Integer representation of time of flash period */
@@ -52,14 +52,14 @@ index 9e5624aa8245..8af20af0e740 100644
  	if (delay_total_ms < KTD202X_FLASH_PERIOD_MIN_MS)
  		num_steps = 0;
  	else
-@@ -308,8 +311,8 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+@@ -309,8 +312,8 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
  	 * Integer representation of percentage of LED ON time. A value of 0
  	 * keeps the LED dark, so use the shortest on time instead.
  	 */
 -	on = (*delay_on * KTD202X_FLASH_ON_MAX) / (*delay_on + *delay_off);
--	on = max(on, 1);
+-	on = max(on, KTD202X_FLASH_ON_MIN);
 +	on = mul_u64_u64_div_u64(*delay_on, KTD202X_FLASH_ON_MAX, delay_total_ms);
-+	on = clamp(on, 1, KTD202X_FLASH_ON_MAX - 1);
++	on = clamp(on, KTD202X_FLASH_ON_MIN, KTD202X_FLASH_ON_MAX - 1);
  
  	/* Actually used delay_{on,off} values */
  	delay_total_ms = num_steps * KTD202X_FLASH_PERIOD_STEP_MS + KTD202X_FLASH_PERIOD_MIN_MS;

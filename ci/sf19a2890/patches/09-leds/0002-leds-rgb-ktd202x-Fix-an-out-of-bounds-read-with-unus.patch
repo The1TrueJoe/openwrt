@@ -1,4 +1,4 @@
-From 9f9615ec6845b624a121b7ac7540565b9e7914f9 Mon Sep 17 00:00:00 2001
+From 724e34550beaa9b241d199f32de571e92c9df34b Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:58 -0400
 Subject: [PATCH 02/11] leds: rgb: ktd202x: Fix an out-of-bounds read with
@@ -16,11 +16,11 @@ Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
 Cc: stable@vger.kernel.org
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- drivers/leds/rgb/leds-ktd202x.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/leds/rgb/leds-ktd202x.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 539cf425cdb7..482af28e8370 100644
+index 539cf425cdb7..e7e44d5612a7 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -537,6 +537,7 @@ static int ktd202x_probe(struct i2c_client *client)
@@ -31,13 +31,14 @@ index 539cf425cdb7..482af28e8370 100644
  	int count;
  	int ret;
  
-@@ -544,10 +545,13 @@ static int ktd202x_probe(struct i2c_client *client)
+@@ -544,10 +545,14 @@ static int ktd202x_probe(struct i2c_client *client)
  	if (!count || count > KTD202X_MAX_LEDS)
  		return dev_err_probe(dev, -EINVAL, "Incorrect number of leds (%d)", count);
  
 -	chip = devm_kzalloc(dev, struct_size(chip, leds, count), GFP_KERNEL);
-+	/* Loops over the LEDs go up to the number of channels, not of child nodes */
 +	num_leds = (unsigned long)i2c_get_match_data(client);
++
++	/* Loops over the LEDs go up to the number of channels, not of child nodes */
 +	chip = devm_kzalloc(dev, struct_size(chip, leds, num_leds), GFP_KERNEL);
  	if (!chip)
  		return -ENOMEM;
@@ -46,7 +47,7 @@ index 539cf425cdb7..482af28e8370 100644
  	chip->dev = dev;
  	i2c_set_clientdata(client, chip);
  
-@@ -562,8 +566,6 @@ static int ktd202x_probe(struct i2c_client *client)
+@@ -562,8 +567,6 @@ static int ktd202x_probe(struct i2c_client *client)
  	if (ret)
  		return ret;
  

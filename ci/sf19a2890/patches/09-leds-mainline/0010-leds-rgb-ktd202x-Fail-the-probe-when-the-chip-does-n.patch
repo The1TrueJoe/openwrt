@@ -1,4 +1,4 @@
-From 4ceded388a3fa17d162be680ca9392b2025afb2c Mon Sep 17 00:00:00 2001
+From 7c2e7751c7c1a1d47c0eb82af0b20990ec6590a7 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 10/11] leds: rgb: ktd202x: Fail the probe when the chip does
@@ -19,7 +19,7 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  1 file changed, 11 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index 85b51ee8e3ba..78deb60d0400 100644
+index a95910817e76..c9f1a5234d6e 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
 @@ -738,20 +738,29 @@ static int ktd202x_probe_fw(struct ktd202x *chip)

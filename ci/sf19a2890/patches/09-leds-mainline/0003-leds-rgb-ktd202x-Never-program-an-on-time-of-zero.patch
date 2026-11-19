@@ -1,4 +1,4 @@
-From 4e095d5626c6ec63d8378864446712a8f7187dee Mon Sep 17 00:00:00 2001
+From 2257ef8e201ec63a3253bd68f87d9ee7439a53d6 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:25:12 -0400
 Subject: [PATCH 03/11] leds: rgb: ktd202x: Never program an on time of zero
@@ -14,14 +14,22 @@ report it back.
 Fixes: 0ebdb7210943 ("leds: Add ktd202x driver")
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
- drivers/leds/rgb/leds-ktd202x.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/leds/rgb/leds-ktd202x.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index b17e04d80515..9e5624aa8245 100644
+index e7e44d5612a7..362d231eddcc 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
-@@ -304,8 +304,12 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
+@@ -66,6 +66,7 @@
+ #define KTD202X_FLASH_PERIOD_MIN_MS 256
+ #define KTD202X_FLASH_PERIOD_STEP_MS 128
+ #define KTD202X_FLASH_PERIOD_MAX_STEPS 126
++#define KTD202X_FLASH_ON_MIN 1
+ #define KTD202X_FLASH_ON_MAX 256
+ 
+ #define KTD202X_MAX_BRIGHTNESS 192
+@@ -304,8 +305,12 @@ static int ktd202x_blink_set(struct ktd202x_led *led, unsigned long *delay_on,
  				  (delay_total_ms - KTD202X_FLASH_PERIOD_MIN_MS) /
  				  KTD202X_FLASH_PERIOD_STEP_MS);
  
@@ -31,7 +39,7 @@ index b17e04d80515..9e5624aa8245 100644
 +	 * keeps the LED dark, so use the shortest on time instead.
 +	 */
  	on = (*delay_on * KTD202X_FLASH_ON_MAX) / (*delay_on + *delay_off);
-+	on = max(on, 1);
++	on = max(on, KTD202X_FLASH_ON_MIN);
  
  	/* Actually used delay_{on,off} values */
  	delay_total_ms = num_steps * KTD202X_FLASH_PERIOD_STEP_MS + KTD202X_FLASH_PERIOD_MIN_MS;

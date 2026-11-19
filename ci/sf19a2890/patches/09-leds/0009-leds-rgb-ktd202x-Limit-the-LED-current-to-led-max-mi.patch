@@ -1,4 +1,4 @@
-From f2c8066a886c23949d6f14442edff2ce2fc3368d Mon Sep 17 00:00:00 2001
+From e9b4cb4bbad3aa6afc7712d3bfcb1ebbca49e2d7 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:32 -0400
 Subject: [PATCH 09/11] leds: rgb: ktd202x: Limit the LED current to
@@ -23,10 +23,10 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  1 file changed, 17 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/leds/rgb/leds-ktd202x.c b/drivers/leds/rgb/leds-ktd202x.c
-index daa04f8ecefd..2a3fda860e68 100644
+index ba370c429b04..a95910817e76 100644
 --- a/drivers/leds/rgb/leds-ktd202x.c
 +++ b/drivers/leds/rgb/leds-ktd202x.c
-@@ -78,6 +78,7 @@
+@@ -83,6 +83,7 @@
  #define KTD202X_PATTERN_MAX_MS 16384
  
  #define KTD202X_MAX_BRIGHTNESS 192
@@ -34,7 +34,7 @@ index daa04f8ecefd..2a3fda860e68 100644
  
  static const struct reg_default ktd202x_reg_defaults[] = {
  	{ KTD202X_REG_RESET_CONTROL, KTD202X_TIMER_SLOT_CONTROL_TSLOT1 |
-@@ -408,7 +409,7 @@ static int ktd202x_blink_single_set(struct led_classdev *cdev,
+@@ -411,7 +412,7 @@ static int ktd202x_blink_single_set(struct led_classdev *cdev,
  	int ret;
  
  	if (!cdev->brightness) {

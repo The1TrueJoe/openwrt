@@ -1,13 +1,13 @@
-From 20e5b9ab8a677edb23adee12ef04cbc0b253ab32 Mon Sep 17 00:00:00 2001
+From c77cc528ec4e4050a7bc8ef0ac8f615dde73ff66 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 26 Oct 2026 21:24:31 -0400
 Subject: [PATCH 06/11] dt-bindings: leds: kinetic,ktd202x: Add Etek ET6326
 
 The Etek ET6326 is a 3 channel LED driver with the register map, the I2C
 address and the current steps of the KTD2026. It only differs in the
-flash period, which is (Reg1 + 1) * 128 ms instead of 256 ms + Reg1 *
-128 ms, so a KTD2026 driver runs it with blink periods that are 128 ms
-off. Document it with the KTD2026 as fallback.
+flash period, which is (n + 1) * 128 ms instead of 256 ms + n * 128 ms
+for a period setting of n, so a KTD2026 driver runs it with blink
+periods that are 128 ms off. Document it with the KTD2026 as fallback.
 
 The ET6326 drives the status LED of the GL.iNet GL-SFT1200 (Opal).
 
