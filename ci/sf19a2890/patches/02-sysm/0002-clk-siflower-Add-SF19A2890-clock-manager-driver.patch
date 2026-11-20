@@ -1,12 +1,14 @@
-From 6e2f48e54e5d164c052c3b1f881ec897e5b6a007 Mon Sep 17 00:00:00 2001
+From 8ab609211071479736dc4db2da611ef111e184af Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
 Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver
 
 Add a driver for the clock manager of the Siflower SF19A2890: the CPU,
 DDR and common PLLs, and the muxes with dividers that derive the bus,
-CPU and peripheral clocks from them. The GIC timer needs the CPU clock,
-so the driver registers early, from CLK_OF_DECLARE.
+CPU and peripheral clocks from them. The GIC timer probes before the
+platform bus and needs the CPU clock, so the driver registers that clock
+and its PLLs early, from CLK_OF_DECLARE_DRIVER, and the other clocks from
+a platform driver.
 
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 [Joseph Telaak:
@@ -22,6 +24,10 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
   - scale the fractional part of the VCO rate by the reference, not
     by the integer rate
   - reject a rate of 0 in the mux dividers instead of dividing by it
+  - map the mux values with a table and keep MUXDIV_USE_NCO when
+    setting the parent
+  - register only the CPU clock and its PLLs early, the others from a
+    platform driver
   - pr_fmt, u32 offsets and sorted includes
   - one Kconfig symbol without the menu, depending on
     MACH_SIFLOWER_MIPS
@@ -34,8 +40,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  drivers/clk/Makefile                 |   1 +
  drivers/clk/siflower/Kconfig         |  11 +
  drivers/clk/siflower/Makefile        |   2 +
- drivers/clk/siflower/clk-sf19a2890.c | 419 +++++++++++++++++++++++++++
- 6 files changed, 435 insertions(+)
+ drivers/clk/siflower/clk-sf19a2890.c | 486 +++++++++++++++++++++++++++
+ 6 files changed, 502 insertions(+)
  create mode 100644 drivers/clk/siflower/Kconfig
  create mode 100644 drivers/clk/siflower/Makefile
  create mode 100644 drivers/clk/siflower/clk-sf19a2890.c
@@ -103,19 +109,22 @@ index 000000000000..3f4d689f7d9b
 +obj-$(CONFIG_CLK_SF19A2890) += clk-sf19a2890.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890.c b/drivers/clk/siflower/clk-sf19a2890.c
 new file mode 100644
-index 000000000000..cc3ee5c904a2
+index 000000000000..4dad8f65eb4b
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890.c
-@@ -0,0 +1,419 @@
+@@ -0,0 +1,486 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +#define pr_fmt(fmt) "sf19a2890-clk: " fmt
 +
 +#include <linux/bitfield.h>
 +#include <linux/clk-provider.h>
++#include <linux/device-id/of.h>
 +#include <linux/io.h>
 +#include <linux/math64.h>
 +#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
 +
 +#include <dt-bindings/clock/siflower,sf19a2890-clk.h>
 +
@@ -217,19 +226,16 @@ index 000000000000..cc3ee5c904a2
 +
 +	if (reg_hi == reg_lo) {
 +		u32 mask = (BIT(reg_hi_pos - reg_lo_pos + 1)) - 1;
-+		u32 reg_val =
-+			sf_readl(cmn, priv->offset + REG_PLL_PARAM(reg_hi));
++		u32 reg_val = sf_readl(cmn, priv->offset + REG_PLL_PARAM(reg_hi));
++
 +		return (reg_val >> reg_lo_pos) & mask;
 +	}
 +
-+	ret = sf_readl(cmn, priv->offset + REG_PLL_PARAM(reg_hi)) &
-+	      (BIT(reg_hi_pos + 1) - 1);
++	ret = sf_readl(cmn, priv->offset + REG_PLL_PARAM(reg_hi)) & (BIT(reg_hi_pos + 1) - 1);
 +	for (i = reg_hi - 1; i > reg_lo; i--)
-+		ret = (ret << 8) |
-+		      sf_readl(cmn, priv->offset + REG_PLL_PARAM(i));
++		ret = (ret << 8) | sf_readl(cmn, priv->offset + REG_PLL_PARAM(i));
 +	ret = (ret << (8 - reg_lo_pos)) |
-+	      (sf_readl(cmn, priv->offset + REG_PLL_PARAM(reg_lo)) >>
-+	       reg_lo_pos);
++	      (sf_readl(cmn, priv->offset + REG_PLL_PARAM(reg_lo)) >> reg_lo_pos);
 +
 +	return ret;
 +}
@@ -244,20 +250,18 @@ index 000000000000..cc3ee5c904a2
 +	u32 postdiv1 = sf_pll_param_get(priv, PLL_POSTDIV1_HI, PLL_POSTDIV1_LO);
 +	u32 postdiv2 = sf_pll_param_get(priv, PLL_POSTDIV2_HI, PLL_POSTDIV2_LO);
 +	u32 pll_pd = sf_readl(cmn_priv, priv->offset + REG_PLL_PD);
-+	unsigned long ref;
 +	u64 rate;
 +	u32 frac;
 +
 +	if (!refdiv || !postdiv1 || !postdiv2)
 +		return 0;
 +
-+	ref = parent_rate / refdiv;
-+	rate = (u64)ref * fbdiv;
++	rate = div_u64((u64)parent_rate * fbdiv, refdiv);
 +
-+	/* With the DSM on, the VCO runs at ref * (fbdiv + frac / 2^24) */
++	/* With the DSM on, the VCO runs at parent / refdiv * (fbdiv + frac / 2^24) */
 +	if (!(pll_pd & PLL_PD_DSM)) {
 +		frac = sf_pll_param_get(priv, PLL_FRAC_HI, PLL_FRAC_LO);
-+		rate += ((u64)ref * frac) >> PLL_FRAC_BITS;
++		rate += div_u64((u64)parent_rate * frac, refdiv) >> PLL_FRAC_BITS;
 +	}
 +
 +	return div_u64(rate, postdiv1 * postdiv2);
@@ -271,7 +275,9 @@ index 000000000000..cc3ee5c904a2
 +
 +	if (sf_readl(cmn_priv, priv->offset + REG_PLL_SRC_OVERRIDE))
 +		return 1;
++
 +	cfg = sf_readl(cmn_priv, priv->offset + REG_PLL_CFG);
++
 +	return (FIELD_GET(PLL_CFG_SRC, cfg) == 1);
 +}
 +
@@ -384,33 +390,29 @@ index 000000000000..cc3ee5c904a2
 +	return !!sf_readl(cmn_priv, priv->offset + REG_MUXDIV_EN);
 +}
 +
++/* MUXDIV_SRC_SEL values of clk_muxdiv_parents */
++static const u32 sf19a28_muxdiv_table[] = { 0, 1, 2, 4, 6 };
++
 +static u8 sf19a28_muxdiv_get_parent(struct clk_hw *hw)
 +{
 +	struct sf_clk_common *cmn_priv = hw_to_sf_clk_common(hw);
 +	struct sf19a2890_clk *priv = cmn_to_clk(cmn_priv);
 +	u32 cfg = sf_readl(cmn_priv, priv->offset + REG_MUXDIV_CFG);
-+	u32 src = FIELD_GET(MUXDIV_SRC_SEL, cfg);
 +
-+	if (src <= 2)
-+		return src;
-+	if (src == 4)
-+		return 3;
-+	return 4;
++	return clk_mux_val_to_index(hw, sf19a28_muxdiv_table, 0, FIELD_GET(MUXDIV_SRC_SEL, cfg));
 +}
 +
 +static int sf19a28_muxdiv_set_parent(struct clk_hw *hw, u8 index)
 +{
 +	struct sf_clk_common *cmn_priv = hw_to_sf_clk_common(hw);
 +	struct sf19a2890_clk *priv = cmn_to_clk(cmn_priv);
-+	u32 src;
++	u32 cfg = sf_readl(cmn_priv, priv->offset + REG_MUXDIV_CFG);
 +
-+	if (index <= 2)
-+		src = index;
-+	else if (index == 3)
-+		src = 4;
-+	else
-+		src = 6;
-+	sf_writel(cmn_priv, priv->offset + REG_MUXDIV_CFG, src);
++	/* Keep MUXDIV_USE_NCO */
++	cfg &= ~MUXDIV_SRC_SEL;
++	cfg |= FIELD_PREP(MUXDIV_SRC_SEL, clk_mux_index_to_val(sf19a28_muxdiv_table, 0, index));
++	sf_writel(cmn_priv, priv->offset + REG_MUXDIV_CFG, cfg);
++
 +	return 0;
 +}
 +
@@ -443,8 +445,7 @@ index 000000000000..cc3ee5c904a2
 +static SF19A28_MUXDIV(muxdiv_bus1, 0x0, CLK_IS_CRITICAL);
 +static SF19A28_MUXDIV(muxdiv_bus2, 0x20, CLK_IS_CRITICAL);
 +static SF19A28_MUXDIV(muxdiv_bus3, 0x40, CLK_IS_CRITICAL);
-+static SF19A28_MUXDIV(muxdiv_cpu, 0x100,
-+		      CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT);
++static SF19A28_MUXDIV(muxdiv_cpu, 0x100, CLK_SET_RATE_NO_REPARENT);
 +static SF19A28_MUXDIV(muxdiv_pbus, 0x120, CLK_IS_CRITICAL);
 +static SF19A28_MUXDIV(muxdiv_mem_phy, 0x140, CLK_IS_CRITICAL);
 +static SF19A28_MUXDIV(muxdiv_uart, 0x180, 0);
@@ -460,72 +461,144 @@ index 000000000000..cc3ee5c904a2
 +static SF19A28_MUXDIV(muxdiv_tclk, 0x320, 0);
 +static SF19A28_MUXDIV(muxdiv_npu_pe, 0x340, 0);
 +
-+static struct clk_hw_onecell_data sf19a2890_hw_clks = {
-+	.num = CLK_SF19A2890_NR_CLKS,
-+	.hws = {
-+		[CLK_PLL_CPU] = &pll_cpu.common.hw,
-+		[CLK_PLL_DDR] = &pll_ddr.common.hw,
-+		[CLK_PLL_CMN] = &pll_cmn.common.hw,
-+		[CLK_MUXDIV_BUS1] = &muxdiv_bus1.common.hw,
-+		[CLK_MUXDIV_BUS2] = &muxdiv_bus2.common.hw,
-+		[CLK_MUXDIV_BUS3] = &muxdiv_bus3.common.hw,
-+		[CLK_MUXDIV_CPU] = &muxdiv_cpu.common.hw,
-+		[CLK_MUXDIV_PBUS] = &muxdiv_pbus.common.hw,
-+		[CLK_MUXDIV_MEM_PHY] = &muxdiv_mem_phy.common.hw,
-+		[CLK_MUXDIV_UART] = &muxdiv_uart.common.hw,
-+		[CLK_MUXDIV_ETH_REF] = &muxdiv_eth_ref.common.hw,
-+		[CLK_MUXDIV_ETH_BYP_REF] = &muxdiv_eth_byp_ref.common.hw,
-+		[CLK_MUXDIV_ETH_TSU] = &muxdiv_eth_tsu.common.hw,
-+		[CLK_MUXDIV_GMAC_BYP_REF] = &muxdiv_gmac_byp_ref.common.hw,
-+		[CLK_MUXDIV_M6250_0] = &muxdiv_m6250_0.common.hw,
-+		[CLK_MUXDIV_M6250_1] = &muxdiv_m6250_1.common.hw,
-+		[CLK_MUXDIV_WLAN24_PLF] = &muxdiv_wlan24_plf.common.hw,
-+		[CLK_MUXDIV_WLAN5_PLF] = &muxdiv_wlan5_plf.common.hw,
-+		[CLK_MUXDIV_USBPHY_REF] = &muxdiv_usbphy_ref.common.hw,
-+		[CLK_MUXDIV_TCLK] = &muxdiv_tclk.common.hw,
-+		[CLK_MUXDIV_NPU_PE] = &muxdiv_npu_pe.common.hw,
-+	},
++static struct clk_hw *const sf19a2890_hws[CLK_SF19A2890_NR_CLKS] = {
++	[CLK_PLL_CPU] = &pll_cpu.common.hw,
++	[CLK_PLL_DDR] = &pll_ddr.common.hw,
++	[CLK_PLL_CMN] = &pll_cmn.common.hw,
++	[CLK_MUXDIV_BUS1] = &muxdiv_bus1.common.hw,
++	[CLK_MUXDIV_BUS2] = &muxdiv_bus2.common.hw,
++	[CLK_MUXDIV_BUS3] = &muxdiv_bus3.common.hw,
++	[CLK_MUXDIV_CPU] = &muxdiv_cpu.common.hw,
++	[CLK_MUXDIV_PBUS] = &muxdiv_pbus.common.hw,
++	[CLK_MUXDIV_MEM_PHY] = &muxdiv_mem_phy.common.hw,
++	[CLK_MUXDIV_UART] = &muxdiv_uart.common.hw,
++	[CLK_MUXDIV_ETH_REF] = &muxdiv_eth_ref.common.hw,
++	[CLK_MUXDIV_ETH_BYP_REF] = &muxdiv_eth_byp_ref.common.hw,
++	[CLK_MUXDIV_ETH_TSU] = &muxdiv_eth_tsu.common.hw,
++	[CLK_MUXDIV_GMAC_BYP_REF] = &muxdiv_gmac_byp_ref.common.hw,
++	[CLK_MUXDIV_M6250_0] = &muxdiv_m6250_0.common.hw,
++	[CLK_MUXDIV_M6250_1] = &muxdiv_m6250_1.common.hw,
++	[CLK_MUXDIV_WLAN24_PLF] = &muxdiv_wlan24_plf.common.hw,
++	[CLK_MUXDIV_WLAN5_PLF] = &muxdiv_wlan5_plf.common.hw,
++	[CLK_MUXDIV_USBPHY_REF] = &muxdiv_usbphy_ref.common.hw,
++	[CLK_MUXDIV_TCLK] = &muxdiv_tclk.common.hw,
++	[CLK_MUXDIV_NPU_PE] = &muxdiv_npu_pe.common.hw,
 +};
 +
-+static void __init sf19a2890_clk_init(struct device_node *node)
++/*
++ * The MIPS GIC timer runs from the CPU clock and probes from
++ * TIMER_OF_DECLARE() in time_init(), before the platform bus. Register that
++ * clock and the PLLs it may run from early, and the others at probe.
++ */
++static const unsigned int sf19a2890_early_clks[] __initconst = {
++	CLK_PLL_CPU,
++	CLK_PLL_DDR,
++	CLK_PLL_CMN,
++	CLK_MUXDIV_CPU,
++};
++
++static struct clk_hw_onecell_data *sf19a2890_clk_data;
++static void __iomem *sf19a2890_clk_base;
++
++static void __init sf19a2890_clk_early_init(struct device_node *node)
 +{
++	struct clk_hw_onecell_data *data;
 +	void __iomem *base;
-+	int i, ret;
++	unsigned int i;
++	int ret;
++
++	data = kzalloc_flex(*data, hws, CLK_SF19A2890_NR_CLKS);
++	if (!data)
++		return;
++
++	data->num = CLK_SF19A2890_NR_CLKS;
++	/* The clocks registered at probe defer until then */
++	for (i = 0; i < data->num; i++)
++		data->hws[i] = ERR_PTR(-EPROBE_DEFER);
 +
 +	base = of_iomap(node, 0);
 +	if (!base) {
 +		pr_err("failed to map the registers\n");
-+		return;
++		goto err_free;
 +	}
 +
-+	for (i = 0; i < sf19a2890_hw_clks.num; i++) {
-+		struct clk_hw *hw = sf19a2890_hw_clks.hws[i];
++	for (i = 0; i < ARRAY_SIZE(sf19a2890_early_clks); i++) {
++		unsigned int id = sf19a2890_early_clks[i];
++		struct clk_hw *hw = sf19a2890_hws[id];
 +
-+		if (!hw)
-+			continue;
 +		hw_to_sf_clk_common(hw)->base = base;
 +		ret = of_clk_hw_register(node, hw);
 +		if (ret) {
-+			pr_err("failed to register clock %d: %d\n", i, ret);
-+			goto err;
++			pr_err("failed to register clock %u: %d\n", id, ret);
++			goto err_unregister;
 +		}
++		data->hws[id] = hw;
 +	}
 +
-+	ret = of_clk_add_hw_provider(node, of_clk_hw_onecell_get,
-+				     &sf19a2890_hw_clks);
++	ret = of_clk_add_hw_provider(node, of_clk_hw_onecell_get, data);
 +	if (ret) {
 +		pr_err("failed to add the clock provider: %d\n", ret);
-+		goto err;
++		goto err_unregister;
 +	}
++
++	sf19a2890_clk_data = data;
++	sf19a2890_clk_base = base;
 +	return;
-+err:
-+	while (--i >= 0)
-+		if (sf19a2890_hw_clks.hws[i])
-+			clk_hw_unregister(sf19a2890_hw_clks.hws[i]);
++
++err_unregister:
++	while (i--)
++		clk_hw_unregister(data->hws[sf19a2890_early_clks[i]]);
 +	iounmap(base);
++err_free:
++	kfree(data);
 +}
 +
-+CLK_OF_DECLARE(sf19a2890_clk, "siflower,sf19a2890-clk", sf19a2890_clk_init);
++CLK_OF_DECLARE_DRIVER(sf19a2890_clk, "siflower,sf19a2890-clk", sf19a2890_clk_early_init);
++
++static int sf19a2890_clk_probe(struct platform_device *pdev)
++{
++	struct clk_hw_onecell_data *data = sf19a2890_clk_data;
++	struct device *dev = &pdev->dev;
++	unsigned int i;
++	int ret;
++
++	if (!data)
++		return -ENODEV;
++
++	for (i = 0; i < data->num; i++) {
++		struct clk_hw *hw = sf19a2890_hws[i];
++
++		/* Registered early */
++		if (!IS_ERR(data->hws[i]))
++			continue;
++
++		hw_to_sf_clk_common(hw)->base = sf19a2890_clk_base;
++		ret = devm_clk_hw_register(dev, hw);
++		if (ret)
++			return dev_err_probe(dev, ret, "failed to register clock %u\n", i);
++	}
++
++	/* Hand out the clocks only once they are all registered */
++	for (i = 0; i < data->num; i++)
++		data->hws[i] = sf19a2890_hws[i];
++
++	return 0;
++}
++
++static const struct of_device_id sf19a2890_clk_dt_ids[] = {
++	{ .compatible = "siflower,sf19a2890-clk" },
++	{ /* sentinel */ }
++};
++
++static struct platform_driver sf19a2890_clk_driver = {
++	.probe	= sf19a2890_clk_probe,
++	.driver = {
++		.name			= "sf19a2890-clk",
++		.of_match_table		= sf19a2890_clk_dt_ids,
++		.suppress_bind_attrs	= true,
++	},
++};
++builtin_platform_driver(sf19a2890_clk_driver);
 -- 
 2.50.1 (Apple Git-155)
 
