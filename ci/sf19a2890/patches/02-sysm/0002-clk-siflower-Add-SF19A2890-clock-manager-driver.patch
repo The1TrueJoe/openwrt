@@ -1,4 +1,4 @@
-From 8ab609211071479736dc4db2da611ef111e184af Mon Sep 17 00:00:00 2001
+From 079f12e0c02add757ceda566c510d4a485910cbe Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
 Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver
@@ -40,8 +40,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  drivers/clk/Makefile                 |   1 +
  drivers/clk/siflower/Kconfig         |  11 +
  drivers/clk/siflower/Makefile        |   2 +
- drivers/clk/siflower/clk-sf19a2890.c | 486 +++++++++++++++++++++++++++
- 6 files changed, 502 insertions(+)
+ drivers/clk/siflower/clk-sf19a2890.c | 496 +++++++++++++++++++++++++++
+ 6 files changed, 512 insertions(+)
  create mode 100644 drivers/clk/siflower/Kconfig
  create mode 100644 drivers/clk/siflower/Makefile
  create mode 100644 drivers/clk/siflower/clk-sf19a2890.c
@@ -109,10 +109,10 @@ index 000000000000..3f4d689f7d9b
 +obj-$(CONFIG_CLK_SF19A2890) += clk-sf19a2890.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890.c b/drivers/clk/siflower/clk-sf19a2890.c
 new file mode 100644
-index 000000000000..4dad8f65eb4b
+index 000000000000..b184407e861d
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890.c
-@@ -0,0 +1,486 @@
+@@ -0,0 +1,496 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +#define pr_fmt(fmt) "sf19a2890-clk: " fmt
@@ -557,32 +557,42 @@ index 000000000000..4dad8f65eb4b
 +
 +static int sf19a2890_clk_probe(struct platform_device *pdev)
 +{
-+	struct clk_hw_onecell_data *data = sf19a2890_clk_data;
++	struct clk_hw_onecell_data *early = sf19a2890_clk_data;
 +	struct device *dev = &pdev->dev;
++	struct clk_hw_onecell_data *data;
 +	unsigned int i;
 +	int ret;
 +
-+	if (!data)
++	if (!early)
 +		return -ENODEV;
++
++	data = devm_kzalloc_flex(dev, *data, hws, CLK_SF19A2890_NR_CLKS);
++	if (!data)
++		return -ENOMEM;
++
++	data->num = CLK_SF19A2890_NR_CLKS;
 +
 +	for (i = 0; i < data->num; i++) {
 +		struct clk_hw *hw = sf19a2890_hws[i];
 +
-+		/* Registered early */
-+		if (!IS_ERR(data->hws[i]))
++		/* Registered early, so the early provider hands it out */
++		if (!IS_ERR(early->hws[i])) {
++			data->hws[i] = ERR_PTR(-ENOENT);
 +			continue;
++		}
 +
 +		hw_to_sf_clk_common(hw)->base = sf19a2890_clk_base;
 +		ret = devm_clk_hw_register(dev, hw);
 +		if (ret)
 +			return dev_err_probe(dev, ret, "failed to register clock %u\n", i);
++		data->hws[i] = hw;
 +	}
 +
-+	/* Hand out the clocks only once they are all registered */
-+	for (i = 0; i < data->num; i++)
-+		data->hws[i] = sf19a2890_hws[i];
-+
-+	return 0;
++	/*
++	 * Add a second provider for these clocks. It is looked up before the
++	 * early one, and adding it reparents any clocks orphaned on them.
++	 */
++	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get, data);
 +}
 +
 +static const struct of_device_id sf19a2890_clk_dt_ids[] = {
