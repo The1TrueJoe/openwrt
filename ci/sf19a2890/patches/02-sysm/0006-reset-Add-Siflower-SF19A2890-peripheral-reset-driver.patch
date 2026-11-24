@@ -1,4 +1,4 @@
-From 567c5ef94c4e6106a4c029e5a35c94f63757d324 Mon Sep 17 00:00:00 2001
+From f4376c088e7656954283d1e0c2db88858c4d05fc Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 23 Nov 2026 19:04:32 -0500
 Subject: [PATCH 6/6] reset: Add Siflower SF19A2890 peripheral reset driver

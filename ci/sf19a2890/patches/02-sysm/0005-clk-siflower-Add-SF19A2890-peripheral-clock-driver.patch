@@ -1,4 +1,4 @@
-From c960feb582fd342ab5d708b2fc6a10cd83d4b98e Mon Sep 17 00:00:00 2001
+From eea07b12cfaf7edcb2aa8583eb594e82f857ae5c Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Wed, 8 Apr 2026 22:17:11 +0800
 Subject: [PATCH 5/6] clk: siflower: Add SF19A2890 peripheral clock driver
@@ -19,10 +19,10 @@ Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  MAINTAINERS                                   |   1 +
- drivers/clk/siflower/Kconfig                  |  11 +
+ drivers/clk/siflower/Kconfig                  |  12 +
  drivers/clk/siflower/Makefile                 |   1 +
  .../clk/siflower/clk-sf19a2890-periphcrm.c    | 287 ++++++++++++++++++
- 4 files changed, 300 insertions(+)
+ 4 files changed, 301 insertions(+)
  create mode 100644 drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
@@ -38,10 +38,10 @@ index 47a3a72a5d08..34ff7ec0b60e 100644
  F:	include/dt-bindings/clock/siflower,sf19a2890-clk.h
  F:	include/dt-bindings/clock/siflower,sf19a2890-periph-crm.h
 diff --git a/drivers/clk/siflower/Kconfig b/drivers/clk/siflower/Kconfig
-index ad1b04b4bb9b..1073f9f4377c 100644
+index ad1b04b4bb9b..fa09bca275b4 100644
 --- a/drivers/clk/siflower/Kconfig
 +++ b/drivers/clk/siflower/Kconfig
-@@ -9,3 +9,14 @@ config CLK_SF19A2890
+@@ -9,3 +9,15 @@ config CLK_SF19A2890
  	  and the muxes and dividers that feed the CPU, the buses and the
  	  peripherals. The GIC timer runs from the CPU clock, so a kernel
  	  for this SoC needs it built in.
@@ -51,6 +51,7 @@ index ad1b04b4bb9b..1073f9f4377c 100644
 +	depends on MACH_SIFLOWER_MIPS || COMPILE_TEST
 +	default MACH_SIFLOWER_MIPS
 +	select AUXILIARY_BUS
++	select RESET_CONTROLLER
 +	help
 +	  Supports the clocks of the peripheral clock and reset managers of
 +	  the Siflower SF19A2890. Each peripheral block has one, with its
