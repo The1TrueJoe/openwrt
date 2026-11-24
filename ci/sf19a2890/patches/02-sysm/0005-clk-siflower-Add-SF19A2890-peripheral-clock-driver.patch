@@ -1,4 +1,4 @@
-From eea07b12cfaf7edcb2aa8583eb594e82f857ae5c Mon Sep 17 00:00:00 2001
+From bef555bc019dd92d98c564ba8db952995ce678f4 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Wed, 8 Apr 2026 22:17:11 +0800
 Subject: [PATCH 5/6] clk: siflower: Add SF19A2890 peripheral clock driver
@@ -21,8 +21,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  MAINTAINERS                                   |   1 +
  drivers/clk/siflower/Kconfig                  |  12 +
  drivers/clk/siflower/Makefile                 |   1 +
- .../clk/siflower/clk-sf19a2890-periphcrm.c    | 287 ++++++++++++++++++
- 4 files changed, 301 insertions(+)
+ .../clk/siflower/clk-sf19a2890-periphcrm.c    | 306 ++++++++++++++++++
+ 4 files changed, 320 insertions(+)
  create mode 100644 drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
@@ -67,10 +67,10 @@ index 3f4d689f7d9b..c4f4e0b8820d 100644
 +obj-$(CONFIG_CLK_SF19A2890_PERIPHCRM) += clk-sf19a2890-periphcrm.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890-periphcrm.c b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 new file mode 100644
-index 000000000000..07106aec7d0f
+index 000000000000..95b3c6927067
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
-@@ -0,0 +1,287 @@
+@@ -0,0 +1,306 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +/*
@@ -88,6 +88,7 @@ index 000000000000..07106aec7d0f
 +#include <linux/auxiliary_bus.h>
 +#include <linux/clk-provider.h>
 +#include <linux/device-id/of.h>
++#include <linux/idr.h>
 +#include <linux/io.h>
 +#include <linux/platform_device.h>
 +#include <linux/slab.h>
@@ -258,6 +259,13 @@ index 000000000000..07106aec7d0f
 +SINGLE_CRM(wdt);
 +SINGLE_CRM(gpio);
 +
++static DEFINE_IDA(sf19a2890_periphcrm_ida);
++
++static void sf19a2890_periphcrm_ida_free(void *data)
++{
++	ida_free(&sf19a2890_periphcrm_ida, (uintptr_t)data);
++}
++
 +static int sf19a2890_periphcrm_probe(struct platform_device *pdev)
 +{
 +	const struct sf19a2890_periphcrm_data *data;
@@ -267,7 +275,7 @@ index 000000000000..07106aec7d0f
 +	struct sf19a2890_periphcrm *crm;
 +	u32 valid_gates = 0;
 +	unsigned int i;
-+	int ret;
++	int ret, id;
 +	u32 reg;
 +
 +	data = device_get_match_data(dev);
@@ -327,7 +335,18 @@ index 000000000000..07106aec7d0f
 +	if (ret)
 +		return ret;
 +
-+	adev = devm_auxiliary_device_create(dev, "reset", (void __force *)crm->base);
++	/* Each block gets a reset device of its own, so they need distinct IDs */
++	id = ida_alloc(&sf19a2890_periphcrm_ida, GFP_KERNEL);
++	if (id < 0)
++		return id;
++
++	ret = devm_add_action_or_reset(dev, sf19a2890_periphcrm_ida_free,
++				       (void *)(uintptr_t)id);
++	if (ret)
++		return ret;
++
++	adev = __devm_auxiliary_device_create(dev, KBUILD_MODNAME, "reset",
++					      (void __force *)crm->base, id);
 +	if (!adev)
 +		return dev_err_probe(dev, -ENODEV, "failed to create the reset device\n");
 +
