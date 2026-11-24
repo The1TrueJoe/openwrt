@@ -1,7 +1,7 @@
-From 079f12e0c02add757ceda566c510d4a485910cbe Mon Sep 17 00:00:00 2001
-From: Chuanhong Guo <gch981213@gmail.com>
+From 65d8a25fdfc7cc735c10480caa5748789d726abb Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
 Date: Thu, 21 Nov 2024 18:06:34 +0800
-Subject: [PATCH 2/4] clk: siflower: Add SF19A2890 clock manager driver
+Subject: [PATCH 3/6] clk: siflower: Add SF19A2890 clock manager driver
 
 Add a driver for the clock manager of the Siflower SF19A2890: the CPU,
 DDR and common PLLs, and the muxes with dividers that derive the bus,
@@ -10,29 +10,11 @@ platform bus and needs the CPU clock, so the driver registers that clock
 and its PLLs early, from CLK_OF_DECLARE_DRIVER, and the other clocks from
 a platform driver.
 
+Based on the driver in Chuanhong Guo's SF19A2890 branch.
+
+Link: https://github.com/981213/linux/commit/0466d6303c25
+Co-developed-by: Chuanhong Guo <gch981213@gmail.com>
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[Joseph Telaak:
-  - take it from Chuanhong's siflower-7.1 branch
-  - read the PLL power-down register at the PLL's offset, not at
-    offset 1
-  - take the oscillators from the node's clocks and the PLLs by
-    pointer, not by global name
-  - count the clocks in the driver, not in the binding header
-  - drop the spinlock and sf_rmw(), which nothing used
-  - unregister the clocks and unmap on errors
-  - return 0 for a zero divider and compute the VCO rate in 64 bits
-  - scale the fractional part of the VCO rate by the reference, not
-    by the integer rate
-  - reject a rate of 0 in the mux dividers instead of dividing by it
-  - map the mux values with a table and keep MUXDIV_USE_NCO when
-    setting the parent
-  - register only the CPU clock and its PLLs early, the others from a
-    platform driver
-  - pr_fmt, u32 offsets and sorted includes
-  - one Kconfig symbol without the menu, depending on
-    MACH_SIFLOWER_MIPS
-  - checkpatch --strict cleanups, commit message and subject]
-Co-developed-by: Joseph Telaak <joseph@telaak.dev>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  MAINTAINERS                          |   1 +
@@ -40,8 +22,8 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  drivers/clk/Makefile                 |   1 +
  drivers/clk/siflower/Kconfig         |  11 +
  drivers/clk/siflower/Makefile        |   2 +
- drivers/clk/siflower/clk-sf19a2890.c | 496 +++++++++++++++++++++++++++
- 6 files changed, 512 insertions(+)
+ drivers/clk/siflower/clk-sf19a2890.c | 494 +++++++++++++++++++++++++++
+ 6 files changed, 510 insertions(+)
  create mode 100644 drivers/clk/siflower/Kconfig
  create mode 100644 drivers/clk/siflower/Makefile
  create mode 100644 drivers/clk/siflower/clk-sf19a2890.c
@@ -109,10 +91,10 @@ index 000000000000..3f4d689f7d9b
 +obj-$(CONFIG_CLK_SF19A2890) += clk-sf19a2890.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890.c b/drivers/clk/siflower/clk-sf19a2890.c
 new file mode 100644
-index 000000000000..b184407e861d
+index 000000000000..3ccb768331ad
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890.c
-@@ -0,0 +1,496 @@
+@@ -0,0 +1,494 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +#define pr_fmt(fmt) "sf19a2890-clk: " fmt
@@ -555,44 +537,42 @@ index 000000000000..b184407e861d
 +
 +CLK_OF_DECLARE_DRIVER(sf19a2890_clk, "siflower,sf19a2890-clk", sf19a2890_clk_early_init);
 +
++static void sf19a2890_clk_unpublish(void *data)
++{
++	struct clk_hw **hw = data;
++
++	*hw = ERR_PTR(-EPROBE_DEFER);
++}
++
 +static int sf19a2890_clk_probe(struct platform_device *pdev)
 +{
-+	struct clk_hw_onecell_data *early = sf19a2890_clk_data;
++	struct clk_hw_onecell_data *data = sf19a2890_clk_data;
 +	struct device *dev = &pdev->dev;
-+	struct clk_hw_onecell_data *data;
 +	unsigned int i;
 +	int ret;
 +
-+	if (!early)
-+		return -ENODEV;
-+
-+	data = devm_kzalloc_flex(dev, *data, hws, CLK_SF19A2890_NR_CLKS);
 +	if (!data)
-+		return -ENOMEM;
-+
-+	data->num = CLK_SF19A2890_NR_CLKS;
++		return -ENODEV;
 +
 +	for (i = 0; i < data->num; i++) {
 +		struct clk_hw *hw = sf19a2890_hws[i];
 +
-+		/* Registered early, so the early provider hands it out */
-+		if (!IS_ERR(early->hws[i])) {
-+			data->hws[i] = ERR_PTR(-ENOENT);
++		/* Registered early */
++		if (!IS_ERR(data->hws[i]))
 +			continue;
-+		}
 +
 +		hw_to_sf_clk_common(hw)->base = sf19a2890_clk_base;
 +		ret = devm_clk_hw_register(dev, hw);
 +		if (ret)
 +			return dev_err_probe(dev, ret, "failed to register clock %u\n", i);
++
 +		data->hws[i] = hw;
++		ret = devm_add_action_or_reset(dev, sf19a2890_clk_unpublish, &data->hws[i]);
++		if (ret)
++			return ret;
 +	}
 +
-+	/*
-+	 * Add a second provider for these clocks. It is looked up before the
-+	 * early one, and adding it reparents any clocks orphaned on them.
-+	 */
-+	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get, data);
++	return 0;
 +}
 +
 +static const struct of_device_id sf19a2890_clk_dt_ids[] = {

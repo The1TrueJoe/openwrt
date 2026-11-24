@@ -37,8 +37,9 @@ jobs:
             tree: clk/linux.git
             branch: clk-next
             bindings: clock/siflower,sf19a2890-clk.yaml clock/siflower,sf19a2890-periph-crm.yaml
-            syms: COMMON_CLK CLK_SF19A2890 CLK_SF19A2890_PERIPHCRM
-            objs: drivers/clk/siflower/clk-sf19a2890.o drivers/clk/siflower/clk-sf19a2890-periphcrm.o
+            syms: COMMON_CLK CLK_SF19A2890 CLK_SF19A2890_PERIPHCRM RESET_SF19A2890_PERIPHCRM
+            objs: drivers/clk/siflower/clk-sf19a2890.o drivers/clk/siflower/clk-sf19a2890-periphcrm.o drivers/reset/reset-sf19a2890-periphcrm.o
+            mods: RESET_SF19A2890_PERIPHCRM
           - series: 03-pinctrl
             tree: linusw/linux-pinctrl.git
             branch: devel
@@ -268,6 +269,14 @@ jobs:
           # 09-leds-mainline is the LED series as sent, rebased onto mainline:
           # since v7.4-rc2 the probe allocates with devm_kzalloc_flex().
           for s in 02-sysm 03-pinctrl 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts 09-leds-mainline deps-gsw; do
+            # A series may carry a patch of an earlier one, for an immutable
+            # branch (MACH_SIFLOWER_MIPS in 02-sysm); skip what is applied
+            for f in $P/$s/*.patch; do
+              subj=$(sed -n 's/^Subject: \[PATCH[^]]*\] //p' $f | head -1)
+              if git log --format=%s $base..HEAD | grep -qxF "$subj"; then
+                echo "$s: already applied: $subj"; mv $f $f.skip
+              fi
+            done
             git am -q $P/$s/*.patch && continue
             git am --abort
             # Series for different trees may add MAINTAINERS entries at the

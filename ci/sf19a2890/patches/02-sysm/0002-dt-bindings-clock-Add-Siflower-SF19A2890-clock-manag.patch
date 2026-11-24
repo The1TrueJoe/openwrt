@@ -1,7 +1,7 @@
-From 09be1e1a27ecd868de43bdee0ce6406712b93193 Mon Sep 17 00:00:00 2001
+From 777c9cbe3af9459943854a3f6e184566a58b7888 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:17:23 -0500
-Subject: [PATCH 1/4] dt-bindings: clock: Add Siflower SF19A2890 clock manager
+Subject: [PATCH 2/6] dt-bindings: clock: Add Siflower SF19A2890 clock manager
 
 The clock manager of the Siflower SF19A2890 holds the SoC's PLLs and
 the muxes and dividers that derive the bus, CPU and peripheral clocks

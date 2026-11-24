@@ -1,56 +1,28 @@
-From 51371668f2ad5f76335d7994d615240cbf395535 Mon Sep 17 00:00:00 2001
-From: Chuanhong Guo <gch981213@gmail.com>
+From c960feb582fd342ab5d708b2fc6a10cd83d4b98e Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
 Date: Wed, 8 Apr 2026 22:17:11 +0800
-Subject: [PATCH 4/4] clk: siflower: Add SF19A2890 peripheral clock and reset
- manager driver
+Subject: [PATCH 5/6] clk: siflower: Add SF19A2890 peripheral clock driver
 
-Add a platform driver for the peripheral clock and reset manager (CRM)
-block found on Siflower SF19A2890 and compatible SoCs.
+Each peripheral block of the Siflower SF19A2890 has a clock and reset
+manager with the block's clock gates, its resets and a bus output enable
+that the block needs to answer bus requests. Add a driver for the clock
+gates. It turns the bus output on with the first gate and off with the
+last, and leaves the resets to a reset driver, through an auxiliary
+device.
 
-Each CRM block manages a group of APB peripherals through three registers:
-a reset register, a clock gate register, and a shared Bus Output Enable
-(BOE) register that must be asserted for any peripheral in the block to
-respond to bus transactions.
+Based on the driver in Chuanhong Guo's SF19A2890 branch, which handled
+the resets too and described each block's bits with properties.
 
-The driver registers a clock gate controller and a reset controller from
-a single DT node. A shared spinlock protects all read-modify-write
-accesses across both. BOE is managed automatically: asserted when the
-first clock gate is enabled and deasserted when the last one is disabled.
-
-Some peripherals have more than one reset line, one for each clock
-domain of the same IP. The driver exposes each such group as one reset,
-because the lines have to be asserted together:
-
-  - GMAC: bits 0-1 are the two sides of an asynchronous AXI bridge, and
-    asserting one alone locks up the bus.
-  - SPI: bits 4-5 are the PL022's PRESETn and nSSPRST, and its TRM
-    requires nSSPRST to be asserted with PRESETn.
-  - UART: bits 0-2 are the PL011s' PRESETn and bits 4-6 their nUARTRST,
-    with the same requirement in the PL011 TRM.
-  - USB: bits 0-2 are the DWC2 controller's clock domains, its AXI
-    master among them.
-  - WLAN: bits 0-2 are the AXI slave, AXI master and platform domains.
-
+Link: https://github.com/981213/linux/commit/37c81bebaf54
+Co-developed-by: Chuanhong Guo <gch981213@gmail.com>
 Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
-[Joseph Telaak:
-  - take it from Chuanhong's siflower-7.1 branch
-  - one compatible per block, with its gate bits, critical gates and
-    reset masks in tables in the driver instead of the
-    siflower,valid-gates, siflower,critical-gates,
-    siflower,reset-masks and siflower,num-resets properties
-  - parent gate N to input clock N by index, not by global name
-  - update the gates under the spinlock too, taken with guard()
-  - drop the separator comments
-  - Kconfig dependencies and help, subject]
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
-Co-developed-by: Joseph Telaak <joseph@telaak.dev>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  MAINTAINERS                                   |   1 +
  drivers/clk/siflower/Kconfig                  |  11 +
  drivers/clk/siflower/Makefile                 |   1 +
- .../clk/siflower/clk-sf19a2890-periphcrm.c    | 362 ++++++++++++++++++
- 4 files changed, 375 insertions(+)
+ .../clk/siflower/clk-sf19a2890-periphcrm.c    | 287 ++++++++++++++++++
+ 4 files changed, 300 insertions(+)
  create mode 100644 drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
@@ -66,7 +38,7 @@ index 47a3a72a5d08..34ff7ec0b60e 100644
  F:	include/dt-bindings/clock/siflower,sf19a2890-clk.h
  F:	include/dt-bindings/clock/siflower,sf19a2890-periph-crm.h
 diff --git a/drivers/clk/siflower/Kconfig b/drivers/clk/siflower/Kconfig
-index ad1b04b4bb9b..4fa6dd156b8a 100644
+index ad1b04b4bb9b..1073f9f4377c 100644
 --- a/drivers/clk/siflower/Kconfig
 +++ b/drivers/clk/siflower/Kconfig
 @@ -9,3 +9,14 @@ config CLK_SF19A2890
@@ -75,15 +47,15 @@ index ad1b04b4bb9b..4fa6dd156b8a 100644
  	  for this SoC needs it built in.
 +
 +config CLK_SF19A2890_PERIPHCRM
-+	bool "Clock and reset driver for Siflower SF19A2890 peripherals"
++	bool "Clock driver for Siflower SF19A2890 peripherals"
 +	depends on MACH_SIFLOWER_MIPS || COMPILE_TEST
 +	default MACH_SIFLOWER_MIPS
-+	select RESET_CONTROLLER
++	select AUXILIARY_BUS
 +	help
-+	  Supports the peripheral clock and reset managers of the Siflower
-+	  SF19A2890. Each peripheral block has one, with its clock gates,
-+	  its resets and the bus output enable it needs to answer bus
-+	  requests.
++	  Supports the clocks of the peripheral clock and reset managers of
++	  the Siflower SF19A2890. Each peripheral block has one, with its
++	  clock gates, its resets and the bus output enable it needs to
++	  answer bus requests. The resets have a driver of their own.
 diff --git a/drivers/clk/siflower/Makefile b/drivers/clk/siflower/Makefile
 index 3f4d689f7d9b..c4f4e0b8820d 100644
 --- a/drivers/clk/siflower/Makefile
@@ -94,10 +66,10 @@ index 3f4d689f7d9b..c4f4e0b8820d 100644
 +obj-$(CONFIG_CLK_SF19A2890_PERIPHCRM) += clk-sf19a2890-periphcrm.o
 diff --git a/drivers/clk/siflower/clk-sf19a2890-periphcrm.c b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
 new file mode 100644
-index 000000000000..c3642fb743b4
+index 000000000000..07106aec7d0f
 --- /dev/null
 +++ b/drivers/clk/siflower/clk-sf19a2890-periphcrm.c
-@@ -0,0 +1,362 @@
+@@ -0,0 +1,287 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +/*
@@ -108,19 +80,20 @@ index 000000000000..c3642fb743b4
 + *   CLK_GATE at base + 0x4  - one bit per clock gate
 + *   BOE      at base + 0xc  - shared Bus Output Enable; bits [1:0] must be set
 + *                             for any APB peripheral in the block to respond
++ *
++ * The resets are left to the reset driver, through an auxiliary device.
 + */
 +
++#include <linux/auxiliary_bus.h>
 +#include <linux/clk-provider.h>
 +#include <linux/device-id/of.h>
 +#include <linux/io.h>
 +#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
 +#include <linux/slab.h>
 +#include <linux/spinlock.h>
 +
 +#include <dt-bindings/clock/siflower,sf19a2890-periph-crm.h>
 +
-+#define REG_RESET	0x0
 +#define REG_CLK_GATE	0x4
 +#define REG_BOE		0xc
 +#define BOE_EN		GENMASK(1, 0)
@@ -134,15 +107,11 @@ index 000000000000..c3642fb743b4
 +struct sf19a2890_periphcrm_data {
 +	const struct sf19a2890_periphcrm_gate *gates;
 +	unsigned int num_gates;
-+	const u32 *reset_masks;
-+	unsigned int num_resets;
 +};
 +
 +struct sf19a2890_periphcrm {
 +	void __iomem *base;
-+	spinlock_t lock;	/* serializes all register updates */
-+	struct reset_controller_dev rcdev;
-+	const u32 *reset_masks;
++	spinlock_t lock;	/* serializes gate and BOE updates */
 +	struct clk_hw_onecell_data clk_data;
 +};
 +
@@ -198,66 +167,13 @@ index 000000000000..c3642fb743b4
 +	.is_enabled = sf19a2890_periphclk_is_enabled,
 +};
 +
-+static inline struct sf19a2890_periphcrm *
-+rcdev_to_periphcrm(struct reset_controller_dev *rcdev)
-+{
-+	return container_of(rcdev, struct sf19a2890_periphcrm, rcdev);
-+}
-+
-+static int sf19a2890_periphcrm_reset_update(struct reset_controller_dev *rcdev,
-+					    unsigned long id, bool assert)
-+{
-+	struct sf19a2890_periphcrm *crm = rcdev_to_periphcrm(rcdev);
-+	u32 reg;
-+
-+	guard(spinlock_irqsave)(&crm->lock);
-+	reg = readl(crm->base + REG_RESET);
-+	if (assert)
-+		reg |= crm->reset_masks[id];
-+	else
-+		reg &= ~crm->reset_masks[id];
-+	writel(reg, crm->base + REG_RESET);
-+	return 0;
-+}
-+
-+static int sf19a2890_periphcrm_reset_assert(struct reset_controller_dev *rcdev,
-+					    unsigned long id)
-+{
-+	return sf19a2890_periphcrm_reset_update(rcdev, id, true);
-+}
-+
-+static int
-+sf19a2890_periphcrm_reset_deassert(struct reset_controller_dev *rcdev,
-+				   unsigned long id)
-+{
-+	return sf19a2890_periphcrm_reset_update(rcdev, id, false);
-+}
-+
-+static int sf19a2890_periphcrm_reset_status(struct reset_controller_dev *rcdev,
-+					    unsigned long id)
-+{
-+	struct sf19a2890_periphcrm *crm = rcdev_to_periphcrm(rcdev);
-+
-+	return !!(readl(crm->base + REG_RESET) & crm->reset_masks[id]);
-+}
-+
-+static const struct reset_control_ops sf19a2890_periphcrm_reset_ops = {
-+	.assert = sf19a2890_periphcrm_reset_assert,
-+	.deassert = sf19a2890_periphcrm_reset_deassert,
-+	.status = sf19a2890_periphcrm_reset_status,
-+};
-+
 +#define GATE(_name, _bit, _flags) { .name = _name, .bit = _bit, .flags = _flags }
 +
-+#define CRM_DATA(_g, _r)						\
++#define CRM_DATA(_g)							\
 +	{								\
 +		.gates = sf19a2890_##_g##_gates,			\
 +		.num_gates = ARRAY_SIZE(sf19a2890_##_g##_gates),	\
-+		.reset_masks = sf19a2890_##_r##_resets,			\
-+		.num_resets = ARRAY_SIZE(sf19a2890_##_r##_resets),	\
 +	}
-+
-+static const u32 sf19a2890_single_resets[] = { BIT(0) };
 +
 +static const struct sf19a2890_periphcrm_gate sf19a2890_gmac_gates[] = {
 +	[CLK_GMAC_BUS] = GATE("gmac", 0, 0),
@@ -266,10 +182,8 @@ index 000000000000..c3642fb743b4
 +	[CLK_GMAC_TSU] = GATE("ethtsu", 3, 0),
 +};
 +
-+static const u32 sf19a2890_gmac_resets[] = { [RST_GMAC] = GENMASK(1, 0) };
-+
 +static const struct sf19a2890_periphcrm_data sf19a2890_gmac_crm =
-+	CRM_DATA(gmac, gmac);
++	CRM_DATA(gmac);
 +
 +static const struct sf19a2890_periphcrm_gate sf19a2890_wlan24_gates[] = {
 +	[CLK_WLAN24_AXIS] = GATE("wlan24_axis", 0, 0),
@@ -283,13 +197,11 @@ index 000000000000..c3642fb743b4
 +	[CLK_WLAN5_PLF] = GATE("wlan5_plf", 2, 0),
 +};
 +
-+static const u32 sf19a2890_wlan_resets[] = { GENMASK(2, 0) };
-+
 +static const struct sf19a2890_periphcrm_data sf19a2890_wlan24_crm =
-+	CRM_DATA(wlan24, wlan);
++	CRM_DATA(wlan24);
 +
 +static const struct sf19a2890_periphcrm_data sf19a2890_wlan5_crm =
-+	CRM_DATA(wlan5, wlan);
++	CRM_DATA(wlan5);
 +
 +static const struct sf19a2890_periphcrm_gate sf19a2890_rf_gates[] = {
 +	[CLK_RF_TEST] = GATE("rf_dft", 0, 0),
@@ -299,7 +211,7 @@ index 000000000000..c3642fb743b4
 +};
 +
 +static const struct sf19a2890_periphcrm_data sf19a2890_rf_crm =
-+	CRM_DATA(rf, wlan);
++	CRM_DATA(rf);
 +
 +/* Nothing describes a consumer of usb_axim, and gating it is not safe */
 +static const struct sf19a2890_periphcrm_gate sf19a2890_usb_gates[] = {
@@ -308,24 +220,16 @@ index 000000000000..c3642fb743b4
 +	[CLK_USB_PHY_REF] = GATE("usbphy_ref", 3, 0),
 +};
 +
-+static const u32 sf19a2890_usb_resets[] = {
-+	[RST_USB] = GENMASK(2, 0),
-+	[RST_USB_PHY_POR] = BIT(3),
-+	[RST_USB_PHY] = BIT(4),
-+};
-+
 +static const struct sf19a2890_periphcrm_data sf19a2890_usb_crm =
-+	CRM_DATA(usb, usb);
++	CRM_DATA(usb);
 +
 +static const struct sf19a2890_periphcrm_gate sf19a2890_spi_gates[] = {
 +	[CLK_SPI_APB] = GATE("spi_apb", 4, 0),
 +	[CLK_SPI_SSP] = GATE("spi_ssp", 5, 0),
 +};
 +
-+static const u32 sf19a2890_spi_resets[] = { [RST_SPI] = GENMASK(5, 4) };
-+
 +static const struct sf19a2890_periphcrm_data sf19a2890_spi_crm =
-+	CRM_DATA(spi, spi);
++	CRM_DATA(spi);
 +
 +/* UART0 carries the console from the bootloader on */
 +static const struct sf19a2890_periphcrm_gate sf19a2890_uart_gates[] = {
@@ -337,21 +241,15 @@ index 000000000000..c3642fb743b4
 +	[CLK_UART2] = GATE("uart2", 6, 0),
 +};
 +
-+static const u32 sf19a2890_uart_resets[] = {
-+	[RST_UART0] = BIT(0) | BIT(4),
-+	[RST_UART1] = BIT(1) | BIT(5),
-+	[RST_UART2] = BIT(2) | BIT(6),
-+};
-+
 +static const struct sf19a2890_periphcrm_data sf19a2890_uart_crm =
-+	CRM_DATA(uart, uart);
++	CRM_DATA(uart);
 +
 +#define SINGLE_CRM(_name)						\
 +	static const struct sf19a2890_periphcrm_gate sf19a2890_##_name##_gates[] = { \
 +		GATE(#_name, 0, 0),					\
 +	};								\
 +	static const struct sf19a2890_periphcrm_data sf19a2890_##_name##_crm = \
-+		CRM_DATA(_name, single)
++		CRM_DATA(_name)
 +
 +SINGLE_CRM(i2c0);
 +SINGLE_CRM(pwm);
@@ -362,6 +260,7 @@ index 000000000000..c3642fb743b4
 +static int sf19a2890_periphcrm_probe(struct platform_device *pdev)
 +{
 +	const struct sf19a2890_periphcrm_data *data;
++	struct auxiliary_device *adev;
 +	struct device *dev = &pdev->dev;
 +	struct sf19a2890_periphclk *gates;
 +	struct sf19a2890_periphcrm *crm;
@@ -390,16 +289,6 @@ index 000000000000..c3642fb743b4
 +		return PTR_ERR(crm->base);
 +
 +	spin_lock_init(&crm->lock);
-+
-+	crm->reset_masks = data->reset_masks;
-+	crm->rcdev.owner = THIS_MODULE;
-+	crm->rcdev.nr_resets = data->num_resets;
-+	crm->rcdev.ops = &sf19a2890_periphcrm_reset_ops;
-+	crm->rcdev.of_node = dev->of_node;
-+
-+	ret = devm_reset_controller_register(dev, &crm->rcdev);
-+	if (ret)
-+		return ret;
 +
 +	/*
 +	 * Clear any stale bits outside the block's gates so the BOE-disable
@@ -432,8 +321,16 @@ index 000000000000..c3642fb743b4
 +		crm->clk_data.hws[i] = &gates[i].hw;
 +	}
 +
-+	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
-+					   &crm->clk_data);
++	ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
++					  &crm->clk_data);
++	if (ret)
++		return ret;
++
++	adev = devm_auxiliary_device_create(dev, "reset", (void __force *)crm->base);
++	if (!adev)
++		return dev_err_probe(dev, -ENODEV, "failed to create the reset device\n");
++
++	return 0;
 +}
 +
 +static const struct of_device_id sf19a2890_periphcrm_dt_ids[] = {

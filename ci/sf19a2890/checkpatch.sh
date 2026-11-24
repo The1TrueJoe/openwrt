@@ -12,8 +12,10 @@ done
 echo "checkpatch from linux$(cat $cp/localversion-next)"
 
 # series/patch/type/count. FILE_PATH_CHANGES: the new file is covered by
-# an existing entry (LED SUBSYSTEM's Documentation/leds/). ENOTSUPP: the pinconf core requires it.
+# an existing entry (LED SUBSYSTEM's Documentation/leds/), or by the MIPS
+# series' entry (02-sysm carries its MACH_SIFLOWER_MIPS patch). ENOTSUPP: the pinconf core requires it.
 allowed="
+02-sysm/0001/WARNING:FILE_PATH_CHANGES/1
 03-pinctrl/0002/WARNING:ENOTSUPP/2
 09-leds/0008/WARNING:FILE_PATH_CHANGES/1
 "

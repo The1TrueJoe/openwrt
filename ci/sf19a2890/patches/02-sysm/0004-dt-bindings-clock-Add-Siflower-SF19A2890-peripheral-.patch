@@ -1,7 +1,7 @@
-From b875a8db5b34615d0ddce08b8151027103cb6ba7 Mon Sep 17 00:00:00 2001
+From 9d8947dbd5cbc75c36e5e49e371338e66d11f0fb Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 22:18:45 -0500
-Subject: [PATCH 3/4] dt-bindings: clock: Add Siflower SF19A2890 peripheral
+Subject: [PATCH 4/6] dt-bindings: clock: Add Siflower SF19A2890 peripheral
  clock/reset managers
 
 Each peripheral block of the Siflower SF19A2890 has a clock and reset
