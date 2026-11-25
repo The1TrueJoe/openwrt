@@ -1,0 +1,62 @@
+From b86aa20404ba0fc91b762b056130e94c671f55ad Mon Sep 17 00:00:00 2001
+From: Chuanhong Guo <gch981213@gmail.com>
+Date: Mon, 20 Jan 2025 09:52:52 +0800
+Subject: [PATCH 3/5] MIPS: siflower: Override the kmalloc alignment
+
+Most devices on the market with Siflower MIPS SoCs come with 64M or
+less DRAM. Their InterAptiv cores have 32-byte cache lines, so add a
+kmalloc.h that sets ARCH_DMA_MINALIGN to 32 instead of the generic 128,
+to conserve memory.
+
+Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
+[Joseph Telaak: split out of "MIPS: Add support for Siflower MIPS SoCs"]
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ MAINTAINERS                                   | 1 +
+ arch/mips/generic/Platform                    | 1 +
+ arch/mips/include/asm/mach-siflower/kmalloc.h | 9 +++++++++
+ 3 files changed, 11 insertions(+)
+ create mode 100644 arch/mips/include/asm/mach-siflower/kmalloc.h
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7fb18c2d6959..3aa80a8dd785 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -25703,6 +25703,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
+ L:	linux-mips@vger.kernel.org
+ S:	Maintained
+ F:	Documentation/devicetree/bindings/mips/siflower.yaml
++F:	arch/mips/include/asm/mach-siflower/
+ N:	sf19a2890
+ 
+ SILEAD TOUCHSCREEN DRIVER
+diff --git a/arch/mips/generic/Platform b/arch/mips/generic/Platform
+index 0c03623f3897..c09a8484db9b 100644
+--- a/arch/mips/generic/Platform
++++ b/arch/mips/generic/Platform
+@@ -10,6 +10,7 @@
+ 
+ # Note: order matters, keep the asm/mach-generic include last.
+ cflags-$(CONFIG_MACH_INGENIC_SOC)	+= -I$(srctree)/arch/mips/include/asm/mach-ingenic
++cflags-$(CONFIG_MACH_SIFLOWER_MIPS)	+= -I$(srctree)/arch/mips/include/asm/mach-siflower
+ cflags-$(CONFIG_MIPS_GENERIC)	+= -I$(srctree)/arch/mips/include/asm/mach-generic
+ 
+ load-$(CONFIG_MIPS_GENERIC)	+= 0xffffffff80100000
+diff --git a/arch/mips/include/asm/mach-siflower/kmalloc.h b/arch/mips/include/asm/mach-siflower/kmalloc.h
+new file mode 100644
+index 000000000000..0887ae3575d7
+--- /dev/null
++++ b/arch/mips/include/asm/mach-siflower/kmalloc.h
+@@ -0,0 +1,9 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef __ASM_MACH_SIFLOWER_KMALLOC_H
++#define __ASM_MACH_SIFLOWER_KMALLOC_H
++
++#ifdef CONFIG_DMA_NONCOHERENT
++#define ARCH_DMA_MINALIGN	32
++#endif
++
++#endif /* __ASM_MACH_SIFLOWER_KMALLOC_H */
+-- 
+2.50.1 (Apple Git-155)
+

@@ -1,0 +1,74 @@
+From 030fd97353a1a618656f9009680f3cfd7f9a76c6 Mon Sep 17 00:00:00 2001
+From: Chuanhong Guo <gch981213@gmail.com>
+Date: Mon, 20 Jan 2025 09:52:52 +0800
+Subject: [PATCH 2/5] MIPS: Add support for Siflower MIPS SoCs
+
+Siflower MIPS SoCs like SF19A2890 use a dual-core MIPS InterAptiv
+processor, built-in GMAC, USB, dual-band WiFi and various other
+peripherals.
+
+Notably, they use some ARM PLxxx peripherals, and ARM_AMBA is
+selected for the drivers.
+
+Most devices on the market with this chip come with 64M or less
+DRAM, so a MACH_SIFLOWER_MIPS is created with reduced features
+instead of using the generic kernel.
+
+Signed-off-by: Chuanhong Guo <gch981213@gmail.com>
+[Joseph Telaak:
+  - rebase on v7.4-rc1 and use the "MIPS:" prefix
+  - longer Kconfig help
+  - commit message grammar and paragraphs
+  - move the kmalloc.h override to a patch of its own]
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ arch/mips/Kconfig | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+index ed17c9b1624c..549bc7d13dd9 100644
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -937,6 +937,39 @@ config SIBYTE_BIGSUR
+ 	select ZONE_DMA32 if 64BIT
+ 	select SWIOTLB if ARCH_DMA_ADDR_T_64BIT && PCI
+ 
++config MACH_SIFLOWER_MIPS
++	bool "Siflower MIPS SoCs"
++	select MIPS_GENERIC
++	select MACH_GENERIC_CORE
++	select ARM_AMBA
++	select BOOT_RAW
++	select CEVT_R4K
++	select CLKSRC_MIPS_GIC
++	select COMMON_CLK
++	select CPU_MIPSR2_IRQ_EI
++	select CPU_MIPSR2_IRQ_VI
++	select CSRC_R4K
++	select DMA_NONCOHERENT
++	select IRQ_MIPS_CPU
++	select MIPS_CPU_SCACHE
++	select MIPS_GIC
++	select MIPS_L1_CACHE_SHIFT_5
++	select NO_EXCEPT_FILL
++	select SMP_UP if SMP
++	select SYS_HAS_CPU_MIPS32_R2
++	select SYS_SUPPORTS_32BIT_KERNEL
++	select SYS_SUPPORTS_LITTLE_ENDIAN
++	select SYS_SUPPORTS_MIPS16
++	select SYS_SUPPORTS_MIPS_CPS
++	select SYS_SUPPORTS_MULTITHREADING
++	select USE_OF
++	help
++	  Select this to build a kernel which supports SoCs from Siflower
++	  with MIPS InterAptiv cores, like Siflower SF19A2890. These have
++	  ARM PrimeCell peripherals, so ARM_AMBA is selected. Most boards
++	  with them have 64M of DRAM or less, so this kernel leaves out the
++	  generic kernel's support for other boards.
++
+ config SNI_RM
+ 	bool "SNI RM200/300/400"
+ 	select ARC_MEMORY
+-- 
+2.50.1 (Apple Git-155)
+
