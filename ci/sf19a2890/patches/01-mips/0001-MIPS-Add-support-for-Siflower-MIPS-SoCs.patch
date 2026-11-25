@@ -1,7 +1,7 @@
-From 030fd97353a1a618656f9009680f3cfd7f9a76c6 Mon Sep 17 00:00:00 2001
+From 523a92e3b3da2f0d05420efdbae17f4d7741bab7 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 20 Jan 2025 09:52:52 +0800
-Subject: [PATCH 2/5] MIPS: Add support for Siflower MIPS SoCs
+Subject: [PATCH 1/5] MIPS: Add support for Siflower MIPS SoCs
 
 Siflower MIPS SoCs like SF19A2890 use a dual-core MIPS InterAptiv
 processor, built-in GMAC, USB, dual-band WiFi and various other

@@ -1,4 +1,4 @@
-From b86aa20404ba0fc91b762b056130e94c671f55ad Mon Sep 17 00:00:00 2001
+From 4d7260ae4ccfdee40367d4ecdbaef8394cfb20b8 Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Mon, 20 Jan 2025 09:52:52 +0800
 Subject: [PATCH 3/5] MIPS: siflower: Override the kmalloc alignment

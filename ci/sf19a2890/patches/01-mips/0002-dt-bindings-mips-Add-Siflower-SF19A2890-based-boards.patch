@@ -1,12 +1,13 @@
-From c655ded88ae3feda4853e19f9bd61fd148620a5a Mon Sep 17 00:00:00 2001
+From 46ae3e8271669eefaba09c9631c1501b9a3f55e7 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:49:40 -0500
-Subject: [PATCH 1/5] dt-bindings: mips: Add Siflower SF19A2890 based boards
+Subject: [PATCH 2/5] dt-bindings: mips: Add Siflower SF19A2890 based boards
 
 The SF19A2890 is a MIPS interAptiv SoC from Siflower (two cores, two
 VPEs each) for home routers. Document its compatible and the first
 board using it, the GL.iNet GL-SFT1200 ("Opal") travel router.
 
+Acked-by: Conor Dooley <conor.dooley@microchip.com>
 Signed-off-by: Joseph Telaak <joseph@telaak.dev>
 ---
  .../devicetree/bindings/mips/siflower.yaml    | 26 +++++++++++++++++++

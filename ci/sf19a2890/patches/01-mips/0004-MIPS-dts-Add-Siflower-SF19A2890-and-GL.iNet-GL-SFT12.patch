@@ -1,4 +1,4 @@
-From 8248a7def17a10b81f3d094192793a91be65f3ef Mon Sep 17 00:00:00 2001
+From 1f76838fc8723d6ba355dd3d036f47b461234310 Mon Sep 17 00:00:00 2001
 From: Joseph Telaak <joseph@telaak.dev>
 Date: Mon, 2 Nov 2026 17:51:28 -0500
 Subject: [PATCH 4/5] MIPS: dts: Add Siflower SF19A2890 and GL.iNet GL-SFT1200
