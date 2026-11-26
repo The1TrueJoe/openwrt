@@ -1,0 +1,85 @@
+From 83b75ed0e21ca552ace29012ff4b035cd59a138b Mon Sep 17 00:00:00 2001
+From: Michael Walle <mwalle@kernel.org>
+Date: Thu, 26 Nov 2026 16:35:18 +0100
+Subject: [PATCH 07/15] gpio: sl28cpld: create the regmap-irq chip from the
+ gpio-regmap callback
+
+Use the new gpio_regmap_add_irq_chip() helper to create the regmap-irq
+domain.
+
+Signed-off-by: Michael Walle <mwalle@kernel.org>
+---
+ drivers/gpio/gpio-sl28cpld.c | 34 +++++++++++++++++++++++-----------
+ 1 file changed, 23 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/gpio/gpio-sl28cpld.c b/drivers/gpio/gpio-sl28cpld.c
+index 57cadeb07fde..46141da2d2f7 100644
+--- a/drivers/gpio/gpio-sl28cpld.c
++++ b/drivers/gpio/gpio-sl28cpld.c
+@@ -44,14 +44,28 @@ static const struct regmap_irq sl28cpld_gpio_irqs[] = {
+ 	REGMAP_IRQ_REG_LINE(7, 8),
+ };
+ 
++struct sl28cpld_gpio {
++	struct regmap_irq_chip irq_chip;
++	int irq;
++};
++
++static struct irq_domain *sl28cpld_gpio_create_irq_domain(struct gpio_regmap *gpio)
++{
++	struct sl28cpld_gpio *sl28cpld_gpio = gpio_regmap_get_drvdata(gpio);
++
++	return gpio_regmap_add_irq_chip(gpio, sl28cpld_gpio->irq,
++					IRQF_SHARED | IRQF_ONESHOT,
++					&sl28cpld_gpio->irq_chip);
++}
++
+ static int sl28cpld_gpio_irq_init(struct platform_device *pdev,
+ 				  unsigned int base,
+ 				  struct gpio_regmap_config *config)
+ {
+-	struct regmap_irq_chip_data *irq_data;
++	struct sl28cpld_gpio *sl28cpld_gpio;
+ 	struct regmap_irq_chip *irq_chip;
+ 	struct device *dev = &pdev->dev;
+-	int irq, ret;
++	int irq;
+ 
+ 	if (!device_property_read_bool(dev, "interrupt-controller"))
+ 		return 0;
+@@ -60,10 +74,12 @@ static int sl28cpld_gpio_irq_init(struct platform_device *pdev,
+ 	if (irq < 0)
+ 		return irq;
+ 
+-	irq_chip = devm_kzalloc_obj(dev, *irq_chip);
+-	if (!irq_chip)
++	sl28cpld_gpio = devm_kzalloc_obj(dev, *sl28cpld_gpio);
++	if (!sl28cpld_gpio)
+ 		return -ENOMEM;
+ 
++	irq_chip = &sl28cpld_gpio->irq_chip;
++
+ 	irq_chip->name = "sl28cpld-gpio-irq";
+ 	irq_chip->irqs = sl28cpld_gpio_irqs;
+ 	irq_chip->num_irqs = ARRAY_SIZE(sl28cpld_gpio_irqs);
+@@ -72,14 +88,10 @@ static int sl28cpld_gpio_irq_init(struct platform_device *pdev,
+ 	irq_chip->unmask_base = base + GPIO_REG_IE;
+ 	irq_chip->ack_base = base + GPIO_REG_IP;
+ 
+-	ret = devm_regmap_add_irq_chip_fwnode(dev, dev_fwnode(dev),
+-					      config->regmap, irq,
+-					      IRQF_SHARED | IRQF_ONESHOT,
+-					      0, irq_chip, &irq_data);
+-	if (ret)
+-		return ret;
++	sl28cpld_gpio->irq = irq;
+ 
+-	config->irq_domain = regmap_irq_get_domain(irq_data);
++	config->drvdata = sl28cpld_gpio;
++	config->create_irq_domain = sl28cpld_gpio_create_irq_domain;
+ 
+ 	return 0;
+ }
+-- 
+2.50.1 (Apple Git-155)
+

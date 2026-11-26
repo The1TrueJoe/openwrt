@@ -1,0 +1,96 @@
+From b885793f6a4bd1b28a780ad8ac276a245c309d65 Mon Sep 17 00:00:00 2001
+From: Michael Walle <mwalle@kernel.org>
+Date: Thu, 26 Nov 2026 16:35:22 +0100
+Subject: [PATCH 11/15] gpio: 104-idi-48: create the regmap-irq chip from the
+ gpio-regmap callback
+
+Use the new gpio_regmap_add_irq_chip() helper to create the regmap-irq
+domain.
+
+Signed-off-by: Michael Walle <mwalle@kernel.org>
+---
+ drivers/gpio/gpio-104-idi-48.c | 38 +++++++++++++++++++++++++---------
+ 1 file changed, 28 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/gpio/gpio-104-idi-48.c b/drivers/gpio/gpio-104-idi-48.c
+index 93d7ccaded83..434704c06d7e 100644
+--- a/drivers/gpio/gpio-104-idi-48.c
++++ b/drivers/gpio/gpio-104-idi-48.c
+@@ -123,15 +123,33 @@ static const char *idi48_names[IDI48_NGPIO] = {
+ 	"Bit 18 B", "Bit 19 B", "Bit 20 B", "Bit 21 B", "Bit 22 B", "Bit 23 B"
+ };
+ 
++struct idi_48_gpio {
++	struct regmap_irq_chip chip;
++	struct device *dev;
++	unsigned int irq;
++};
++
++static struct irq_domain *idi_48_create_irq_domain(struct gpio_regmap *gpio)
++{
++	struct idi_48_gpio *const idi48gpio = gpio_regmap_get_drvdata(gpio);
++	struct irq_domain *domain;
++
++	domain = gpio_regmap_add_irq_chip(gpio, idi48gpio->irq, IRQF_SHARED, &idi48gpio->chip);
++	if (IS_ERR(domain))
++		return dev_err_cast_probe(idi48gpio->dev, domain,
++					  "IRQ registration failed\n");
++
++	return domain;
++}
++
+ static int idi_48_probe(struct device *dev, unsigned int id)
+ {
+ 	const char *const name = dev_name(dev);
+ 	struct gpio_regmap_config config = {};
++	struct idi_48_gpio *idi48gpio;
+ 	void __iomem *regs;
+ 	struct regmap *map;
+ 	struct regmap_irq_chip *chip;
+-	struct regmap_irq_chip_data *chip_data;
+-	int err;
+ 
+ 	if (!devm_request_region(dev, base[id], IDI_48_EXTENT, name)) {
+ 		dev_err(dev, "Unable to lock port addresses (0x%X-0x%X)\n",
+@@ -148,10 +166,14 @@ static int idi_48_probe(struct device *dev, unsigned int id)
+ 		return dev_err_probe(dev, PTR_ERR(map),
+ 				     "Unable to initialize register map\n");
+ 
+-	chip = devm_kzalloc_obj(dev, *chip);
+-	if (!chip)
++	idi48gpio = devm_kzalloc_obj(dev, *idi48gpio);
++	if (!idi48gpio)
+ 		return -ENOMEM;
+ 
++	idi48gpio->dev = dev;
++	idi48gpio->irq = irq[id];
++	chip = &idi48gpio->chip;
++
+ 	chip->name = name;
+ 	chip->status_base = IDI48_IRQ_STATUS;
+ 	chip->unmask_base = IDI48_IRQ_ENABLE;
+@@ -160,11 +182,6 @@ static int idi_48_probe(struct device *dev, unsigned int id)
+ 	chip->irqs = idi48_regmap_irqs;
+ 	chip->num_irqs = ARRAY_SIZE(idi48_regmap_irqs);
+ 
+-	err = devm_regmap_add_irq_chip(dev, map, irq[id], IRQF_SHARED, 0, chip,
+-				       &chip_data);
+-	if (err)
+-		return dev_err_probe(dev, err, "IRQ registration failed\n");
+-
+ 	config.parent = dev;
+ 	config.regmap = map;
+ 	config.ngpio = IDI48_NGPIO;
+@@ -172,7 +189,8 @@ static int idi_48_probe(struct device *dev, unsigned int id)
+ 	config.reg_dat_base = GPIO_REGMAP_ADDR(0x0);
+ 	config.ngpio_per_reg = 8;
+ 	config.reg_mask_xlate = idi_48_reg_mask_xlate;
+-	config.irq_domain = regmap_irq_get_domain(chip_data);
++	config.drvdata = idi48gpio;
++	config.create_irq_domain = idi_48_create_irq_domain;
+ 
+ 	return PTR_ERR_OR_ZERO(devm_gpio_regmap_register(dev, &config));
+ }
+-- 
+2.50.1 (Apple Git-155)
+

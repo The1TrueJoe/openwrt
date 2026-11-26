@@ -1,0 +1,99 @@
+From 0bf640c67b277e9df71a5bf3bd1088b1eeca7a8c Mon Sep 17 00:00:00 2001
+From: Michael Walle <mwalle@kernel.org>
+Date: Thu, 26 Nov 2026 16:35:13 +0100
+Subject: [PATCH 02/15] gpio: regmap: add a callback to create the IRQ domain
+
+At the moment, the an IRQ domain is attached via config->irg_domain.
+This means, that it has to be created before the gpio_regmap_register()
+call. The callbacks of the IRQ domain might use the gpio_regmap_*_irq()
+functions. Consumers can already use the domain as soon as it is
+created and this creates a small window where the callbacks dereference
+a NULL pointer.
+
+To fix this, create a new create_irq_domain() callback, that is called
+after the gpio_chip is added.
+
+Signed-off-by: Michael Walle <mwalle@kernel.org>
+---
+ drivers/gpio/gpio-regmap.c  | 21 +++++++++++++++++++--
+ include/linux/gpio/regmap.h | 10 +++++++++-
+ 2 files changed, 28 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpio/gpio-regmap.c b/drivers/gpio/gpio-regmap.c
+index 10cf946dbfc4..e8c13434ea5b 100644
+--- a/drivers/gpio/gpio-regmap.c
++++ b/drivers/gpio/gpio-regmap.c
+@@ -454,6 +454,14 @@ struct gpio_regmap *gpio_regmap_register(const struct gpio_regmap_config *config
+ 	if (config->reg_dir_out_base && config->reg_dir_in_base)
+ 		return ERR_PTR(-EINVAL);
+ 
++	/* there is only one way to provide an IRQ domain */
++	if (config->create_irq_domain && config->irq_domain)
++		return ERR_PTR(-EINVAL);
++#ifdef CONFIG_REGMAP_IRQ
++	if (config->create_irq_domain && config->regmap_irq_chip)
++		return ERR_PTR(-EINVAL);
++#endif
++
+ 	gpio = kzalloc_obj(*gpio);
+ 	if (!gpio)
+ 		return ERR_PTR(-ENOMEM);
+@@ -545,6 +553,16 @@ struct gpio_regmap *gpio_regmap_register(const struct gpio_regmap_config *config
+ 	if (ret < 0)
+ 		goto err_free_bitmap_output;
+ 
++	irq_domain = config->irq_domain;
++
++	if (config->create_irq_domain) {
++		irq_domain = config->create_irq_domain(gpio);
++		if (IS_ERR(irq_domain)) {
++			ret = PTR_ERR(irq_domain);
++			goto err_remove_gpiochip;
++		}
++	}
++
+ #ifdef CONFIG_REGMAP_IRQ
+ 	if (config->regmap_irq_chip) {
+ 		gpio->regmap_irq_line = config->regmap_irq_line;
+@@ -558,9 +576,8 @@ struct gpio_regmap *gpio_regmap_register(const struct gpio_regmap_config *config
+ 			goto err_remove_gpiochip;
+ 
+ 		irq_domain = regmap_irq_get_domain(gpio->irq_chip_data);
+-	} else
++	}
+ #endif
+-	irq_domain = config->irq_domain;
+ 
+ 	if (irq_domain) {
+ 		ret = gpiochip_irqchip_add_domain(chip, irq_domain);
+diff --git a/include/linux/gpio/regmap.h b/include/linux/gpio/regmap.h
+index 6fe0877717cb..eba0620c63d6 100644
+--- a/include/linux/gpio/regmap.h
++++ b/include/linux/gpio/regmap.h
+@@ -62,7 +62,14 @@ enum gpio_regmap_operation {
+  *			same type, dat, set, etc) are not consecutive.
+  * @ngpio_per_reg:	(Optional) Number of GPIOs per register
+  * @irq_domain:		(Optional) IRQ domain if the controller is
+- *			interrupt-capable
++ *			interrupt-capable. Cannot be used together with the
++ *			gpio_regmap_*_irq() callbacks. Use @create_irq_domain
++ *			instead.
++ * @create_irq_domain:	(Optional) Callback to create the IRQ domain in the
++ *			controller driver. Called after the gpio_chip is added
++ *			so the gpio_regmap_*_irq() have a valid gpio_regmap
++ *			pointer.
++ *			Mutually exclusive with @irq_domain and @regmap_irq_chip.
+  * @fixed_direction_mask:
+  *			(Optional) Bitmap representing the GPIO lines that
+  *			make use of the @fixed_direction_output list to
+@@ -133,6 +140,7 @@ struct gpio_regmap_config {
+ 	int reg_stride;
+ 	int ngpio_per_reg;
+ 	struct irq_domain *irq_domain;
++	struct irq_domain *(*create_irq_domain)(struct gpio_regmap *gpio);
+ 	unsigned long *fixed_direction_mask;
+ 	unsigned long *fixed_direction_output;
+ 
+-- 
+2.50.1 (Apple Git-155)
+

@@ -105,6 +105,10 @@ jobs:
           echo "base: ${{ matrix.tree }} ${{ matrix.branch }} $(git rev-parse --short=12 HEAD) $(git log -1 --format=%s)"
           git config user.name ci
           git config user.email ci@example.invalid
+          # <series>-deps: posted patches by others that the series builds on;
+          # applied first, and not checked as the series' own
+          deps=../ci-src/ci/sf19a2890/patches/${{ matrix.series }}-deps
+          if [ -d "$deps" ]; then git am -q "$deps"/*.patch; fi
           git am -q ../ci-src/ci/sf19a2890/patches/${{ matrix.series }}/*.patch
           git log --oneline -12
           echo "TIP=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
@@ -268,7 +272,7 @@ jobs:
           git branch s1
           # 09-leds-mainline is the LED series as sent, rebased onto mainline:
           # since v7.4-rc2 the probe allocates with devm_kzalloc_flex().
-          for s in 02-sysm 03-pinctrl 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts 09-leds-mainline deps-gsw; do
+          for s in 02-sysm 03-pinctrl 04-gpio-deps 04-gpio 05-usb-phy 06-dwc2 07-gmac 08-dts 09-leds-mainline deps-gsw; do
             # A series may carry a patch of an earlier one, for an immutable
             # branch (MACH_SIFLOWER_MIPS in 02-sysm); skip what is applied
             for f in $P/$s/*.patch; do

@@ -1,0 +1,118 @@
+From e278a4042435187106d41ada62d0861d0e51cc84 Mon Sep 17 00:00:00 2001
+From: Michael Walle <mwalle@kernel.org>
+Date: Thu, 26 Nov 2026 16:35:17 +0100
+Subject: [PATCH 06/15] gpio: max7360: create the regmap-irq chip from the
+ gpio-regmap callback
+
+Use the new gpio_regmap_add_irq_chip() helper to create the regmap-irq
+domain.
+
+Signed-off-by: Michael Walle <mwalle@kernel.org>
+---
+ drivers/gpio/gpio-max7360.c | 62 ++++++++++++++++++++++++-------------
+ 1 file changed, 41 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/gpio/gpio-max7360.c b/drivers/gpio/gpio-max7360.c
+index b77a51092dcb..87f9442181d7 100644
+--- a/drivers/gpio/gpio-max7360.c
++++ b/drivers/gpio/gpio-max7360.c
+@@ -27,6 +27,11 @@ struct max7360_gpio_plat_data {
+ 	unsigned int function;
+ };
+ 
++struct max7360_gpio {
++	struct device *dev;
++	struct regmap *regmap;
++};
++
+ static struct max7360_gpio_plat_data max7360_gpio_port_plat = { .function = MAX7360_GPIO_PORT };
+ static struct max7360_gpio_plat_data max7360_gpio_col_plat = { .function = MAX7360_GPIO_COL };
+ 
+@@ -128,7 +133,8 @@ static int max7360_handle_mask_sync(const int index,
+ 				    const unsigned int mask_buf,
+ 				    void *const irq_drv_data)
+ {
+-	struct regmap *regmap = gpio_regmap_get_drvdata(irq_drv_data);
++	struct max7360_gpio *max7360_gpio = gpio_regmap_get_drvdata(irq_drv_data);
++	struct regmap *regmap = max7360_gpio->regmap;
+ 	int ret;
+ 
+ 	for (unsigned int i = 0; i < MAX7360_MAX_GPIO; i++) {
+@@ -141,11 +147,38 @@ static int max7360_handle_mask_sync(const int index,
+ 	return 0;
+ }
+ 
++static struct irq_domain *max7360_gpio_create_irq_domain(struct gpio_regmap *gpio)
++{
++	struct max7360_gpio *max7360_gpio = gpio_regmap_get_drvdata(gpio);
++	struct device *dev = max7360_gpio->dev;
++	struct regmap_irq_chip *irq_chip;
++	int irq;
++
++	irq = fwnode_irq_get_byname(dev_fwnode(dev->parent), "inti");
++	if (irq < 0)
++		return ERR_PTR(dev_err_probe(dev, irq, "Failed to get IRQ\n"));
++
++	/* Create custom IRQ configuration. */
++	irq_chip = devm_kzalloc_obj(dev, *irq_chip);
++	if (!irq_chip)
++		return ERR_PTR(-ENOMEM);
++
++	irq_chip->name = dev_name(dev);
++	irq_chip->status_base = MAX7360_REG_GPIOIN;
++	irq_chip->status_is_level = true;
++	irq_chip->num_regs = 1;
++	irq_chip->num_irqs = MAX7360_MAX_GPIO;
++	irq_chip->irqs = max7360_regmap_irqs;
++	irq_chip->handle_mask_sync = max7360_handle_mask_sync;
++
++	return gpio_regmap_add_irq_chip(gpio, irq, IRQF_ONESHOT | IRQF_SHARED, irq_chip);
++}
++
+ static int max7360_gpio_probe(struct platform_device *pdev)
+ {
+ 	const struct max7360_gpio_plat_data *plat_data;
+ 	struct gpio_regmap_config gpio_config = { };
+-	struct regmap_irq_chip *irq_chip;
++	struct max7360_gpio *max7360_gpio;
+ 	struct device *dev = &pdev->dev;
+ 	struct regmap *regmap;
+ 	unsigned int outconf;
+@@ -162,28 +195,15 @@ static int max7360_gpio_probe(struct platform_device *pdev)
+ 			 * Port GPIOs with interrupt-controller property: add IRQ
+ 			 * controller.
+ 			 */
+-			gpio_config.regmap_irq_flags = IRQF_ONESHOT | IRQF_SHARED;
+-			gpio_config.regmap_irq_line =
+-				fwnode_irq_get_byname(dev_fwnode(dev->parent), "inti");
+-			if (gpio_config.regmap_irq_line < 0)
+-				return dev_err_probe(dev, gpio_config.regmap_irq_line,
+-						     "Failed to get IRQ\n");
+-
+-			/* Create custom IRQ configuration. */
+-			irq_chip = devm_kzalloc_obj(dev, *irq_chip);
+-			if (!irq_chip)
++			max7360_gpio = devm_kzalloc_obj(dev, *max7360_gpio);
++			if (!max7360_gpio)
+ 				return -ENOMEM;
+ 
+-			irq_chip->name = dev_name(dev);
+-			irq_chip->status_base = MAX7360_REG_GPIOIN;
+-			irq_chip->status_is_level = true;
+-			irq_chip->num_regs = 1;
+-			irq_chip->num_irqs = MAX7360_MAX_GPIO;
+-			irq_chip->irqs = max7360_regmap_irqs;
+-			irq_chip->handle_mask_sync = max7360_handle_mask_sync;
++			max7360_gpio->dev = dev;
++			max7360_gpio->regmap = regmap;
+ 
+-			gpio_config.regmap_irq_chip = irq_chip;
+-			gpio_config.drvdata = regmap;
++			gpio_config.drvdata = max7360_gpio;
++			gpio_config.create_irq_domain = max7360_gpio_create_irq_domain;
+ 
+ 			for (unsigned int i = 0; i < MAX7360_MAX_GPIO; i++) {
+ 				ret = regmap_write_bits(regmap, MAX7360_REG_PWMCFG(i),
+-- 
+2.50.1 (Apple Git-155)
+

@@ -1,0 +1,124 @@
+From fd86f6f8bb95f7f4a18310bcb8d88dc1ca019eb0 Mon Sep 17 00:00:00 2001
+From: Michael Walle <mwalle@kernel.org>
+Date: Thu, 26 Nov 2026 16:35:20 +0100
+Subject: [PATCH 09/15] gpio: pcie-idio-24: create the regmap-irq chip from the
+ gpio-regmap callback
+
+Use the new gpio_regmap_add_irq_chip() helper to create the regmap-irq
+domain.
+
+Signed-off-by: Michael Walle <mwalle@kernel.org>
+---
+ drivers/gpio/gpio-pcie-idio-24.c | 36 ++++++++++++++++++++++----------
+ 1 file changed, 25 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/gpio/gpio-pcie-idio-24.c b/drivers/gpio/gpio-pcie-idio-24.c
+index 8fb34398053d..3be7aad266e0 100644
+--- a/drivers/gpio/gpio-pcie-idio-24.c
++++ b/drivers/gpio/gpio-pcie-idio-24.c
+@@ -148,18 +148,22 @@ static const struct regmap_irq idio_24_regmap_irqs[] = {
+  * @map:	regmap for the device
+  * @lock:	synchronization lock to prevent I/O race conditions
+  * @irq_type:	type configuration for IRQs
++ * @chip:	regmap_irq_chip for the device
++ * @irq:	parent IRQ
+  */
+ struct idio_24_gpio {
+ 	struct regmap *map;
+ 	raw_spinlock_t lock;
+ 	u8 irq_type;
++	struct regmap_irq_chip *chip;
++	int irq;
+ };
+ 
+ static int idio_24_handle_mask_sync(const int index, const unsigned int mask_buf_def,
+ 				    const unsigned int mask_buf, void *const irq_drv_data)
+ {
+ 	const unsigned int type_mask = COS_ENABLE_BOTH << index;
+-	struct idio_24_gpio *const idio24gpio = irq_drv_data;
++	struct idio_24_gpio *const idio24gpio = gpio_regmap_get_drvdata(irq_drv_data);
+ 	u8 type;
+ 	int ret;
+ 
+@@ -183,7 +187,7 @@ static int idio_24_set_type_config(unsigned int **const buf, const unsigned int
+ 	const unsigned int rising = COS_ENABLE_RISING << offset;
+ 	const unsigned int falling = COS_ENABLE_FALLING << offset;
+ 	const unsigned int mask = COS_ENABLE_BOTH << offset;
+-	struct idio_24_gpio *const idio24gpio = irq_drv_data;
++	struct idio_24_gpio *const idio24gpio = gpio_regmap_get_drvdata(irq_drv_data);
+ 	unsigned int new;
+ 	unsigned int cos_enable;
+ 	int ret;
+@@ -225,13 +229,27 @@ static int idio_24_set_type_config(unsigned int **const buf, const unsigned int
+ 	return ret;
+ }
+ 
++static struct irq_domain *idio_24_create_irq_domain(struct gpio_regmap *gpio)
++{
++	struct idio_24_gpio *const idio24gpio = gpio_regmap_get_drvdata(gpio);
++	struct irq_domain *domain;
++
++	domain = gpio_regmap_add_irq_chip(gpio, idio24gpio->irq, 0, idio24gpio->chip);
++	if (IS_ERR(domain))
++		return dev_err_cast_probe(regmap_get_device(idio24gpio->map), domain,
++					  "IRQ registration failed\n");
++
++	return domain;
++}
++
+ static int idio_24_reg_mask_xlate(struct gpio_regmap *const gpio, enum gpio_regmap_operation op,
+ 				  const unsigned int base, const unsigned int offset,
+ 				  unsigned int *const reg, unsigned int *const mask)
+ {
+ 	const unsigned int out_stride = offset / IDIO_24_NGPIO_PER_REG;
+ 	const unsigned int in_stride = (offset - 24) / IDIO_24_NGPIO_PER_REG;
+-	struct regmap *const map = gpio_regmap_get_drvdata(gpio);
++	struct idio_24_gpio *const idio24gpio = gpio_regmap_get_drvdata(gpio);
++	struct regmap *const map = idio24gpio->map;
+ 	int err;
+ 	unsigned int ctrl_reg;
+ 
+@@ -302,7 +320,6 @@ static int idio_24_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ 	void __iomem *idio_24_regs;
+ 	struct regmap *intcsr_map;
+ 	struct regmap_irq_chip *chip;
+-	struct regmap_irq_chip_data *chip_data;
+ 
+ 	err = pcim_enable_device(pdev);
+ 	if (err)
+@@ -348,7 +365,8 @@ static int idio_24_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ 	chip->num_irqs = ARRAY_SIZE(idio_24_regmap_irqs);
+ 	chip->handle_mask_sync = idio_24_handle_mask_sync;
+ 	chip->set_type_config = idio_24_set_type_config;
+-	chip->irq_drv_data = idio24gpio;
++	idio24gpio->chip = chip;
++	idio24gpio->irq = pdev->irq;
+ 
+ 	/* Software board reset */
+ 	err = regmap_write(idio24gpio->map, IDIO_24_SOFT_RESET, 0);
+@@ -362,10 +380,6 @@ static int idio_24_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ 	if (err)
+ 		return err;
+ 
+-	err = devm_regmap_add_irq_chip(dev, idio24gpio->map, pdev->irq, 0, 0, chip, &chip_data);
+-	if (err)
+-		return dev_err_probe(dev, err, "IRQ registration failed\n");
+-
+ 	gpio_config.parent = dev;
+ 	gpio_config.regmap = idio24gpio->map;
+ 	gpio_config.ngpio = IDIO_24_NGPIO;
+@@ -374,9 +388,9 @@ static int idio_24_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ 	gpio_config.reg_set_base = GPIO_REGMAP_ADDR(IDIO_24_OUT_BASE);
+ 	gpio_config.reg_dir_out_base = GPIO_REGMAP_ADDR(IDIO_24_CONTROL_REG);
+ 	gpio_config.ngpio_per_reg = IDIO_24_NGPIO_PER_REG;
+-	gpio_config.irq_domain = regmap_irq_get_domain(chip_data);
+ 	gpio_config.reg_mask_xlate = idio_24_reg_mask_xlate;
+-	gpio_config.drvdata = idio24gpio->map;
++	gpio_config.drvdata = idio24gpio;
++	gpio_config.create_irq_domain = idio_24_create_irq_domain;
+ 
+ 	return PTR_ERR_OR_ZERO(devm_gpio_regmap_register(dev, &gpio_config));
+ }
+-- 
+2.50.1 (Apple Git-155)
+

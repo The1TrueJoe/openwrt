@@ -1,0 +1,163 @@
+From 0933942d63579fb9c186d7186069594f9503e458 Mon Sep 17 00:00:00 2001
+From: Michael Walle <mwalle@kernel.org>
+Date: Thu, 26 Nov 2026 16:35:23 +0100
+Subject: [PATCH 12/15] gpio: i8255: create the regmap-irq chip from the
+ gpio-regmap callback
+
+Use the new gpio_regmap_add_irq_chip() helper to create the regmap-irq
+domain.
+
+Signed-off-by: Michael Walle <mwalle@kernel.org>
+---
+ drivers/gpio/gpio-104-dio-48e.c | 31 +++++++++++++++++++++++--------
+ drivers/gpio/gpio-i8255.c       |  3 ++-
+ drivers/gpio/gpio-i8255.h       |  8 ++++++--
+ 3 files changed, 31 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/gpio/gpio-104-dio-48e.c b/drivers/gpio/gpio-104-dio-48e.c
+index 7ddf578ba530..0efaa654274d 100644
+--- a/drivers/gpio/gpio-104-dio-48e.c
++++ b/drivers/gpio/gpio-104-dio-48e.c
+@@ -9,6 +9,7 @@
+ #include <linux/bits.h>
+ #include <linux/device.h>
+ #include <linux/err.h>
++#include <linux/gpio/regmap.h>
+ #include <linux/i8254.h>
+ #include <linux/ioport.h>
+ #include <linux/irq.h>
+@@ -113,6 +114,8 @@ static const struct regmap_irq dio48e_regmap_irqs[] = {
+  * @regs:	virtual mapping for device registers
+  * @flags:	IRQ flags saved during locking
+  * @irq_mask:	Current IRQ mask state on the device
++ * @chip:	regmap_irq_chip for the device
++ * @irq:	Parent IRQ
+  */
+ struct dio48e_gpio {
+ 	raw_spinlock_t lock;
+@@ -120,6 +123,8 @@ struct dio48e_gpio {
+ 	void __iomem *regs;
+ 	unsigned long flags;
+ 	unsigned int irq_mask;
++	struct regmap_irq_chip *chip;
++	unsigned int irq;
+ };
+ 
+ static void dio48e_regmap_lock(void *lock_arg) __acquires(&dio48egpio->lock)
+@@ -163,7 +168,7 @@ static int dio48e_handle_mask_sync(const int index,
+ 				   const unsigned int mask_buf,
+ 				   void *const irq_drv_data)
+ {
+-	struct dio48e_gpio *const dio48egpio = irq_drv_data;
++	struct dio48e_gpio *const dio48egpio = gpio_regmap_get_drvdata(irq_drv_data);
+ 	const unsigned int prev_mask = dio48egpio->irq_mask;
+ 	int err;
+ 	unsigned int val;
+@@ -218,6 +223,19 @@ static int dio48e_irq_init_hw(struct regmap *const map)
+ 	return regmap_read(map, DIO48E_DISABLE_INTERRUPT, &val);
+ }
+ 
++static struct irq_domain *dio48e_create_irq_domain(struct gpio_regmap *gpio)
++{
++	struct dio48e_gpio *const dio48egpio = gpio_regmap_get_drvdata(gpio);
++	struct irq_domain *domain;
++
++	domain = gpio_regmap_add_irq_chip(gpio, dio48egpio->irq, 0, dio48egpio->chip);
++	if (IS_ERR(domain))
++		return dev_err_cast_probe(regmap_get_device(dio48egpio->map), domain,
++					  "IRQ registration failed\n");
++
++	return domain;
++}
++
+ static int dio48e_probe(struct device *dev, unsigned int id)
+ {
+ 	const char *const name = dev_name(dev);
+@@ -230,7 +248,6 @@ static int dio48e_probe(struct device *dev, unsigned int id)
+ 	int err;
+ 	struct regmap_irq_chip *chip;
+ 	struct dio48e_gpio *dio48egpio;
+-	struct regmap_irq_chip_data *chip_data;
+ 
+ 	if (!devm_request_region(dev, base[id], DIO48E_EXTENT, name)) {
+ 		dev_err(dev, "Unable to lock port addresses (0x%X-0x%X)\n",
+@@ -302,17 +319,14 @@ static int dio48e_probe(struct device *dev, unsigned int id)
+ 	chip->irqs = dio48e_regmap_irqs;
+ 	chip->num_irqs = ARRAY_SIZE(dio48e_regmap_irqs);
+ 	chip->handle_mask_sync = dio48e_handle_mask_sync;
+-	chip->irq_drv_data = dio48egpio;
++	dio48egpio->chip = chip;
++	dio48egpio->irq = irq[id];
+ 
+ 	/* Initialize to prevent spurious interrupts before we're ready */
+ 	err = dio48e_irq_init_hw(map);
+ 	if (err)
+ 		return err;
+ 
+-	err = devm_regmap_add_irq_chip(dev, map, irq[id], 0, 0, chip, &chip_data);
+-	if (err)
+-		return dev_err_probe(dev, err, "IRQ registration failed\n");
+-
+ 	pit_config.parent = dev;
+ 
+ 	err = devm_i8254_regmap_register(dev, &pit_config);
+@@ -323,7 +337,8 @@ static int dio48e_probe(struct device *dev, unsigned int id)
+ 	config.map = map;
+ 	config.num_ppi = DIO48E_NUM_PPI;
+ 	config.names = dio48e_names;
+-	config.domain = regmap_irq_get_domain(chip_data);
++	config.drvdata = dio48egpio;
++	config.create_irq_domain = dio48e_create_irq_domain;
+ 
+ 	return devm_i8255_regmap_register(dev, &config);
+ }
+diff --git a/drivers/gpio/gpio-i8255.c b/drivers/gpio/gpio-i8255.c
+index 541a348447cd..8ac46bb2c235 100644
+--- a/drivers/gpio/gpio-i8255.c
++++ b/drivers/gpio/gpio-i8255.c
+@@ -129,7 +129,8 @@ int devm_i8255_regmap_register(struct device *const dev,
+ 	gpio_config.reg_set_base = GPIO_REGMAP_ADDR(I8255_REG_DAT_BASE);
+ 	gpio_config.reg_dir_in_base = GPIO_REGMAP_ADDR(I8255_REG_DIR_IN_BASE);
+ 	gpio_config.ngpio_per_reg = I8255_NGPIO_PER_REG;
+-	gpio_config.irq_domain = config->domain;
++	gpio_config.drvdata = config->drvdata;
++	gpio_config.create_irq_domain = config->create_irq_domain;
+ 	gpio_config.reg_mask_xlate = i8255_reg_mask_xlate;
+ 
+ 	return PTR_ERR_OR_ZERO(devm_gpio_regmap_register(dev, &gpio_config));
+diff --git a/drivers/gpio/gpio-i8255.h b/drivers/gpio/gpio-i8255.h
+index 9dcf639b94df..fa90044c9cd5 100644
+--- a/drivers/gpio/gpio-i8255.h
++++ b/drivers/gpio/gpio-i8255.h
+@@ -4,6 +4,7 @@
+ #define _I8255_H_
+ 
+ struct device;
++struct gpio_regmap;
+ struct irq_domain;
+ struct regmap;
+ 
+@@ -15,7 +16,9 @@ struct regmap;
+  * @map:	regmap for the i8255
+  * @num_ppi:	number of i8255 Programmable Peripheral Interface
+  * @names:	(optional) array of names for gpios
+- * @domain:	(optional) IRQ domain if the controller is interrupt-capable
++ * @drvdata:	(optional) driver data, see gpio_regmap_get_drvdata()
++ * @create_irq_domain:	(optional) create the IRQ domain if the controller is
++ *			interrupt-capable, see struct gpio_regmap_config
+  *
+  * Note: The regmap is expected to have cache enabled and i8255 control
+  * registers not marked as volatile.
+@@ -25,7 +28,8 @@ struct i8255_regmap_config {
+ 	struct regmap *map;
+ 	int num_ppi;
+ 	const char *const *names;
+-	struct irq_domain *domain;
++	void *drvdata;
++	struct irq_domain *(*create_irq_domain)(struct gpio_regmap *gpio);
+ };
+ 
+ int devm_i8255_regmap_register(struct device *dev,
+-- 
+2.50.1 (Apple Git-155)
+

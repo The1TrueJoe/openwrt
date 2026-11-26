@@ -1,4 +1,4 @@
-From ca5331809dfbb3b8df574d0ca666e5fd396e95ab Mon Sep 17 00:00:00 2001
+From f06b056d380d63a2c25102dd6ac2bcaa888a6a8b Mon Sep 17 00:00:00 2001
 From: Chuanhong Guo <gch981213@gmail.com>
 Date: Wed, 25 Dec 2024 10:37:58 +0800
 Subject: [PATCH 1/2] dt-bindings: gpio: Add Siflower SF19A2890 GPIO controller
@@ -109,10 +109,10 @@ index 000000000000..830a049ae4f5
 +        #interrupt-cells = <2>;
 +    };
 diff --git a/MAINTAINERS b/MAINTAINERS
-index b5a6dc379c09..4193b433c915 100644
+index 04851be0ae42..b2ac90862029 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -25706,6 +25706,12 @@ N:	sifive
+@@ -25802,6 +25802,12 @@ N:	sifive
  K:	fu[57]40
  K:	[^@]sifive
  

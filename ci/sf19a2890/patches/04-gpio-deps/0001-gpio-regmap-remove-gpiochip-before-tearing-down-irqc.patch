@@ -1,0 +1,46 @@
+From 61d913c954f442b8578bc58bfda0ce92fb567fec Mon Sep 17 00:00:00 2001
+From: Long Zhao <longzhao@ambarella.com>
+Date: Thu, 26 Nov 2026 16:35:12 +0100
+Subject: [PATCH 01/15] gpio: regmap: remove gpiochip before tearing down
+ irqchip
+
+gpiochip_remove() calls acpi_gpiochip_free_interrupts() and
+gpiod_free_irqs(). Both still need the irq domain.
+regmap_del_irq_chip() removes that domain, so remove the
+gpiochip first.
+
+Fixes: 553b75d4bfe9 ("gpio: regmap: Allow to allocate regmap-irq device")
+Signed-off-by: Long Zhao <longzhao@ambarella.com>
+Signed-off-by: Michael Walle <mwalle@kernel.org>
+---
+ drivers/gpio/gpio-regmap.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpio/gpio-regmap.c b/drivers/gpio/gpio-regmap.c
+index ac6ad56f4479..10cf946dbfc4 100644
+--- a/drivers/gpio/gpio-regmap.c
++++ b/drivers/gpio/gpio-regmap.c
+@@ -593,12 +593,19 @@ EXPORT_SYMBOL_GPL(gpio_regmap_register);
+  */
+ void gpio_regmap_unregister(struct gpio_regmap *gpio)
+ {
++	/*
++	 * gpiochip_remove() runs acpi_gpiochip_free_interrupts() and
++	 * gpiod_free_irqs(). Both still need the irq domain.
++	 * regmap_del_irq_chip() removes that domain, so remove the
++	 * gpiochip first.
++	 */
++	gpiochip_remove(&gpio->gpio_chip);
++
+ #ifdef CONFIG_REGMAP_IRQ
+ 	if (gpio->irq_chip_data)
+ 		regmap_del_irq_chip(gpio->regmap_irq_line, gpio->irq_chip_data);
+ #endif
+ 
+-	gpiochip_remove(&gpio->gpio_chip);
+ 	bitmap_free(gpio->fixed_direction_output);
+ 	bitmap_free(gpio->fixed_direction_mask);
+ 	kfree(gpio);
+-- 
+2.50.1 (Apple Git-155)
+

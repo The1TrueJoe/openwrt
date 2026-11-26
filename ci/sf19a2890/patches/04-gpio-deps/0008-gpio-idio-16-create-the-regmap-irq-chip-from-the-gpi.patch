@@ -1,0 +1,95 @@
+From 51559c392c129f9b4bc5c8aad3c94374f4eaab19 Mon Sep 17 00:00:00 2001
+From: Michael Walle <mwalle@kernel.org>
+Date: Thu, 26 Nov 2026 16:35:19 +0100
+Subject: [PATCH 08/15] gpio: idio-16: create the regmap-irq chip from the
+ gpio-regmap callback
+
+Use the new gpio_regmap_add_irq_chip() helper to create the regmap-irq
+domain.
+
+Signed-off-by: Michael Walle <mwalle@kernel.org>
+---
+ drivers/gpio/gpio-idio-16.c | 28 ++++++++++++++++++++--------
+ 1 file changed, 20 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/gpio/gpio-idio-16.c b/drivers/gpio/gpio-idio-16.c
+index b9aa8bb9347a..b8ea1c0aa2a5 100644
+--- a/drivers/gpio/gpio-idio-16.c
++++ b/drivers/gpio/gpio-idio-16.c
+@@ -34,12 +34,14 @@
+ struct idio_16_data {
+ 	struct regmap *map;
+ 	unsigned int irq_mask;
++	struct regmap_irq_chip *chip;
++	unsigned int irq;
+ };
+ 
+ static int idio_16_handle_mask_sync(const int index, const unsigned int mask_buf_def,
+ 				    const unsigned int mask_buf, void *const irq_drv_data)
+ {
+-	struct idio_16_data *const data = irq_drv_data;
++	struct idio_16_data *const data = gpio_regmap_get_drvdata(irq_drv_data);
+ 	const unsigned int prev_mask = data->irq_mask;
+ 	int err;
+ 	unsigned int val;
+@@ -66,6 +68,19 @@ static int idio_16_handle_mask_sync(const int index, const unsigned int mask_buf
+ 	return 0;
+ }
+ 
++static struct irq_domain *idio_16_create_irq_domain(struct gpio_regmap *gpio)
++{
++	struct idio_16_data *data = gpio_regmap_get_drvdata(gpio);
++	struct irq_domain *domain;
++
++	domain = gpio_regmap_add_irq_chip(gpio, data->irq, 0, data->chip);
++	if (IS_ERR(domain))
++		return dev_err_cast_probe(regmap_get_device(data->map), domain,
++					  "IRQ registration failed\n");
++
++	return domain;
++}
++
+ static int idio_16_reg_mask_xlate(struct gpio_regmap *const gpio, enum gpio_regmap_operation op,
+ 				  const unsigned int base, const unsigned int offset,
+ 				  unsigned int *const reg, unsigned int *const mask)
+@@ -107,7 +122,6 @@ int devm_idio_16_regmap_register(struct device *const dev,
+ 	int err;
+ 	struct idio_16_data *data;
+ 	struct regmap_irq_chip *chip;
+-	struct regmap_irq_chip_data *chip_data;
+ 	DECLARE_BITMAP(fixed_direction_output, IDIO_16_NGPIO);
+ 
+ 	if (!config->parent)
+@@ -137,17 +151,14 @@ int devm_idio_16_regmap_register(struct device *const dev,
+ 	chip->irqs = config->regmap_irqs;
+ 	chip->num_irqs = config->num_regmap_irqs;
+ 	chip->handle_mask_sync = idio_16_handle_mask_sync;
+-	chip->irq_drv_data = data;
++	data->chip = chip;
++	data->irq = config->irq;
+ 
+ 	/* Disable IRQ to prevent spurious interrupts before we're ready */
+ 	err = regmap_write(data->map, IDIO_16_DISABLE_IRQ, 0x00);
+ 	if (err)
+ 		return err;
+ 
+-	err = devm_regmap_add_irq_chip(dev, data->map, config->irq, 0, 0, chip, &chip_data);
+-	if (err)
+-		return dev_err_probe(dev, err, "IRQ registration failed\n");
+-
+ 	if (config->filters) {
+ 		/* Deactivate input filters */
+ 		err = regmap_write(data->map, IDIO_16_DEACTIVATE_INPUT_FILTERS, 0x00);
+@@ -163,7 +174,8 @@ int devm_idio_16_regmap_register(struct device *const dev,
+ 	gpio_config.reg_set_base = GPIO_REGMAP_ADDR(IDIO_16_DAT_BASE);
+ 	gpio_config.ngpio_per_reg = IDIO_16_NGPIO_PER_REG;
+ 	gpio_config.reg_stride = IDIO_16_REG_STRIDE;
+-	gpio_config.irq_domain = regmap_irq_get_domain(chip_data);
++	gpio_config.drvdata = data;
++	gpio_config.create_irq_domain = idio_16_create_irq_domain;
+ 	gpio_config.reg_mask_xlate = idio_16_reg_mask_xlate;
+ 
+ 	bitmap_from_u64(fixed_direction_output, GENMASK_U64(15, 0));
+-- 
+2.50.1 (Apple Git-155)
+

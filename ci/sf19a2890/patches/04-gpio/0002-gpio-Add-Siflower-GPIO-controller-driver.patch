@@ -1,7 +1,7 @@
-From 9d946f6f44ad53c81bcf6dbc95e653fdd753e254 Mon Sep 17 00:00:00 2001
+From 1fa0dd34b3ae5fe6b2f78ef9699734910e17f2d4 Mon Sep 17 00:00:00 2001
 From: Qingfang Deng <qingfang.deng@siflower.com.cn>
 Date: Tue, 20 Aug 2024 08:33:57 +0800
-Subject: [PATCH 2/2] gpio: Add Siflower GPIO controller driver
+Subject: [PATCH] gpio: Add Siflower GPIO controller driver
 
 Add a driver for the GPIO controller on Siflower SoCs.
 This controller is found on all current Siflower MIPS and RISC-V
@@ -37,29 +37,23 @@ Signed-off-by: Joseph Telaak <joseph@telaak.dev>
  MAINTAINERS                  |   1 +
  drivers/gpio/Kconfig         |  14 ++
  drivers/gpio/Makefile        |   1 +
- drivers/gpio/gpio-siflower.c | 344 +++++++++++++++++++++++++++++++++++
- 4 files changed, 360 insertions(+)
+ drivers/gpio/gpio-siflower.c | 361 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 377 insertions(+)
  create mode 100644 drivers/gpio/gpio-siflower.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 4193b433c915..0a3f91844072 100644
+index b2ac90862029..b9f81f196db0 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -25711,6 +25711,7 @@ M:	Joseph Telaak <joseph@telaak.dev>
- L:	linux-gpio@vger.kernel.org
- S:	Maintained
+@@ -25809,2 +25809,3 @@ S:	Maintained
  F:	Documentation/devicetree/bindings/gpio/siflower,sf19a2890-gpio.yaml
 +F:	drivers/gpio/gpio-siflower.c
  
- SILEAD TOUCHSCREEN DRIVER
- M:	Hans de Goede <hansg@kernel.org>
 diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 55e4280029d8..0b52fc2a5335 100644
+index 20c01eb8a12c..379eed04658f 100644
 --- a/drivers/gpio/Kconfig
 +++ b/drivers/gpio/Kconfig
-@@ -721,6 +721,20 @@ config GPIO_SIFIVE
- 	help
- 	  Say yes here to support the GPIO device on SiFive SoCs.
+@@ -743,2 +743,16 @@ config GPIO_SIFIVE
  
 +config GPIO_SIFLOWER
 +	tristate "Siflower GPIO support"
@@ -76,26 +70,20 @@ index 55e4280029d8..0b52fc2a5335 100644
 +	  be called gpio-siflower.
 +
  config GPIO_SIOX
- 	tristate "SIOX GPIO support"
- 	depends on SIOX
 diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index 88f748846e60..bde6181081f9 100644
+index 8e9b51717404..f3054c0a71ea 100644
 --- a/drivers/gpio/Makefile
 +++ b/drivers/gpio/Makefile
-@@ -171,6 +171,7 @@ obj-$(CONFIG_GPIO_SCH311X)		+= gpio-sch311x.o
- obj-$(CONFIG_GPIO_SCH)			+= gpio-sch.o
- obj-$(CONFIG_GPIO_SHARED_PROXY)		+= gpio-shared-proxy.o
+@@ -176,2 +176,3 @@ obj-$(CONFIG_SCx200_GPIO)		+= gpio-scx200.o
  obj-$(CONFIG_GPIO_SIFIVE)		+= gpio-sifive.o
 +obj-$(CONFIG_GPIO_SIFLOWER)		+= gpio-siflower.o
  obj-$(CONFIG_GPIO_SIM)			+= gpio-sim.o
- obj-$(CONFIG_GPIO_SIOX)			+= gpio-siox.o
- obj-$(CONFIG_GPIO_SL28CPLD)		+= gpio-sl28cpld.o
 diff --git a/drivers/gpio/gpio-siflower.c b/drivers/gpio/gpio-siflower.c
 new file mode 100644
-index 000000000000..4bf7e36960e4
+index 000000000000..23131af7faa0
 --- /dev/null
 +++ b/drivers/gpio/gpio-siflower.c
-@@ -0,0 +1,344 @@
+@@ -0,0 +1,361 @@
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +/*
 + * GPIO controller driver for Siflower MIPS and RISC-V SoCs including:
@@ -141,10 +129,10 @@ index 000000000000..4bf7e36960e4
 +};
 +
 +struct sf_gpio_priv {
-+	struct gpio_regmap *gpio;
 +	struct regmap *regmap;
 +	struct irq_domain *domain;
 +	struct clk *clk;
++	unsigned int ngpios;
 +	unsigned int ngroups;
 +	unsigned int irq[];
 +};
@@ -196,34 +184,36 @@ index 000000000000..4bf7e36960e4
 +
 +static void sf_gpio_irq_ack(struct irq_data *data)
 +{
-+	struct sf_gpio_priv *priv = irq_data_get_irq_chip_data(data);
++	struct sf_gpio_priv *priv = gpio_regmap_get_drvdata(irq_data_get_irq_chip_data(data));
 +
 +	regmap_write(priv->regmap, GPIO_PIR(irqd_to_hwirq(data)), 0);
 +}
 +
 +static void sf_gpio_irq_mask(struct irq_data *data)
 +{
-+	struct sf_gpio_priv *priv = irq_data_get_irq_chip_data(data);
++	struct gpio_regmap *gpio = irq_data_get_irq_chip_data(data);
++	struct sf_gpio_priv *priv = gpio_regmap_get_drvdata(gpio);
 +	irq_hw_number_t hwirq = irqd_to_hwirq(data);
 +
 +	regmap_write(priv->regmap, GPIO_IMR(hwirq), 1);
 +	regmap_write(priv->regmap, GPIO_GPIMR(hwirq), 1);
-+	gpio_regmap_disable_irq(priv->gpio, hwirq);
++	gpio_regmap_disable_irq(gpio, hwirq);
 +}
 +
 +static void sf_gpio_irq_unmask(struct irq_data *data)
 +{
-+	struct sf_gpio_priv *priv = irq_data_get_irq_chip_data(data);
++	struct gpio_regmap *gpio = irq_data_get_irq_chip_data(data);
++	struct sf_gpio_priv *priv = gpio_regmap_get_drvdata(gpio);
 +	irq_hw_number_t hwirq = irqd_to_hwirq(data);
 +
-+	gpio_regmap_enable_irq(priv->gpio, hwirq);
++	gpio_regmap_enable_irq(gpio, hwirq);
 +	regmap_write(priv->regmap, GPIO_IMR(hwirq), 0);
 +	regmap_write(priv->regmap, GPIO_GPIMR(hwirq), 0);
 +}
 +
 +static int sf_gpio_irq_set_type(struct irq_data *data, unsigned int flow_type)
 +{
-+	struct sf_gpio_priv *priv = irq_data_get_irq_chip_data(data);
++	struct sf_gpio_priv *priv = gpio_regmap_get_drvdata(irq_data_get_irq_chip_data(data));
 +	u32 val;
 +	int ret;
 +
@@ -261,16 +251,14 @@ index 000000000000..4bf7e36960e4
 +
 +static int sf_gpio_irq_request_resources(struct irq_data *data)
 +{
-+	struct sf_gpio_priv *priv = irq_data_get_irq_chip_data(data);
-+
-+	return gpio_regmap_reqres_irq(priv->gpio, irqd_to_hwirq(data));
++	return gpio_regmap_reqres_irq(irq_data_get_irq_chip_data(data),
++				      irqd_to_hwirq(data));
 +}
 +
 +static void sf_gpio_irq_release_resources(struct irq_data *data)
 +{
-+	struct sf_gpio_priv *priv = irq_data_get_irq_chip_data(data);
-+
-+	gpio_regmap_relres_irq(priv->gpio, irqd_to_hwirq(data));
++	gpio_regmap_relres_irq(irq_data_get_irq_chip_data(data),
++			       irqd_to_hwirq(data));
 +}
 +
 +static const struct irq_chip sf_gpio_irqchip = {
@@ -327,25 +315,51 @@ index 000000000000..4bf7e36960e4
 +	.xlate	= irq_domain_xlate_twocell,
 +};
 +
-+static void sf_gpio_remove_chained_handler(void *data)
++static struct irq_domain *sf_gpio_create_irq_domain(struct gpio_regmap *gpio)
 +{
-+	irq_set_chained_handler_and_data((unsigned long)data, NULL, NULL);
++	struct sf_gpio_priv *priv = gpio_regmap_get_drvdata(gpio);
++	struct device *dev = regmap_get_device(priv->regmap);
++	struct irq_domain_info d_info = {
++		.fwnode		= dev_fwnode(dev),
++		.size		= priv->ngpios,
++		.hwirq_max	= priv->ngpios,
++		.ops		= &sf_gpio_irq_domain_ops,
++		.host_data	= gpio,
++	};
++
++	priv->domain = devm_irq_domain_instantiate(dev, &d_info);
++
++	return priv->domain;
++}
++
++static void sf_gpio_irq_teardown(void *data)
++{
++	struct sf_gpio_priv *priv = data;
++	unsigned int i;
++
++	for (i = 0; i < priv->ngroups; i++)
++		irq_set_chained_handler_and_data(priv->irq[i], NULL, NULL);
++
++	for (i = 0; i < priv->ngpios; i++)
++		irq_dispose_mapping(irq_find_mapping(priv->domain, i));
 +}
 +
 +static const struct regmap_config sf_gpio_regmap_config = {
 +	.reg_bits	= 32,
 +	.reg_stride	= 4,
 +	.val_bits	= 32,
++	/* Taken under the irq_desc lock and in the chained handler */
++	.use_raw_spinlock = true,
 +};
 +
 +static int sf_gpio_probe(struct platform_device *pdev)
 +{
 +	struct gpio_regmap_config config = { };
-+	struct irq_domain_info d_info = { };
 +	struct device *dev = &pdev->dev;
 +	const struct sf_gpio_soc_data *soc;
 +	struct reset_control *rstc;
 +	struct sf_gpio_priv *priv;
++	struct gpio_regmap *gpio;
 +	unsigned int ngroups, i;
 +	void __iomem *base;
 +	int ret;
@@ -359,6 +373,7 @@ index 000000000000..4bf7e36960e4
 +	if (!priv)
 +		return -ENOMEM;
 +
++	priv->ngpios = soc->ngpios;
 +	priv->ngroups = ngroups;
 +
 +	base = devm_platform_ioremap_resource(pdev, 0);
@@ -377,29 +392,12 @@ index 000000000000..4bf7e36960e4
 +	if (IS_ERR(rstc))
 +		return PTR_ERR(rstc);
 +
-+	d_info.fwnode = dev_fwnode(dev);
-+	d_info.size = soc->ngpios;
-+	d_info.hwirq_max = soc->ngpios;
-+	d_info.ops = &sf_gpio_irq_domain_ops;
-+	d_info.host_data = priv;
-+
-+	priv->domain = devm_irq_domain_instantiate(dev, &d_info);
-+	if (IS_ERR(priv->domain))
-+		return PTR_ERR(priv->domain);
-+
 +	for (i = 0; i < ngroups; i++) {
 +		ret = platform_get_irq(pdev, i);
 +		if (ret < 0)
 +			return ret;
 +
 +		priv->irq[i] = ret;
-+		irq_set_chained_handler_and_data(priv->irq[i],
-+						 sf_gpio_irq_handler, priv);
-+		ret = devm_add_action_or_reset(dev,
-+					       sf_gpio_remove_chained_handler,
-+					       (void *)(unsigned long)priv->irq[i]);
-+		if (ret)
-+			return ret;
 +	}
 +
 +	config.parent = dev;
@@ -410,12 +408,19 @@ index 000000000000..4bf7e36960e4
 +	config.reg_dir_in_base = GPIO_OEN(0);
 +	config.reg_mask_xlate = sf_gpio_reg_mask_xlate;
 +	config.set_config = sf_gpio_set_config;
-+	config.irq_domain = priv->domain;
++	config.create_irq_domain = sf_gpio_create_irq_domain;
 +	config.drvdata = priv;
 +
-+	priv->gpio = devm_gpio_regmap_register(dev, &config);
++	gpio = devm_gpio_regmap_register(dev, &config);
++	if (IS_ERR(gpio))
++		return PTR_ERR(gpio);
 +
-+	return PTR_ERR_OR_ZERO(priv->gpio);
++	for (i = 0; i < ngroups; i++)
++		irq_set_chained_handler_and_data(priv->irq[i],
++						 sf_gpio_irq_handler, priv);
++
++	/* Runs before gpio-regmap is unregistered */
++	return devm_add_action_or_reset(dev, sf_gpio_irq_teardown, priv);
 +}
 +
 +static const struct sf_gpio_soc_data sf19a2890_gpio_data = {
