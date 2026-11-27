@@ -1,0 +1,51 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Fri, 27 Nov 2026 00:21:03 -0500
+Subject: [PATCH] sf_smac: report the AP's beacon interval and DTIM period to a
+ client
+
+get_station sets NL80211_STA_INFO_BSS_PARAM for every interface but
+fills the beacon interval and DTIM period only in AP mode, so a client
+interface showed "beacon int: 0" and "dtim period: 0" in iw link.
+
+For a client, take both from cfg80211's entry for the AP's BSS: the
+beacon interval from the entry and the DTIM period from the TIM element
+of its last beacon.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_main.c | 21 +++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+index 13de06b..2ec98ad 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+@@ -3049,6 +3049,27 @@ tag:
+   } else {
+    sinfo->bss_param.flags = 0;
+   }
++ } else if (SIWIFI_VIF_TYPE(siwifi_vif) == NL80211_IFTYPE_STATION) {
++  /* The AP's beacon interval and DTIM period, from its BSS entry */
++  struct cfg80211_bss *bss;
++
++  bss = cfg80211_get_bss(wiphy, NULL, found_sta->mac_addr, NULL, 0,
++           IEEE80211_BSS_TYPE_ESS, IEEE80211_PRIVACY_ANY);
++  if (bss) {
++   const struct cfg80211_bss_ies *ies;
++   const u8 *tim;
++
++   sinfo->bss_param.beacon_interval = bss->beacon_interval;
++   rcu_read_lock();
++   ies = rcu_dereference(bss->beacon_ies);
++   if (ies) {
++    tim = cfg80211_find_ie(WLAN_EID_TIM, ies->data, ies->len);
++    if (tim && tim[1] >= 2)
++     sinfo->bss_param.dtim_period = tim[3];
++   }
++   rcu_read_unlock();
++   cfg80211_put_bss(wiphy, bss);
++  }
+  }
+  return status = 0;
+ }

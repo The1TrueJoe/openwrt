@@ -1,0 +1,87 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Fri, 27 Nov 2026 00:20:44 -0500
+Subject: [PATCH] sf_smac: report a station's own tx retries and failures
+
+get_station filled tx_retries and tx_failed from the radio's debugfs
+counters, so every station, and the AP a client is connected to,
+showed the whole radio's totals since the driver loaded, management
+frames and other interfaces included. siwifi_txdatacfm also counted a
+frame that finally failed twice, once before and once after the retry
+decision, so a client showed more failures than packets sent.
+
+Count retries and final failures per station in the two confirmation
+paths and report those. The radio counters keep counting each failed
+confirmation, now once.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h |  1 +
+ sf_smac/src/bb_src/umac/fullmac/siwifi_main.c |  4 ++--
+ sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c   | 12 ++++++------
+ 3 files changed, 9 insertions(+), 8 deletions(-)
+
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h b/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h
+index e74950a..a3a8453 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_defs.h
+@@ -273,6 +273,7 @@ struct siwifi_sta_stats {
+     u64 tx_bytes;
+     u64 rx_bytes;
+     u32 tx_failed;
++    u32 tx_retries;
+     u32 rx_dropped;
+     u32 tx_dropped;
+     u8 short_gi;
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+index 44085c2..13de06b 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_main.c
+@@ -2924,8 +2924,8 @@ tag:
+  if (found_sta->stats.tx_bytes) {
+   sinfo->tx_bytes = found_sta->stats.tx_bytes;
+   sinfo->tx_packets = found_sta->stats.tx_packets;
+-  sinfo->tx_retries = siwifi_hw->stats.tx_retry;
+-  sinfo->tx_failed = siwifi_hw->stats.tx_failed;
++  sinfo->tx_retries = found_sta->stats.tx_retries;
++  sinfo->tx_failed = found_sta->stats.tx_failed;
+   if (SIWIFI_VIF_TYPE(siwifi_vif) == NL80211_IFTYPE_AP || SIWIFI_VIF_TYPE(siwifi_vif) == NL80211_IFTYPE_STATION){
+             r_cfg = (union siwifi_rate_ctrl_info *)(&(found_sta->stats.last_tx_rate_config));
+    mcs_index = (union siwifi_mcs_index *)(&(found_sta->stats.last_tx_rate_config));
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c
+index 416db38..3a8ad8c 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c
+@@ -760,6 +760,8 @@ static void siwifi_tx_retry(struct siwifi_hw *siwifi_hw, struct sk_buff *skb,
+     struct siwifi_txq *txq = sw_txhdr->txq;
+     int peek_off = offsetof(struct siwifi_hw_txhdr, cfm);
+     int peek_len = sizeof(((struct siwifi_hw_txhdr *)0)->cfm);
++    if (sw_txhdr->siwifi_sta)
++        sw_txhdr->siwifi_sta->stats.tx_retries++;
+     if (!sw_retry) {
+         sw_txhdr->desc.host.sn = cfm->sn;
+         sw_txhdr->desc.host.pn[0] = cfm->pn[0];
+@@ -1405,6 +1407,8 @@ int siwifi_txdatacfm_burst(void *pthis, void *host_id, uint32_t burst_length)
+             siwifi_tx_retry(siwifi_hw, skb, txhdr, sw_retry, credits);
+             continue;
+         }
++        if (!siwifi_txst.tx_successful && sw_txhdr->siwifi_sta)
++            sw_txhdr->siwifi_sta->stats.tx_failed++;
+ #if defined (CONFIG_SIWIFI_DEBUGFS) || defined (CONFIG_SIWIFI_PROCFS)
+         if (!siwifi_txst.tx_successful) {
+                 siwifi_hw->stats.tx_failed++;
+@@ -1617,12 +1621,8 @@ int siwifi_txdatacfm(void *pthis, void *host_id)
+         siwifi_tx_retry(siwifi_hw, skb, txhdr, sw_retry, credits);
+         return 0;
+     }
+-#if defined (CONFIG_SIWIFI_DEBUGFS) || defined (CONFIG_SIWIFI_PROCFS)
+-    else {
+-        if(!siwifi_txst.tx_successful)
+-            siwifi_hw->stats.tx_failed++;
+-    }
+-#endif
++    if (!siwifi_txst.tx_successful && sw_txhdr->siwifi_sta)
++        sw_txhdr->siwifi_sta->stats.tx_failed++;
+     siwifi_trace_tx_end(siwifi_hw, skb, &siwifi_txst, sw_txhdr->headroom);
+     trace_skb_confirm(skb, txq, hwq, &txhdr->hw_hdr.cfm);
+     if (txq->idx != TXQ_INACTIVE) {
