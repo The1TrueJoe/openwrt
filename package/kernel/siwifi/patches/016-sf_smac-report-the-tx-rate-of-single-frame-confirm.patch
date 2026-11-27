@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Fri, 27 Nov 2026 00:19:41 -0500
+Subject: [PATCH] sf_smac: report the tx rate of single-frame confirmations
+
+get_station takes a station's tx bitrate from last_tx_rate_config, but
+only the burst confirmation path (siwifi_txdatacfm_burst, used with
+NEW_SCHEDULE) stores it. This build confirms frames one at a time
+through siwifi_txdatacfm, which keeps the firmware's rateinfo and
+leaves last_tx_rate_config at zero: non-HT, legacy index 0. Every
+station, on either side of a link, showed a tx bitrate of 1.0 MBit/s
+whatever rate the firmware used.
+
+Store the rate config in siwifi_txdatacfm as well, as the driver in
+Siflower's 1806 SDK does.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c
+index 54415d1..416db38 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_tx.c
+@@ -1669,6 +1669,7 @@ int siwifi_txdatacfm(void *pthis, void *host_id)
+     if (sw_txhdr->siwifi_sta && !(sw_txhdr->desc.host.flags & TXU_CNTRL_MGMT)
+             && !is_multicast_ether_addr((const u8 *)&txhdr->sw_hdr->desc.host.eth_dest_addr)){
+         sw_txhdr->siwifi_sta->stats.last_tx_info = txhdr->hw_hdr.cfm.rateinfo;
++        sw_txhdr->siwifi_sta->stats.last_tx_rate_config = txhdr->hw_hdr.cfm.rate_config;
+     }
+ #ifdef CONFIG_VDR_HW
+     vendor_hook_txdata(sw_txhdr);
