@@ -1,0 +1,51 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joseph Telaak <joseph@telaak.dev>
+Date: Sat, 28 Nov 2026 03:22:18 -0500
+Subject: [PATCH] sf_smac: update the connected AP's BSS entry from its beacons
+
+get_station reads a client's DTIM period from the TIM element of the
+AP's beacon in cfg80211's BSS entry. The entry is only ever written from
+scan results, which hold whatever frame the firmware heard. An AP found
+by an active scan, as a 5 GHz AP usually is, has only probe response
+IEs, which carry no TIM, so the client showed "dtim period: 0".
+
+The driver passes every beacon it receives to cfg80211 as an OBSS beacon
+only. Also inform cfg80211 of the connected AP's beacons, as mac80211
+does, so its entry has beacon IEs whatever band and scan found it.
+
+Signed-off-by: Joseph Telaak <joseph@telaak.dev>
+---
+ sf_smac/src/bb_src/umac/fullmac/siwifi_rx.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/sf_smac/src/bb_src/umac/fullmac/siwifi_rx.c b/sf_smac/src/bb_src/umac/fullmac/siwifi_rx.c
+index df918e4..f940f54 100644
+--- a/sf_smac/src/bb_src/umac/fullmac/siwifi_rx.c
++++ b/sf_smac/src/bb_src/umac/fullmac/siwifi_rx.c
+@@ -653,6 +653,26 @@ static void siwifi_rx_mgmt(struct siwifi_hw *siwifi_hw, struct siwifi_vif *siwif
+                                         hw_rxhdr->phy_info.phy_prim20_freq,
+                                         rxvect->rssi1);
+         }
++        /*
++         * The connected AP's beacon also updates its BSS entry, as mac80211
++         * does, so the entry has beacon IEs (the DTIM period in its TIM)
++         * when the scan that found the AP saw only a probe response.
++         */
++        if (SIWIFI_VIF_TYPE(siwifi_vif) == NL80211_IFTYPE_STATION &&
++            siwifi_vif->sta.ap &&
++            ether_addr_equal(mgmt->bssid, siwifi_vif->sta.ap->mac_addr)) {
++            struct ieee80211_channel *chan;
++            struct cfg80211_bss *bss = NULL;
++
++            chan = ieee80211_get_channel(siwifi_hw->wiphy,
++                                         hw_rxhdr->phy_info.phy_prim20_freq);
++            if (chan)
++                bss = cfg80211_inform_bss_frame(siwifi_hw->wiphy, chan, mgmt,
++                                                skb->len, rxvect->rssi1 * 100,
++                                                GFP_ATOMIC);
++            if (bss)
++                cfg80211_put_bss(siwifi_hw->wiphy, bss);
++        }
+         siwifi_vif->mgmt_stats.rx_bcn_cnts++;
+     } else if ((ieee80211_is_deauth(mgmt->frame_control) ||
+                 ieee80211_is_disassoc(mgmt->frame_control)) &&
